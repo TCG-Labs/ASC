@@ -6,6 +6,12 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ASC (Alamofire Swift Client) is a Swift Package Manager library built on top of Alamofire. The project targets iOS 18+ and macOS 15+ and uses Swift 6.2.
 
+### Purpose
+Provides a convenient wrapper over Alamofire for:
+- **Simplified network requests** - More declarative and type-safe API
+- **Convenient response handling** - Automatic parsing and error handling
+- **Modern Swift patterns** - Protocol-oriented, async/await, Codable support
+
 ## Development Commands
 
 ### Building
@@ -46,6 +52,199 @@ swiftlint --fix
 
 ### Testing Framework
 Uses Swift Testing framework (not XCTest). Tests use the `@Test` attribute and `#expect` for assertions.
+
+## Library Architecture & Features
+
+### Core Design: Protocol-Based Architecture
+
+The library uses protocol-oriented design for maximum flexibility and testability:
+
+#### NetworkRequest Protocol
+Defines all network request parameters in a declarative way:
+- Base URL, path, HTTP method
+- Headers, query parameters, body
+- Response type (Codable)
+- Retry policy, timeout configuration
+
+#### NetworkClient
+Main client that executes requests using Alamofire:
+- Async/await API
+- Generic response handling
+- Interceptor chain execution
+- Error transformation
+
+### Response Handling System
+
+**Automatic JSON Parsing**
+- Direct Codable model mapping
+- Type-safe response handling
+- Support for various content types
+
+**HTTP Status Code Handling**
+- 2xx: Success with parsed models
+- 4xx: Client errors with detailed info
+- 5xx: Server errors with retry suggestions
+
+**Retry Mechanism**
+- Configurable retry policies
+- Exponential backoff
+- Conditional retry based on error type
+
+**Caching Layer**
+- URLCache integration
+- Custom cache policies
+- Memory and disk caching
+
+### Core Features
+
+**1. Request/Response Interceptors**
+- Chain of responsibility pattern
+- Pre-request modification (add headers, sign requests)
+- Post-response processing (logging, metrics)
+- Error interception and transformation
+
+**2. Authentication System**
+- Token-based authentication
+- Automatic token refresh on 401
+- Secure token storage integration
+- Multiple authentication schemes support
+
+**3. Logging System**
+- Unified Logger (OSLog) integration
+- Request/response logging
+- Configurable log levels
+- Privacy-aware (redact sensitive data)
+
+**4. Mock System for Testing**
+- Protocol-based mocking
+- Predefined response fixtures
+- Network condition simulation
+- Easy test setup
+
+**5. Upload/Download with Progress**
+- Async sequences for progress tracking
+- Background upload/download support
+- Multipart form data
+- Resume capability for downloads
+
+### Error Handling
+
+Structured error types:
+- `NetworkError`: Connection, timeout, no internet
+- `ResponseError`: Invalid status, parsing failed
+- `AuthenticationError`: Token expired, unauthorized
+- Custom error mapping from backend
+
+## Technical Implementation Details
+
+### Alamofire Integration Strategy
+
+**Custom Session Configuration**
+- Use custom `Session` instance (not default singleton)
+- Configure dedicated dispatch queues for optimal performance
+- Custom `URLSessionConfiguration` with timeout, caching policies
+- Session-level interceptors and event monitors
+
+**RequestInterceptor Implementation**
+```swift
+// Combine RequestAdapter + RequestRetrier protocols
+- RequestAdapter: Modify requests before sending
+  * Add authentication headers
+  * Sign requests
+  * Add common headers (User-Agent, Accept-Language)
+  * Transform URLRequest
+
+- RequestRetrier: Intelligent retry logic
+  * Exponential backoff algorithm
+  * Maximum retry attempts
+  * Retry conditions (network errors, 5xx, 401 with token refresh)
+  * Async token refresh handling
+```
+
+**EventMonitor for Observability**
+- Implement custom EventMonitor protocol
+- Track request lifecycle events:
+  * `requestDidResume`: Log request start
+  * `request(_:didCreateURLRequest:)`: Log actual URLRequest
+  * `request(_:didParseResponse:)`: Log response data
+  * `request(_:didCompleteTask:with:)`: Log completion
+- Integrate with OSLog subsystems
+- Support multiple monitors (logging, analytics, debugging)
+
+**Response Validation & Serialization**
+- Use Alamofire's `.validate()` for status code checking
+- Custom validation for specific status codes
+- `.serializingDecodable()` for automatic Codable parsing
+- `.serializingData()` for raw data
+- `.serializingString()` for text responses
+- Custom response serializers for special formats
+
+**ServerTrustManager Integration**
+- Custom SSL/TLS validation policies
+- Support certificate pinning
+- Development/Production trust evaluators
+- Per-host trust policies
+
+**RedirectHandler**
+- Custom redirect logic
+- Prevent redirects for specific status codes
+- Modify redirect requests
+
+**CachedResponseHandler**
+- Smart caching strategies per request
+- Memory/disk cache control
+- Cache validation with ETags/Last-Modified
+
+**Network Reachability**
+- Monitor network status changes
+- Automatic request queuing when offline
+- Retry queued requests when connected
+- Publisher/AsyncSequence for status updates
+
+**Request Pipeline**
+```
+1. Create URLRequest from NetworkRequest protocol
+2. Apply RequestAdapters (add headers, auth)
+3. Validate network reachability
+4. Execute via Alamofire Session
+5. Monitor via EventMonitors
+6. Handle redirects via RedirectHandler
+7. Validate response (status, content type)
+8. Cache response via CachedResponseHandler
+9. Serialize response (Codable, Data, String)
+10. Retry on failure via RequestRetrier
+11. Return typed Result/throw error
+```
+
+### Swift Concurrency Integration
+
+**Async/Await Support**
+- All network methods return async throws
+- Use Alamofire's native async/await API
+- Structured concurrency with Task groups
+- Cancellation support via Task.isCancelled
+
+**Progress Tracking**
+- AsyncStream for upload/download progress
+- Real-time progress updates
+- Cancellable progress tracking
+
+### Type Safety & Generics
+
+**Generic Request/Response**
+```swift
+protocol NetworkRequest {
+    associatedtype Response: Decodable
+    // Request configuration
+}
+
+func execute<T: NetworkRequest>(_ request: T) async throws -> T.Response
+```
+
+**Type-safe builders**
+- RequestBuilder pattern for complex requests
+- Type-safe query parameters
+- Type-safe headers enumeration
 
 ## Code Standards
 
