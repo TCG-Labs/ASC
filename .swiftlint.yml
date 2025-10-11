@@ -1,0 +1,335 @@
+# SwiftLint Best Practices Configuration
+# Optimized configuration for professional Swift projects
+
+# ============================================================================
+# DISABLED RULES
+# ============================================================================
+disabled_rules:
+  - todo  # TODO/FIXME comments are useful during development
+  - multiple_closures_with_trailing_closure  # Swift 5.3+ supports this well
+
+# ============================================================================
+# OPT-IN RULES (strict mode)
+# ============================================================================
+opt_in_rules:
+  # Safety and error prevention
+  - force_unwrapping
+  - implicitly_unwrapped_optional  # Avoid implicit unwrap
+  - fatal_error_message
+  - yoda_condition  # Avoid yoda conditions
+
+  # Performance
+  - empty_count
+  - contains_over_first_not_nil
+  - sorted_first_last
+  - last_where
+  - first_where
+  - contains_over_filter_count
+  - contains_over_filter_is_empty
+  - empty_collection_literal
+  - reduce_into
+
+  # Readability and style
+  - implicit_return
+  - closure_spacing
+  - closure_end_indentation
+  - literal_expression_end_indentation
+  - multiline_arguments
+  - multiline_parameters
+  - multiline_function_chains
+  - vertical_parameter_alignment_on_call
+  - operator_usage_whitespace
+  - modifier_order
+  - sorted_imports
+  - vertical_whitespace_closing_braces
+  - vertical_whitespace_opening_braces
+  - vertical_whitespace_between_cases
+  - attributes
+
+  # Architecture and design
+  - private_outlet
+  - private_action
+  - strict_fileprivate
+  - overridden_super_call
+  - prohibited_super_call
+  - override_in_extension
+  - convenience_type  # Enum instead of class with only static members
+  - static_operator
+  - anonymous_argument_in_multiline_closure
+
+  # Documentation
+  - missing_docs  # Require documentation for public API
+
+  # Trailing closures (selective)
+  - trailing_closure
+  - unneeded_parentheses_in_closure_argument
+
+  # Naming
+  - lower_acl_than_parent
+  - pattern_matching_keywords
+  - prefixed_toplevel_constant
+
+  # Redundancy
+  - redundant_nil_coalescing
+  - redundant_type_annotation
+  - explicit_init
+  - explicit_type_interface
+  - explicit_acl  # Explicit ACL for all declarations
+
+  # Array/Collection
+  - array_init
+  - empty_string
+  - toggle_bool
+
+# ============================================================================
+# EXCLUDED FROM CHECKS
+# ============================================================================
+excluded:
+  - Carthage
+  - Pods
+  - ThirdParty
+  - Vendor
+  - Scripts
+  - Generated
+  - .build
+  - DerivedData
+  - fastlane
+  - "**/*.generated.swift"
+  - "**/Generated"
+  - "**/.build"
+  - Tests  # Exclude all test files from linting
+  - Package.swift  # Exclude Package.swift (SPM configuration file)
+
+# ============================================================================
+# SEVERITY LEVELS
+# ============================================================================
+
+# Critical errors (error level)
+force_cast: error
+force_try: error
+force_unwrapping: error
+fatal_error_message: error
+
+# Formatting
+trailing_whitespace:
+  ignores_empty_lines: false
+  ignores_comments: false
+  severity: error
+
+trailing_newline: error
+trailing_semicolon: error
+comma: error
+colon: error
+opening_brace: error
+empty_count: error
+statement_position:
+  statement_mode: default
+  severity: error
+
+# Legacy constructs
+legacy_constructor: error
+legacy_constant: error
+legacy_cggeometry_functions: error
+legacy_nsgeometry_functions: error
+
+# ============================================================================
+# LIMITS (stricter than original)
+# ============================================================================
+
+# Line length
+line_length:
+  warning: 120  # Industry standard
+  error: 150
+  ignores_comments: true
+  ignores_urls: true
+  ignores_function_declarations: false
+  ignores_interpolated_strings: true
+
+# Function length
+function_body_length:
+  warning: 50   # Functions should be short and focused
+  error: 100    # Maximum
+
+# File length
+file_length:
+  warning: 400  # Files should be compact
+  error: 600
+  ignore_comment_only_lines: true
+
+# Type length
+type_body_length:
+  warning: 250
+  error: 400
+
+# Complexity
+cyclomatic_complexity:
+  warning: 10   # SIGNIFICANTLY stricter
+  error: 15     # Functions should be simple
+  ignores_case_statements: true
+
+# Nesting
+nesting:
+  type_level: 2    # Maximum 2 levels of type nesting
+  function_level: 3  # Maximum 3 levels of nesting in functions
+
+# Function parameters
+function_parameter_count:
+  warning: 5   # SIGNIFICANTLY stricter
+  error: 7     # More than 5 parameters = refactoring needed
+
+# Tuples
+large_tuple:
+  warning: 3   # Stricter
+  error: 4     # Better to use struct/class
+
+# Type naming
+type_name:
+  min_length: 3
+  max_length:
+    warning: 40
+    error: 50
+  excluded:
+    - T
+    - ID
+    - URL
+  validates_start_with_lowercase: false
+
+# Identifier naming
+identifier_name:
+  min_length:
+    warning: 2   # More flexible for loops
+    error: 1
+  max_length:
+    warning: 40
+    error: 50
+  excluded:
+    - id
+    - x
+    - y
+    - z
+    - i
+    - j
+    - k
+    - at
+    - to
+    - in
+    - up
+    - me
+    - url
+    - uri
+  validates_start_with_lowercase: true
+
+# ============================================================================
+# CUSTOM RULES
+# ============================================================================
+custom_rules:
+  # Space after comment
+  comments_space:
+    name: 'Space After Comment'
+    regex: '(^ *//\w+)'
+    message: 'There should be a space after //'
+    severity: warning
+
+  # Empty first line after declaration
+  empty_first_line:
+    name: 'Empty First Line'
+    regex: '(^[ a-zA-Z ]*(?:protocol|extension|class|struct|func|enum|actor) [^\{]*\{\n( *)?\n)'
+    message: 'There should not be an empty line after declaration'
+    severity: error
+
+  # Empty line after guard
+  empty_line_after_guard:
+    name: 'Empty Line After Guard'
+    regex: '(^ *guard[ a-zA-Z0-9=?.\(\),><!`]*\{[^\}]*\}\n *(?!(?:return|guard|\}|case|default))\S+)'
+    message: 'There should be an empty line after guard'
+    severity: error
+
+  # Empty line after super
+  empty_line_after_super:
+    name: 'Empty Line After Super'
+    regex: '(^ *super\.[^\n]*\n *(?!(?:\}|return))\S+)'
+    message: 'There should be an empty line after super'
+    severity: error
+
+  # Prohibit print() in production code
+  no_print:
+    name: 'No Print Statements'
+    regex: '\bprint\s*\('
+    match_kinds:
+      - identifier
+    message: 'Use Logger instead of print(). For debug use #if DEBUG'
+    severity: warning
+
+  # Prohibit UIDevice.current (testing issues)
+  no_ui_device:
+    name: 'No UIDevice.current'
+    regex: 'UIDevice\.current'
+    message: 'UIDevice.current makes testing difficult. Use dependency injection'
+    severity: warning
+
+  # Require MARK for large files
+  marks_required:
+    name: 'MARK Comments Required'
+    regex: '^(?!.*\/\/ MARK:).*(?:^|\n)[ \t]*(?:class|struct|enum|protocol|extension)[ \t]+\w+'
+    message: 'Use // MARK: to organize code'
+    severity: warning
+
+  # Prohibit !. force unwrap in chains
+  no_force_unwrap_chaining:
+    name: 'No Force Unwrap in Chaining'
+    regex: '\!\.'
+    message: 'Avoid !. in call chains. Use optional chaining'
+    severity: error
+
+  # Prohibit empty comments
+  no_empty_comments:
+    name: 'No Empty Comments'
+    regex: '^\s*//\s*$'
+    message: 'Remove empty comments'
+    severity: warning
+
+# ============================================================================
+# REPORTER
+# ============================================================================
+reporter: 'xcode'  # Xcode integration
+
+# ============================================================================
+# ADDITIONAL SETTINGS
+# ============================================================================
+
+# Trailing comma (RECOMMENDATION: enable)
+trailing_comma:
+  mandatory_comma: true  # Require trailing comma
+
+# Switch-case alignment
+switch_case_alignment:
+  indented_cases: true  # Case indentation
+
+# Multiline arguments
+multiline_arguments:
+  first_argument_location: next_line
+  only_enforce_after_first_closure_on_first_line: true
+
+# Vertical whitespace
+vertical_whitespace:
+  max_empty_lines: 1
+  severity: error
+
+vertical_whitespace_between_cases:
+  severity: warning
+
+# Closure parameter position
+closure_parameter_position:
+  severity: error
+
+# Attributes
+attributes:
+  always_on_same_line:
+    - '@IBAction'
+    - '@NSManaged'
+    - '@objc'
+  always_on_line_above:
+    - '@available'
+    - '@discardableResult'
+    - '@MainActor'
+    - '@Published'

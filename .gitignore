@@ -1,62 +1,174 @@
+# ===========================
+# macOS System Files
+# ===========================
+.DS_Store
+.AppleDouble
+.LSOverride
+._*
+
+# Thumbnails
+._*
+
+# Files that might appear in the root of a volume
+.DocumentRevisions-V100
+.fseventsd
+.Spotlight-V100
+.TemporaryItems
+.Trashes
+.VolumeIcon.icns
+.com.apple.timemachine.donotpresent
+
+# Directories potentially created on remote AFP share
+.AppleDB
+.AppleDesktop
+Network Trash Folder
+Temporary Items
+.apdisk
+
+# ===========================
 # Xcode
-#
-# gitignore contributors: remember to update Global/Xcode.gitignore, Objective-C.gitignore & Swift.gitignore
-
-## User settings
+# ===========================
+# User-specific
 xcuserdata/
+*.xcuserstate
+*.xcuserdatad
 
-## Obj-C/Swift specific
+# Build generated
+build/
+DerivedData/
 *.hmap
-
-## App packaging
 *.ipa
 *.dSYM.zip
 *.dSYM
 
-## Playgrounds
+# Archives
+*.xcarchive
+
+# CocoaPods (if ever used)
+Pods/
+Podfile.lock
+
+# Carthage (if ever used)
+Carthage/Build/
+Carthage/Checkouts/
+
+# Swift Package Manager
+.build/
+.swiftpm/
+Packages/
+Package.resolved
+*.xcodeproj
+!Package.swift
+.swiftpm/configuration/registries.json
+.swiftpm/xcode/package.xcworkspace/contents.xcworkspacedata
+
+# Xcode Workspace
+*.xcworkspace
+!default.xcworkspace
+
+# Playgrounds
 timeline.xctimeline
 playground.xcworkspace
 
-# Swift Package Manager
-#
-# Add this line if you want to avoid checking in source code from Swift Package Manager dependencies.
-# Packages/
-# Package.pins
-# Package.resolved
-# *.xcodeproj
-#
-# Xcode automatically generates this directory with a .xcworkspacedata file and xcuserdata
-# hence it is not needed unless you have added a package configuration file to your project
-# .swiftpm
+# Swift Package Manager Build Artifacts
+/.build
+/Packages
+.swiftpm/xcode
 
-.build/
+# ===========================
+# IDE & Editor Files
+# ===========================
+# VSCode
+.vscode/
+*.code-workspace
 
-# CocoaPods
-#
-# We recommend against adding the Pods directory to your .gitignore. However
-# you should judge for yourself, the pros and cons are mentioned at:
-# https://guides.cocoapods.org/using/using-cocoapods.html#should-i-check-the-pods-directory-into-source-control
-#
-# Pods/
-#
-# Add this line if you want to avoid checking in source code from the Xcode workspace
-# *.xcworkspace
+# AppCode
+.idea/
+*.iml
 
-# Carthage
-#
-# Add this line if you want to avoid checking in source code from Carthage dependencies.
-# Carthage/Checkouts
+# Emacs
+*~
+\#*\#
+/.emacs.desktop
+/.emacs.desktop.lock
+*.elc
 
-Carthage/Build/
+# Vim
+*.swp
+*.swo
+*~
 
-# fastlane
-#
-# It is recommended to not store the screenshots in the git repo.
-# Instead, use fastlane to re-generate the screenshots whenever they are needed.
-# For more information about the recommended setup visit:
-# https://docs.fastlane.tools/best-practices/source-control/#source-control
+# Sublime Text
+*.sublime-workspace
+*.sublime-project
 
+# ===========================
+# Testing & Coverage
+# ===========================
+.coverage
+coverage/
+*.gcda
+*.gcno
+*.profdata
+*.profraw
+
+# XCTest
+*.xcresult/
+
+# ===========================
+# Security & Credentials
+# ===========================
+.netrc
+*.p12
+*.cer
+*.mobileprovision
+*.provisionprofile
+credentials.json
+secrets.json
+.env
+.env.*
+!.env.example
+
+# API Keys (be careful with these patterns)
+*apikey*
+*api-key*
+*secret*
+!*secret*.example
+
+# ===========================
+# Documentation
+# ===========================
+docs/build/
+.jazzy/
+
+# ===========================
+# Dependency Managers
+# ===========================
+# Bundler
+vendor/bundle
+.bundle/
+
+# ===========================
+# CI/CD
+# ===========================
 fastlane/report.xml
 fastlane/Preview.html
 fastlane/screenshots/**/*.png
 fastlane/test_output
+fastlane/README.md
+
+# ===========================
+# Backup & Temporary Files
+# ===========================
+*.bak
+*.backup
+*.tmp
+*.temp
+*.orig
+*.log
+
+# ===========================
+# Project Specific
+# ===========================
+# Claude Code files
+.claude/
