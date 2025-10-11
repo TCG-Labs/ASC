@@ -135,6 +135,240 @@ Structured error types:
 - `AuthenticationError`: Token expired, unauthorized
 - Custom error mapping from backend
 
+## Architecture Decision: Type Re-exports
+
+### 🎯 Optimization Strategy
+
+Instead of duplicating Alamofire types, ASC **re-exports them directly**. This approach:
+
+- ✅ **Reduces codebase** from ~1,841 to 1,015 lines (-45% code)
+- ✅ **Eliminates maintenance** of ~826 lines of duplicate code
+- ✅ **Uses battle-tested implementations** from Alamofire
+- ✅ **Maintains API consistency** with Alamofire ecosystem
+- ✅ **Automatic updates** when Alamofire improves
+- ✅ **Zero conversion overhead** between types
+
+### 📦 Re-exported Types
+
+All re-exports are in `Core/AlamofireReExports.swift` (95 lines):
+
+**HTTP Types:**
+- `HTTPHeaders` - Order-preserving, case-insensitive headers
+- `HTTPHeader` - Single header field
+- `HTTPMethod` - HTTP method with custom support
+
+**Parameter Encoding:**
+- `Parameters` - Parameter dictionary typealias
+- `ParameterEncoding` - Encoding protocol
+- `JSONEncoding` - JSON parameter encoding
+- `URLEncoding` - URL-encoded parameter encoding
+
+**URL Conversion:**
+- `URLConvertible` - Type-safe URL conversion
+- `URLRequestConvertible` - Type-safe URLRequest conversion
+
+**Advanced (Future Use):**
+- `RequestAdapter` - Adapt requests before sending
+- `RequestRetrier` - Retry failed requests
+- `RequestInterceptor` - Combined adapter + retrier
+- `EventMonitor` - Observe request lifecycle
+- `CachedResponseHandler` - Handle cached responses
+- `RedirectHandler` - Handle HTTP redirects
+
+### 🔧 ASC-Specific Code
+
+We focus on our unique value:
+- `NetworkRequest` protocol - Type-safe request definition
+- `NetworkClient` - Convenient async/await client
+- Error types - Structured error handling
+- `RetryPolicy` - Retry configuration
+
+## Current Implementation Status
+
+### ✅ Completed Core Features
+
+**1. Type Re-exports from Alamofire**
+- `HTTPHeaders`, `HTTPHeader`, `HTTPMethod`
+- `Parameters`, `ParameterEncoding`, `JSONEncoding`, `URLEncoding`
+- `URLConvertible`, `URLRequestConvertible`
+- All features from Alamofire available directly
+- See Alamofire documentation for full capabilities
+
+**2. NetworkClient with Advanced Configuration**
+- **NetworkClientConfiguration** struct for fine-grained control
+- **RequestInterceptor support**: Adapt and retry requests
+  - Multiple interceptors can be chained
+  - Session-level interceptors apply to all requests
+  - Perfect for authentication, logging, signing
+- **EventMonitor support**: Observe request lifecycle
+  - Multiple monitors can be registered
+  - Track request start, completion, errors
+  - Integrate with logging systems (OSLog, etc.)
+- **ServerTrustManager**: SSL/TLS validation
+  - Certificate pinning support
+  - Custom trust evaluation per host
+  - Development vs production configurations
+- **RedirectHandler**: Custom redirect logic
+  - Control redirect behavior per request
+  - Modify redirect requests
+- **CachedResponseHandler**: Smart caching
+  - Custom cache policies
+  - Memory and disk cache control
+- **Custom Dispatch Queues**: Performance optimization
+  - Separate queues for root, request, serialization
+  - Configurable QoS levels
+- **EmptyResponse**: Support for 204 No Content
+- Default headers with smart override system
+- Full Sendable conformance for Swift 6
+- Async/await API with comprehensive error mapping
+
+**3. NetworkRequest Protocol**
+- Main abstraction layer - our unique value proposition
+- Uses `parameters: Parameters?` for flexible data passing
+- Uses `parameterEncoding` for encoding strategy selection
+- Default encoding is JSONEncoding.default from Alamofire
+- Fully type-safe with associatedtype Response: Decodable & Sendable
+- Protocol extensions provide sensible defaults
+
+**4. Error Handling System**
+- `ASCError` base protocol with LocalizedError conformance
+- `NetworkError`: Connection issues, timeouts, SSL problems
+- `ResponseError`: HTTP status codes, parsing failures
+- `AuthenticationError`: Token and permission issues
+- All errors provide errorDescription, recoverySuggestion, underlyingError
+
+**5. RetryPolicy Configuration**
+- Configurable retry behavior for failed requests
+- Exponential backoff support
+- Retryable status codes customization
+- Network error retry options
+- Predefined policies: .default, .none, .aggressive
+
+### 🎯 Usage Examples
+
+#### Basic Usage
+
+```swift
+// Simple client creation
+let client = NetworkClient(baseURL: "https://api.example.com")
+
+// Define a request
+struct GetUserRequest: NetworkRequest {
+    typealias Response = User
+    let userId: String
+    var path: String { "/users/\(userId)" }
+    var method: HTTPMethod { .get }
+}
+
+// Execute
+let user = try await client.execute(GetUserRequest(userId: "123"))
+```
+
+#### Advanced Configuration with Interceptors and Monitors
+
+```swift
+// Create custom interceptor for authentication
+final class AuthInterceptor: RequestInterceptor {
+    func adapt(
+        _ urlRequest: URLRequest,
+        for session: Session,
+        completion: @escaping (Result<URLRequest, any Error>) -> Void
+    ) {
+        var urlRequest = urlRequest
+        urlRequest.headers.add(.authorization(bearerToken: getToken()))
+        completion(.success(urlRequest))
+    }
+
+    func retry(
+        _ request: Request,
+        for session: Session,
+        dueTo error: any Error,
+        completion: @escaping (RetryResult) -> Void
+    ) {
+        if let response = request.task?.response as? HTTPURLResponse,
+           response.statusCode == 401 {
+            // Refresh token and retry
+            refreshToken { success in
+                completion(success ? .retry : .doNotRetry)
+            }
+        } else {
+            completion(.doNotRetry)
+        }
+    }
+}
+
+// Create logging monitor
+final class Logger: EventMonitor {
+    func requestDidResume(_ request: Request) {
+        print("🚀 Request started: \(request.description)")
+    }
+
+    func request<Value>(_ request: DataRequest, didParseResponse response: DataResponse<Value, AFError>) {
+        print("✅ Response received: \(response.response?.statusCode ?? 0)")
+    }
+}
+
+// Configure advanced client
+let config = NetworkClientConfiguration(
+    baseURL: "https://api.example.com",
+    interceptors: [AuthInterceptor()],
+    eventMonitors: [Logger()],
+    serverTrustManager: ServerTrustManager(
+        evaluators: ["api.example.com": DefaultTrustEvaluator()]
+    )
+)
+
+let client = NetworkClient(configuration: config)
+```
+
+#### Empty Response (204 No Content)
+
+```swift
+struct DeleteUserRequest: NetworkRequest {
+    typealias Response = EmptyResponse
+    let userId: String
+    var path: String { "/users/\(userId)" }
+    var method: HTTPMethod { .delete }
+}
+
+// No return value for empty responses
+try await client.execute(DeleteUserRequest(userId: "123"))
+```
+
+#### Parameter Encoding
+
+```swift
+// JSON encoding (default)
+struct CreatePostRequest: NetworkRequest {
+    typealias Response = Post
+    let title: String
+    let content: String
+
+    var path: String { "/posts" }
+    var method: HTTPMethod { .post }
+    var parameters: Parameters? {
+        ["title": title, "content": content]
+    }
+    // parameterEncoding defaults to JSONEncoding.default
+}
+
+// URL encoding for query parameters
+struct SearchRequest: NetworkRequest {
+    typealias Response = SearchResults
+    let query: String
+    let page: Int
+
+    var path: String { "/search" }
+    var method: HTTPMethod { .get }
+    var parameters: Parameters? {
+        ["q": query, "page": page]
+    }
+    var parameterEncoding: any ParameterEncoding {
+        URLEncoding.default // Will encode in query string for GET
+    }
+}
+```
+
 ## Technical Implementation Details
 
 ### Alamofire Integration Strategy
