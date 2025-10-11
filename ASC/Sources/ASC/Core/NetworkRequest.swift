@@ -67,6 +67,26 @@ public protocol NetworkRequest: Sendable {
     ///
     /// If not specified, the client's default cache policy will be used.
     var cachePolicy: URLRequest.CachePolicy? { get }
+
+    /// Path parameters for template substitution.
+    ///
+    /// Used to substitute placeholders in the path.
+    /// Example: path = "/users/{userId}" with pathParameters = ["userId": "123"]
+    /// results in "/users/123"
+    var pathParameters: [String: String]? { get }
+
+    /// Common path prefix to be prepended to the path.
+    ///
+    /// Useful for API versioning or common prefixes.
+    /// Example: pathPrefix = "/api/v1" with path = "/users"
+    /// results in "/api/v1/users"
+    var pathPrefix: String? { get }
+
+    /// Files to upload in a multipart request.
+    ///
+    /// Dictionary mapping field names to file data.
+    /// When specified, the request automatically becomes a multipart/form-data request.
+    var files: [String: Data]? { get }
 }
 
 // MARK: - Default Implementations
@@ -89,4 +109,13 @@ public extension NetworkRequest {
 
     /// Default cache policy is nil (use client's default)
     var cachePolicy: URLRequest.CachePolicy? { nil }
+
+    /// Default path parameters are nil
+    var pathParameters: [String: String]? { nil }
+
+    /// Default path prefix is nil
+    var pathPrefix: String? { nil }
+
+    /// Default files are nil
+    var files: [String: Data]? { nil }
 }

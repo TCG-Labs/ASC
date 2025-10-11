@@ -65,6 +65,9 @@ Defines all network request parameters in a declarative way:
 - Headers, query parameters, body
 - Response type (Codable)
 - Retry policy, timeout configuration
+- **Path parameters** for template substitution (`{userId}` → `123`)
+- **Path prefix** for API versioning (`/api/v1`)
+- **File uploads** via multipart/form-data
 
 #### NetworkClient
 Main client that executes requests using Alamofire:
@@ -227,6 +230,10 @@ We focus on our unique value:
 - Uses `parameters: Parameters?` for flexible data passing
 - Uses `parameterEncoding` for encoding strategy selection
 - Default encoding is JSONEncoding.default from Alamofire
+- **Path parameters**: Template substitution in URLs (`/users/{userId}`)
+- **Path prefix**: Common path prefix for API versioning (`/api/v1`)
+- **File uploads**: Multipart/form-data support via `files` property
+- Per-request headers, timeout, and cache policy override
 - Fully type-safe with associatedtype Response: Decodable & Sendable
 - Protocol extensions provide sensible defaults
 
@@ -369,6 +376,131 @@ struct SearchRequest: NetworkRequest {
 }
 ```
 
+#### Path Parameters (URL Template Substitution)
+
+```swift
+// Define request with path parameters
+struct GetUserRequest: NetworkRequest {
+    typealias Response = User
+    let userId: String
+
+    var path: String { "/users/{userId}" }
+    var method: HTTPMethod { .get }
+    var pathParameters: [String: String]? {
+        ["userId": userId]
+    }
+}
+
+// Multiple path parameters
+struct GetUserPostRequest: NetworkRequest {
+    typealias Response = Post
+    let userId: String
+    let postId: String
+
+    var path: String { "/users/{userId}/posts/{postId}" }
+    var method: HTTPMethod { .get }
+    var pathParameters: [String: String]? {
+        ["userId": userId, "postId": postId]
+    }
+}
+
+// Execute - path will be automatically resolved
+let user = try await client.execute(GetUserRequest(userId: "123"))
+// Actual URL: https://api.example.com/users/123
+```
+
+#### Path Prefix (API Versioning)
+
+```swift
+// Define request with path prefix
+struct GetUserRequestV1: NetworkRequest {
+    typealias Response = User
+    let userId: String
+
+    var pathPrefix: String? { "/api/v1" }
+    var path: String { "/users/{userId}" }
+    var method: HTTPMethod { .get }
+    var pathParameters: [String: String]? {
+        ["userId": userId]
+    }
+}
+
+// Execute - prefix will be prepended automatically
+let user = try await client.execute(GetUserRequestV1(userId: "123"))
+// Actual URL: https://api.example.com/api/v1/users/123
+```
+
+#### File Upload (Multipart Form Data)
+
+```swift
+// Upload a single file
+struct UploadAvatarRequest: NetworkRequest {
+    typealias Response = User
+    let userId: String
+    let imageData: Data
+
+    var path: String { "/users/{userId}/avatar" }
+    var method: HTTPMethod { .post }
+    var pathParameters: [String: String]? {
+        ["userId": userId]
+    }
+    var files: [String: Data]? {
+        ["avatar": imageData]
+    }
+}
+
+// Upload multiple files with additional parameters
+struct UploadDocumentsRequest: NetworkRequest {
+    typealias Response = UploadResponse
+    let documents: [String: Data]
+
+    var path: String { "/documents" }
+    var method: HTTPMethod { .post }
+    var files: [String: Data]? { documents }
+    var parameters: Parameters? {
+        ["folder": "uploads", "overwrite": true]
+    }
+}
+
+// Execute upload
+let imageData = UIImage(named: "avatar")?.jpegData(compressionQuality: 0.8)
+let user = try await client.execute(UploadAvatarRequest(
+    userId: "123",
+    imageData: imageData!
+))
+```
+
+#### Combining All Features
+
+```swift
+// Complex request with all features
+struct UpdateUserDocumentRequest: NetworkRequest {
+    typealias Response = Document
+    let userId: String
+    let documentId: String
+    let fileData: Data
+    let metadata: [String: Any]
+
+    var pathPrefix: String? { "/api/v2" }
+    var path: String { "/users/{userId}/documents/{documentId}" }
+    var method: HTTPMethod { .put }
+    var pathParameters: [String: String]? {
+        ["userId": userId, "documentId": documentId]
+    }
+    var files: [String: Data]? {
+        ["document": fileData]
+    }
+    var parameters: Parameters? { metadata }
+    var headers: HTTPHeaders? {
+        HTTPHeaders([
+            .contentType("multipart/form-data"),
+            .accept("application/json")
+        ])
+    }
+    var timeout: TimeInterval? { 120 } // 2 minutes for large files
+}
+```
+
 ## Technical Implementation Details
 
 ### Alamofire Integration Strategy
@@ -438,16 +570,22 @@ struct SearchRequest: NetworkRequest {
 **Request Pipeline**
 ```
 1. Create URLRequest from NetworkRequest protocol
-2. Apply RequestAdapters (add headers, auth)
-3. Validate network reachability
-4. Execute via Alamofire Session
-5. Monitor via EventMonitors
-6. Handle redirects via RedirectHandler
-7. Validate response (status, content type)
-8. Cache response via CachedResponseHandler
-9. Serialize response (Codable, Data, String)
-10. Retry on failure via RequestRetrier
-11. Return typed Result/throw error
+   a. Apply path prefix if specified
+   b. Substitute path parameters ({param} → value)
+   c. Build full URL (baseURL + pathPrefix + path)
+2. Check if multipart request (files present)
+   a. If yes: Create multipart/form-data request
+   b. If no: Apply parameter encoding (JSON/URL)
+3. Apply RequestAdapters (add headers, auth)
+4. Validate network reachability
+5. Execute via Alamofire Session (request or upload)
+6. Monitor via EventMonitors
+7. Handle redirects via RedirectHandler
+8. Validate response (status, content type)
+9. Cache response via CachedResponseHandler
+10. Serialize response (Codable, Data, String)
+11. Retry on failure via RequestRetrier
+12. Return typed Result/throw error
 ```
 
 ### Swift Concurrency Integration

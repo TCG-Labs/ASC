@@ -180,6 +180,15 @@ public final class NetworkClient: Sendable {
     public func execute<Request: NetworkRequest>(
         _ request: Request
     ) async throws -> Request.Response {
+        // Check if this is a multipart request
+        if let files = request.files, !files.isEmpty {
+            return try await performMultipartRequest(
+                request,
+                files: files,
+                responseType: Request.Response.self
+            )
+        }
+
         let urlRequest = try buildURLRequest(from: request)
         return try await performRequest(urlRequest, responseType: Request.Response.self)
     }
@@ -193,6 +202,12 @@ public final class NetworkClient: Sendable {
     public func execute<Request: NetworkRequest>(
         _ request: Request
     ) async throws where Request.Response == EmptyResponse {
+        // Check if this is a multipart request
+        if let files = request.files, !files.isEmpty {
+            try await performMultipartEmptyRequest(request, files: files)
+            return
+        }
+
         let urlRequest = try buildURLRequest(from: request)
         try await performEmptyRequest(urlRequest)
     }
@@ -204,7 +219,21 @@ public final class NetworkClient: Sendable {
         from request: Request
     ) throws -> URLRequest {
         let baseURLString = request.baseURL ?? configuration.baseURL
-        let fullURL = baseURLString + request.path
+
+        // Build full path with prefix and parameter substitution
+        var fullPath = request.path
+
+        // Apply path prefix if specified
+        if let pathPrefix = request.pathPrefix {
+            fullPath = pathPrefix + fullPath
+        }
+
+        // Substitute path parameters
+        if let pathParameters = request.pathParameters {
+            fullPath = substitutePath(fullPath, with: pathParameters)
+        }
+
+        let fullURL = baseURLString + fullPath
 
         guard let url = URL(string: fullURL) else {
             throw ResponseError.invalidFormat("Invalid URL: \(fullURL)")
@@ -227,12 +256,27 @@ public final class NetworkClient: Sendable {
             }
         }
 
-        // Encode parameters
-        if let parameters = request.parameters {
+        // Encode parameters (only if not multipart)
+        if request.files == nil, let parameters = request.parameters {
             urlRequest = try request.parameterEncoding.encode(urlRequest, with: parameters)
         }
 
         return urlRequest
+    }
+
+    /// Substitutes path parameters in the path template.
+    ///
+    /// Replaces placeholders like {userId} with actual values.
+    /// - Parameters:
+    ///   - path: Path template with placeholders
+    ///   - parameters: Dictionary of parameter values
+    /// - Returns: Path with substituted values
+    internal func substitutePath(_ path: String, with parameters: [String: String]) -> String {
+        var result = path
+        for (key, value) in parameters {
+            result = result.replacingOccurrences(of: "{\(key)}", with: value)
+        }
+        return result
     }
 
     /// Performs the actual network request using Alamofire.
@@ -268,6 +312,151 @@ public final class NetworkClient: Sendable {
         if let error = response.error {
             throw mapAlamofireError(error, data: response.data)
         }
+    }
+
+    /// Performs a multipart file upload request.
+    private func performMultipartRequest<Request: NetworkRequest, Response: Decodable & Sendable>(
+        _ request: Request,
+        files: [String: Data],
+        responseType: Response.Type
+    ) async throws -> Response {
+        let baseURLString = request.baseURL ?? configuration.baseURL
+
+        // Build full path with prefix and parameter substitution
+        var fullPath = request.path
+
+        if let pathPrefix = request.pathPrefix {
+            fullPath = pathPrefix + fullPath
+        }
+
+        if let pathParameters = request.pathParameters {
+            fullPath = substitutePath(fullPath, with: pathParameters)
+        }
+
+        let fullURL = baseURLString + fullPath
+
+        guard let url = URL(string: fullURL) else {
+            throw ResponseError.invalidFormat("Invalid URL: \(fullURL)")
+        }
+
+        // Create multipart form data
+        let upload = session.upload(
+            multipartFormData: { multipartFormData in
+                // Add files
+                for (name, data) in files {
+                    multipartFormData.append(
+                        data,
+                        withName: name,
+                        fileName: "\(name).dat",
+                        mimeType: "application/octet-stream"
+                    )
+                }
+
+                // Add regular parameters as form fields
+                if let parameters = request.parameters {
+                    for (key, value) in parameters {
+                        if let data = "\(value)".data(using: .utf8) {
+                            multipartFormData.append(data, withName: key)
+                        }
+                    }
+                }
+            },
+            to: url,
+            method: request.method,
+            headers: buildHeaders(for: request)
+        )
+
+        let dataTask = upload
+            .validate()
+            .serializingDecodable(Response.self)
+
+        let response = await dataTask.response
+
+        if let error = response.error {
+            throw mapAlamofireError(error, data: response.data)
+        }
+
+        guard let value = response.value else {
+            throw ResponseError.missingData
+        }
+
+        return value
+    }
+
+    /// Performs a multipart file upload request without expecting a response body.
+    private func performMultipartEmptyRequest<Request: NetworkRequest>(
+        _ request: Request,
+        files: [String: Data]
+    ) async throws {
+        let baseURLString = request.baseURL ?? configuration.baseURL
+
+        // Build full path with prefix and parameter substitution
+        var fullPath = request.path
+
+        if let pathPrefix = request.pathPrefix {
+            fullPath = pathPrefix + fullPath
+        }
+
+        if let pathParameters = request.pathParameters {
+            fullPath = substitutePath(fullPath, with: pathParameters)
+        }
+
+        let fullURL = baseURLString + fullPath
+
+        guard let url = URL(string: fullURL) else {
+            throw ResponseError.invalidFormat("Invalid URL: \(fullURL)")
+        }
+
+        // Create multipart form data
+        let upload = session.upload(
+            multipartFormData: { multipartFormData in
+                // Add files
+                for (name, data) in files {
+                    multipartFormData.append(
+                        data,
+                        withName: name,
+                        fileName: "\(name).dat",
+                        mimeType: "application/octet-stream"
+                    )
+                }
+
+                // Add regular parameters as form fields
+                if let parameters = request.parameters {
+                    for (key, value) in parameters {
+                        if let data = "\(value)".data(using: .utf8) {
+                            multipartFormData.append(data, withName: key)
+                        }
+                    }
+                }
+            },
+            to: url,
+            method: request.method,
+            headers: buildHeaders(for: request)
+        )
+
+        let dataTask = upload
+            .validate()
+            .serializingData()
+
+        let response = await dataTask.response
+
+        if let error = response.error {
+            throw mapAlamofireError(error, data: response.data)
+        }
+    }
+
+    /// Builds HTTP headers for a request.
+    private func buildHeaders<Request: NetworkRequest>(for request: Request) -> HTTPHeaders {
+        var headers = configuration.defaultHeaders
+
+        // Add request-specific headers (overrides defaults)
+        if let requestHeaders = request.headers {
+            for header in requestHeaders {
+                headers.add(header)
+            }
+        }
+
+        return headers
     }
 
     /// Maps Alamofire errors to ASC errors.
