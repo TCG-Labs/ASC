@@ -204,6 +204,7 @@ identifier_name:
     error: 50
   excluded:
     - id
+    - ok
     - x
     - y
     - z
