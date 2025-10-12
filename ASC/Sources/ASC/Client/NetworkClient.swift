@@ -91,11 +91,14 @@ public final class NetworkClient: Sendable {
     ) async throws -> Request.Response {
         // Check if this is a multipart request
         if let files = request.files, !files.isEmpty {
-            return try await performMultipartRequest(
+            guard let response = try await performMultipartRequest(
                 request,
                 files: files,
                 responseType: Request.Response.self
-            )
+            ) else {
+                throw ResponseError.missingData
+            }
+            return response
         }
 
         let urlRequest = try buildURLRequest(from: request)
@@ -113,7 +116,11 @@ public final class NetworkClient: Sendable {
     ) async throws where Request.Response == ASCEmptyResponse {
         // Check if this is a multipart request
         if let files = request.files, !files.isEmpty {
-            try await performMultipartEmptyRequest(request, files: files)
+            _ = try await performMultipartRequest(
+                request,
+                files: files,
+                responseType: nil as ASCEmptyResponse.Type?
+            )
             return
         }
 
@@ -134,16 +141,10 @@ public final class NetworkClient: Sendable {
         urlRequest.timeoutInterval = request.timeout ?? configuration.defaultTimeout
         urlRequest.cachePolicy = request.cachePolicy ?? configuration.defaultCachePolicy
 
-        // Add default headers first
-        for header in configuration.defaultHeaders {
+        // Add headers using consolidated method
+        let headers = buildHeaders(for: request)
+        for header in headers {
             urlRequest.setValue(header.value, forHTTPHeaderField: header.name)
-        }
-
-        // Add request-specific headers (overrides defaults)
-        if let headers = request.headers {
-            for header in headers {
-                urlRequest.setValue(header.value, forHTTPHeaderField: header.name)
-            }
         }
 
         // Encode parameters (only if not multipart)
@@ -190,11 +191,15 @@ public final class NetworkClient: Sendable {
     }
 
     /// Performs a multipart file upload request.
+    ///
+    /// Generic method that handles both regular and empty responses.
+    /// When responseType is provided, decodes and returns the response.
+    /// When responseType is nil, validates the response without decoding.
     private func performMultipartRequest<Request: NetworkRequest, Response: Decodable & Sendable>(
         _ request: Request,
         files: [String: Data],
-        responseType: Response.Type
-    ) async throws -> Response {
+        responseType: Response.Type?
+    ) async throws -> Response? {
         let url = try urlBuilder.buildURL(from: request, baseURL: configuration.baseURL)
         let headers = buildHeaders(for: request)
         let upload = multipartBuilder.buildUpload(
@@ -205,44 +210,33 @@ public final class NetworkClient: Sendable {
             headers: headers
         )
 
-        let response = await upload
-            .validate()
-            .serializingDecodable(Response.self)
-            .response
+        // Handle response based on expected type
+        if let responseType = responseType {
+            let response = await upload
+                .validate()
+                .serializingDecodable(responseType)
+                .response
 
-        if let error = response.error {
-            throw errorMapper.mapError(error, data: response.data)
-        }
+            if let error = response.error {
+                throw errorMapper.mapError(error, data: response.data)
+            }
 
-        guard let value = response.value else {
-            throw ResponseError.missingData
-        }
+            guard let value = response.value else {
+                throw ResponseError.missingData
+            }
 
-        return value
-    }
+            return value
+        } else {
+            let response = await upload
+                .validate()
+                .serializingData()
+                .response
 
-    /// Performs a multipart file upload request without expecting a response body.
-    private func performMultipartEmptyRequest<Request: NetworkRequest>(
-        _ request: Request,
-        files: [String: Data]
-    ) async throws {
-        let url = try urlBuilder.buildURL(from: request, baseURL: configuration.baseURL)
-        let headers = buildHeaders(for: request)
-        let upload = multipartBuilder.buildUpload(
-            for: request,
-            files: files,
-            url: url,
-            session: session,
-            headers: headers
-        )
+            if let error = response.error {
+                throw errorMapper.mapError(error, data: response.data)
+            }
 
-        let response = await upload
-            .validate()
-            .serializingData()
-            .response
-
-        if let error = response.error {
-            throw errorMapper.mapError(error, data: response.data)
+            return nil
         }
     }
 
