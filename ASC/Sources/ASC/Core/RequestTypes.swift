@@ -1,6 +1,6 @@
 // RequestTypes.swift
 // ASC - Alamofire Swift Client
-//
+
 // Common types used in network requests.
 
 import Foundation

@@ -1,6 +1,6 @@
 // URLBuilder.swift
 // ASC - Alamofire Swift Client
-//
+
 // URL construction utilities for network requests.
 
 import Foundation

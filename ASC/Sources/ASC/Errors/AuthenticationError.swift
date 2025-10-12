@@ -1,6 +1,6 @@
 // AuthenticationError.swift
 // ASC - Alamofire Swift Client
-//
+
 // Authentication and authorization errors.
 
 import Foundation

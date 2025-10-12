@@ -1,6 +1,6 @@
 // ErrorMapper.swift
 // ASC - Alamofire Swift Client
-//
+
 // Maps Alamofire errors to ASC error types.
 
 import Alamofire

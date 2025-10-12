@@ -1,6 +1,6 @@
 // ASCError.swift
 // ASC - Alamofire Swift Client
-//
+
 // Base error protocol for all ASC errors.
 
 import Foundation

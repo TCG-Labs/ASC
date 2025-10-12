@@ -1,6 +1,6 @@
 // ResponseError.swift
 // ASC - Alamofire Swift Client
-//
+
 // Response parsing and validation errors.
 
 import Foundation
@@ -67,10 +67,10 @@ public enum ResponseError: ASCError {
         case .invalidFormat(let reason):
             return "Invalid response format: \(reason)"
 
-        case .serverError(let code, let message):
+        case let .serverError(code, message):
             return "Server error (\(code)): \(message)"
 
-        case .clientError(let code, let message):
+        case let .clientError(code, message):
             if let message = message {
                 return "Client error (\(code)): \(message)"
             }

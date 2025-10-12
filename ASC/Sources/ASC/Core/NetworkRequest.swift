@@ -1,6 +1,6 @@
 // NetworkRequest.swift
 // ASC - Alamofire Swift Client
-//
+
 // Core protocol defining network request configuration.
 
 import Foundation
