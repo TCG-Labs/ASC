@@ -260,7 +260,7 @@ func testEventMonitorRecordsCompletion() async throws {
 
     // If this fails, at least we'll see what events were recorded
     if !hasCompleteEvent {
-        print("EventMonitor recorded these events: \(allEvents)")
+        debugPrint("EventMonitor recorded these events: \(allEvents)")
     }
 
     // Actually, let's check for didFinish instead, which is more reliable

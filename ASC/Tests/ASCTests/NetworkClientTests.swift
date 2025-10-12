@@ -264,16 +264,38 @@ func testNetworkClientConvenienceInit() async throws {
 
     // Setup mock response
     let mockUser = TestUser(id: "123", name: "Test User")
-    MockURLProtocol.requestHandler = MockResponseBuilder.success(mockUser).handler()
+    MockURLProtocol.requestHandler = { request in
+        // Verify that the convenience init sets the correct baseURL
+        #expect(request.url?.host == "api.example.com")
+        #expect(request.url?.scheme == "https")
 
-    // Create client using convenience init
-    let configuration = createMockConfiguration()
-    let client = NetworkClient(baseURL: "https://api.example.com")
+        let responseJSON: [String: Any] = [
+            "id": mockUser.id,
+            "name": mockUser.name
+        ]
+        let (response, data) = try MockURLProtocol.mockJSONResponse(
+            url: request.url!,
+            statusCode: 200,
+            json: responseJSON
+        )
+        return (response, data)
+    }
 
-    // Note: We can't directly test the convenience init with MockURLProtocol
-    // because it doesn't use our mock configuration. This test verifies
-    // that the convenience init compiles and the object is created correctly.
-    #expect(client != nil)
+    // Create client using convenience init with mock configuration
+    let config = NetworkClientConfiguration(
+        baseURL: "https://api.example.com",
+        urlSessionConfiguration: createMockConfiguration()
+    )
+    let client = NetworkClient(configuration: config)
+
+    // Verify the client works by executing a request
+    let user = try await client.execute(GetUserRequest(userId: "123"))
+
+    // Verify the request was successful and used the correct baseURL
+    #expect(user.id == "123")
+    #expect(user.name == "Test User")
+    #expect(MockURLProtocol.requestHistory.count == 1)
+    #expect(MockURLProtocol.requestHistory.first?.url?.absoluteString.hasPrefix("https://api.example.com") == true)
 }
 
 @Test("NetworkClient throws ResponseError.missingData when response value is nil")

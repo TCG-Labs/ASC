@@ -24,8 +24,17 @@ swift build
 # Run all tests
 swift test
 
+# Run all tests with coverage
+swift test --enable-code-coverage
+
 # Run a specific test
 swift test --filter ASCTests.example
+
+# View coverage report
+xcrun llvm-cov report \
+    .build/x86_64-apple-macosx/debug/ASCPackageTests.xctest/Contents/MacOS/ASCPackageTests \
+    -instr-profile=.build/x86_64-apple-macosx/debug/codecov/default.profdata \
+    Sources/ASC/
 ```
 
 ### Linting
