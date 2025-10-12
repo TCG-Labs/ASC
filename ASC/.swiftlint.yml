@@ -73,7 +73,7 @@ opt_in_rules:
   - redundant_nil_coalescing
   - redundant_type_annotation
   - explicit_init
-  - explicit_type_interface
+  # - explicit_type_interface  # Too strict - type inference is good for obvious cases
   - explicit_acl  # Explicit ACL for all declarations
 
   # Array/Collection
@@ -204,6 +204,7 @@ identifier_name:
     error: 50
   excluded:
     - id
+    - ok
     - x
     - y
     - z
@@ -215,6 +216,7 @@ identifier_name:
     - in
     - up
     - me
+    - ok
     - url
     - uri
   validates_start_with_lowercase: true
@@ -303,7 +305,7 @@ trailing_comma:
 
 # Switch-case alignment
 switch_case_alignment:
-  indented_cases: true  # Case indentation
+  indented_cases: false  # Case same level as switch
 
 # Multiline arguments
 multiline_arguments:
