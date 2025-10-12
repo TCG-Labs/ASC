@@ -19,34 +19,14 @@ extension IntegrationTests {
 func testNetworkClientSuccessfulGET() async throws {
     setupTest()
 
-    // Setup mock
-    let configuration = createMockConfiguration()
-
+    // Setup mock response
     let mockUser = TestUser(id: "123", name: "John Doe", email: "john@example.com")
-    let mockJSON: [String: Any] = [
-        "id": mockUser.id,
-        "name": mockUser.name,
-        "email": mockUser.email as Any,
-    ]
-
-    MockURLProtocol.requestHandler = { request in
-        let (response, data) = try MockURLProtocol.mockJSONResponse(
-            url: request.url!,
-            statusCode: 200,
-            json: mockJSON
-        )
-        return (response, data)
-    }
-
-    // Create client
-    let clientConfig = NetworkClientConfiguration(
-        baseURL: "https://api.example.com",
-        urlSessionConfiguration: configuration
-    )
-    let client = NetworkClient(configuration: clientConfig)
+    MockURLProtocol.requestHandler = MockResponseBuilder.success(mockUser).handler()
 
     // Execute request
-    let user = try await client.execute(GetUserRequest(userId: "123"))
+    let client = createMockClient()
+    let request = TestRequestFactory.getUser(userId: "123")
+    let user = try await client.execute(request)
 
     // Verify
     #expect(user == mockUser)
@@ -58,51 +38,14 @@ func testNetworkClientSuccessfulGET() async throws {
 func testNetworkClientSuccessfulPOST() async throws {
     setupTest()
 
-    // Setup mock
-    let configuration = createMockConfiguration()
-
-    let mockPost = TestPost(
-        id: "post1",
-        title: "Test Post",
-        content: "Test Content",
-        authorId: "user1"
-    )
-
-    MockURLProtocol.requestHandler = { request in
-        // Note: request.httpBody is nil for streamed requests, so we can't verify it here
-        // The fact that the request reaches this handler and gets the correct response is sufficient
-
-        // Return response
-        let responseJSON: [String: Any] = [
-            "id": mockPost.id,
-            "title": mockPost.title,
-            "content": mockPost.content,
-            "authorId": mockPost.authorId,
-        ]
-
-        let (response, data) = try MockURLProtocol.mockJSONResponse(
-            url: request.url!,
-            statusCode: 201,
-            json: responseJSON
-        )
-        return (response, data)
-    }
-
-    // Create client
-    let clientConfig = NetworkClientConfiguration(
-        baseURL: "https://api.example.com",
-        urlSessionConfiguration: configuration
-    )
-    let client = NetworkClient(configuration: clientConfig)
+    // Setup mock response
+    let mockPost = TestPost(id: "post1", title: "Test Post", content: "Test Content", authorId: "user1")
+    MockURLProtocol.requestHandler = MockResponseBuilder.success(mockPost).statusCode(201).handler()
 
     // Execute request
-    let post = try await client.execute(
-        CreatePostRequest(
-            title: "Test Post",
-            content: "Test Content",
-            authorId: "user1"
-        )
-    )
+    let client = createMockClient()
+    let request = TestRequestFactory.createPost(title: "Test Post", content: "Test Content", authorId: "user1")
+    let post = try await client.execute(request)
 
     // Verify
     #expect(post == mockPost)
@@ -112,39 +55,17 @@ func testNetworkClientSuccessfulPOST() async throws {
 func testNetworkClientPUT() async throws {
     setupTest()
 
-    // Setup mock
-    let configuration = createMockConfiguration()
-
+    // Setup mock response
     let updatedUser = TestUser(id: "123", name: "Jane Doe", email: "jane@example.com")
-
     MockURLProtocol.requestHandler = { request in
         #expect(request.httpMethod == "PUT")
-
-        let responseJSON: [String: Any] = [
-            "id": updatedUser.id,
-            "name": updatedUser.name,
-            "email": updatedUser.email as Any,
-        ]
-
-        let (response, data) = try MockURLProtocol.mockJSONResponse(
-            url: request.url!,
-            statusCode: 200,
-            json: responseJSON
-        )
-        return (response, data)
+        return try MockResponseBuilder.success(updatedUser).build(url: request.url!)
     }
 
-    // Create client
-    let clientConfig = NetworkClientConfiguration(
-        baseURL: "https://api.example.com",
-        urlSessionConfiguration: configuration
-    )
-    let client = NetworkClient(configuration: clientConfig)
-
     // Execute request
-    let user = try await client.execute(
-        UpdateUserRequest(userId: "123", name: "Jane Doe", email: "jane@example.com")
-    )
+    let client = createMockClient()
+    let request = TestRequestFactory.updateUser(userId: "123", name: "Jane Doe", email: "jane@example.com")
+    let user = try await client.execute(request)
 
     // Verify
     #expect(user == updatedUser)
@@ -154,30 +75,18 @@ func testNetworkClientPUT() async throws {
 func testNetworkClientDELETE() async throws {
     setupTest()
 
-    // Setup mock
-    let configuration = createMockConfiguration()
-
+    // Setup mock response
     MockURLProtocol.requestHandler = { request in
         #expect(request.httpMethod == "DELETE")
-
-        let response = MockURLProtocol.mockResponse(
-            url: request.url!,
-            statusCode: 204
-        )
-        return (response, nil)
+        return try MockResponseBuilder.emptySuccess().build(url: request.url!)
     }
 
-    // Create client
-    let clientConfig = NetworkClientConfiguration(
-        baseURL: "https://api.example.com",
-        urlSessionConfiguration: configuration
-    )
-    let client = NetworkClient(configuration: clientConfig)
+    // Execute request
+    let client = createMockClient()
+    let request = TestRequestFactory.deleteUser(userId: "123")
+    try await client.execute(request)
 
-    // Execute request (should not throw)
-    try await client.execute(DeleteUserRequest(userId: "123"))
-
-    // Verify request was made
+    // Verify
     #expect(MockURLProtocol.requestHistory.count == 1)
     #expect(MockURLProtocol.requestHistory.first?.url?.path == "/users/123")
 }
@@ -186,36 +95,17 @@ func testNetworkClientDELETE() async throws {
 func testNetworkClientPathParameters() async throws {
     setupTest()
 
-    // Setup mock
-    let configuration = createMockConfiguration()
-
+    // Setup mock response
     let mockUser = TestUser(id: "456", name: "Test User")
-
     MockURLProtocol.requestHandler = { request in
         #expect(request.url?.path == "/users/456")
-
-        let responseJSON: [String: Any] = [
-            "id": mockUser.id,
-            "name": mockUser.name,
-        ]
-
-        let (response, data) = try MockURLProtocol.mockJSONResponse(
-            url: request.url!,
-            statusCode: 200,
-            json: responseJSON
-        )
-        return (response, data)
+        return try MockResponseBuilder.success(mockUser).build(url: request.url!)
     }
 
-    // Create client
-    let clientConfig = NetworkClientConfiguration(
-        baseURL: "https://api.example.com",
-        urlSessionConfiguration: configuration
-    )
-    let client = NetworkClient(configuration: clientConfig)
-
-    // Execute request with path parameters
-    let user = try await client.execute(GetUserWithPathParamsRequest(userId: "456"))
+    // Execute request
+    let client = createMockClient()
+    let request = TestRequestFactory.getUserWithPathParams(userId: "456")
+    let user = try await client.execute(request)
 
     // Verify
     #expect(user.id == "456")
@@ -225,36 +115,17 @@ func testNetworkClientPathParameters() async throws {
 func testNetworkClientPathPrefix() async throws {
     setupTest()
 
-    // Setup mock
-    let configuration = createMockConfiguration()
-
+    // Setup mock response
     let mockUser = TestUser(id: "789", name: "Prefixed User")
-
     MockURLProtocol.requestHandler = { request in
         #expect(request.url?.path == "/api/v1/users/789")
-
-        let responseJSON: [String: Any] = [
-            "id": mockUser.id,
-            "name": mockUser.name,
-        ]
-
-        let (response, data) = try MockURLProtocol.mockJSONResponse(
-            url: request.url!,
-            statusCode: 200,
-            json: responseJSON
-        )
-        return (response, data)
+        return try MockResponseBuilder.success(mockUser).build(url: request.url!)
     }
 
-    // Create client
-    let clientConfig = NetworkClientConfiguration(
-        baseURL: "https://api.example.com",
-        urlSessionConfiguration: configuration
-    )
-    let client = NetworkClient(configuration: clientConfig)
-
-    // Execute request with path prefix
-    let user = try await client.execute(GetUserWithPrefixRequest(userId: "789"))
+    // Execute request
+    let client = createMockClient()
+    let request = TestRequestFactory.getUserWithPrefix(userId: "789")
+    let user = try await client.execute(request)
 
     // Verify
     #expect(user.id == "789")
@@ -264,38 +135,19 @@ func testNetworkClientPathPrefix() async throws {
 func testNetworkClientCustomHeaders() async throws {
     setupTest()
 
-    // Setup mock
-    let configuration = createMockConfiguration()
-
+    // Setup mock response
     let mockUser = TestUser(id: "me", name: "Current User")
-
     MockURLProtocol.requestHandler = { request in
         // Verify authorization header
         let authHeader = request.value(forHTTPHeaderField: "Authorization")
         #expect(authHeader == "Bearer secret-token")
-
-        let responseJSON: [String: Any] = [
-            "id": mockUser.id,
-            "name": mockUser.name,
-        ]
-
-        let (response, data) = try MockURLProtocol.mockJSONResponse(
-            url: request.url!,
-            statusCode: 200,
-            json: responseJSON
-        )
-        return (response, data)
+        return try MockResponseBuilder.success(mockUser).build(url: request.url!)
     }
 
-    // Create client
-    let clientConfig = NetworkClientConfiguration(
-        baseURL: "https://api.example.com",
-        urlSessionConfiguration: configuration
-    )
-    let client = NetworkClient(configuration: clientConfig)
-
-    // Execute request with custom headers
-    let user = try await client.execute(AuthenticatedRequest(token: "secret-token"))
+    // Execute request
+    let client = createMockClient()
+    let request = TestRequestFactory.authenticated(token: "secret-token")
+    let user = try await client.execute(request)
 
     // Verify
     #expect(user.id == "me")
@@ -305,27 +157,15 @@ func testNetworkClientCustomHeaders() async throws {
 func testNetworkClientHandles404() async throws {
     setupTest()
 
-    // Setup mock
-    let configuration = createMockConfiguration()
-
-    MockURLProtocol.requestHandler = { request in
-        let response = MockURLProtocol.mockResponse(
-            url: request.url!,
-            statusCode: 404
-        )
-        return (response, Data())
-    }
-
-    // Create client
-    let clientConfig = NetworkClientConfiguration(
-        baseURL: "https://api.example.com",
-        urlSessionConfiguration: configuration
-    )
-    let client = NetworkClient(configuration: clientConfig)
+    // Setup mock error response
+    MockURLProtocol.requestHandler = MockResponseBuilder.notFound().handler()
 
     // Execute request and expect error
+    let client = createMockClient()
+    let request = TestRequestFactory.getUser(userId: "999")
+
     do {
-        _ = try await client.execute(GetUserRequest(userId: "999"))
+        _ = try await client.execute(request)
         Issue.record("Expected ResponseError to be thrown")
     } catch let error as ResponseError {
         if case .clientError(let statusCode, _) = error {
@@ -340,27 +180,15 @@ func testNetworkClientHandles404() async throws {
 func testNetworkClientHandles500() async throws {
     setupTest()
 
-    // Setup mock
-    let configuration = createMockConfiguration()
-
-    MockURLProtocol.requestHandler = { request in
-        let response = MockURLProtocol.mockResponse(
-            url: request.url!,
-            statusCode: 500
-        )
-        return (response, Data())
-    }
-
-    // Create client
-    let clientConfig = NetworkClientConfiguration(
-        baseURL: "https://api.example.com",
-        urlSessionConfiguration: configuration
-    )
-    let client = NetworkClient(configuration: clientConfig)
+    // Setup mock error response
+    MockURLProtocol.requestHandler = MockResponseBuilder.serverError().handler()
 
     // Execute request and expect error
+    let client = createMockClient()
+    let request = TestRequestFactory.getUser()
+
     do {
-        _ = try await client.execute(GetUserRequest(userId: "123"))
+        _ = try await client.execute(request)
         Issue.record("Expected ResponseError to be thrown")
     } catch let error as ResponseError {
         if case .serverError(let statusCode, _) = error {
@@ -375,15 +203,10 @@ func testNetworkClientHandles500() async throws {
 func testNetworkClientHandlesDecodingFailure() async throws {
     setupTest()
 
-    // Setup mock
-    let configuration = createMockConfiguration()
-
+    // Setup mock response with invalid JSON structure
     MockURLProtocol.requestHandler = { request in
-        // Return invalid JSON structure
-        let invalidJSON: [String: Any] = [
-            "wrong_field": "value",
-        ]
-
+        // Return JSON with wrong fields
+        let invalidJSON: [String: Any] = ["wrong_field": "value"]
         let (response, data) = try MockURLProtocol.mockJSONResponse(
             url: request.url!,
             statusCode: 200,
@@ -392,16 +215,12 @@ func testNetworkClientHandlesDecodingFailure() async throws {
         return (response, data)
     }
 
-    // Create client
-    let clientConfig = NetworkClientConfiguration(
-        baseURL: "https://api.example.com",
-        urlSessionConfiguration: configuration
-    )
-    let client = NetworkClient(configuration: clientConfig)
-
     // Execute request and expect decoding error
+    let client = createMockClient()
+    let request = TestRequestFactory.getUser()
+
     do {
-        _ = try await client.execute(GetUserRequest(userId: "123"))
+        _ = try await client.execute(request)
         Issue.record("Expected ResponseError.decodingFailed to be thrown")
     } catch let error as ResponseError {
         if case .decodingFailed = error {
@@ -416,9 +235,7 @@ func testNetworkClientHandlesDecodingFailure() async throws {
 func testNetworkClientURLEncoding() async throws {
     setupTest()
 
-    // Setup mock
-    let configuration = createMockConfiguration()
-
+    // Setup mock response
     MockURLProtocol.requestHandler = { request in
         // Verify query parameters are in URL
         let urlComponents = URLComponents(url: request.url!, resolvingAgainstBaseURL: false)
@@ -427,28 +244,16 @@ func testNetworkClientURLEncoding() async throws {
         #expect(queryItems?.contains(where: { $0.name == "q" && $0.value == "test" }) == true)
         #expect(queryItems?.contains(where: { $0.name == "limit" && $0.value == "20" }) == true)
 
-        let responseJSON: [[String: Any]] = [
-            ["id": "1", "name": "Result 1"],
-        ]
-
-        let data = try JSONSerialization.data(withJSONObject: responseJSON)
-        let response = MockURLProtocol.mockResponse(
-            url: request.url!,
-            statusCode: 200,
-            headers: ["Content-Type": "application/json"]
-        )
+        let resultUser = TestUser(id: "1", name: "Result 1")
+        let data = try JSONEncoder().encode([resultUser])
+        let response = MockURLProtocol.mockResponse(url: request.url!, statusCode: 200)
         return (response, data)
     }
 
-    // Create client
-    let clientConfig = NetworkClientConfiguration(
-        baseURL: "https://api.example.com",
-        urlSessionConfiguration: configuration
-    )
-    let client = NetworkClient(configuration: clientConfig)
-
-    // Execute request with URL encoding
-    let results = try await client.execute(SearchRequest(query: "test", limit: 20))
+    // Execute request
+    let client = createMockClient()
+    let request = TestRequestFactory.search(query: "test", limit: 20)
+    let results = try await client.execute(request)
 
     // Verify
     #expect(results.count == 1)

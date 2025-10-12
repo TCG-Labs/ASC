@@ -230,59 +230,68 @@ func testAuthenticationErrorMaxRetryAttemptsExceeded() {
     #expect(error.recoverySuggestion == "Please log in again")
 }
 
-// MARK: - HTTPStatus Tests
+// MARK: - HTTPStatus Tests (Parameterized)
 
-@Test("HTTPStatus.isSuccess identifies success codes")
-func testHTTPStatusIsSuccess() {
-    #expect(HTTPStatus.isSuccess(200) == true)
-    #expect(HTTPStatus.isSuccess(201) == true)
-    #expect(HTTPStatus.isSuccess(204) == true)
-    #expect(HTTPStatus.isSuccess(299) == true)
-
-    #expect(HTTPStatus.isSuccess(199) == false)
-    #expect(HTTPStatus.isSuccess(300) == false)
-    #expect(HTTPStatus.isSuccess(400) == false)
-    #expect(HTTPStatus.isSuccess(500) == false)
+@Test("HTTPStatus.isSuccess identifies success codes",
+      arguments: [
+          (code: 200, expected: true),
+          (code: 201, expected: true),
+          (code: 204, expected: true),
+          (code: 299, expected: true),
+          (code: 199, expected: false),
+          (code: 300, expected: false),
+          (code: 400, expected: false),
+          (code: 500, expected: false),
+      ])
+func testHTTPStatusIsSuccess(code: Int, expected: Bool) {
+    #expect(HTTPStatus.isSuccess(code) == expected)
 }
 
-@Test("HTTPStatus.isClientError identifies client error codes")
-func testHTTPStatusIsClientError() {
-    #expect(HTTPStatus.isClientError(400) == true)
-    #expect(HTTPStatus.isClientError(401) == true)
-    #expect(HTTPStatus.isClientError(404) == true)
-    #expect(HTTPStatus.isClientError(429) == true)
-    #expect(HTTPStatus.isClientError(499) == true)
-
-    #expect(HTTPStatus.isClientError(200) == false)
-    #expect(HTTPStatus.isClientError(300) == false)
-    #expect(HTTPStatus.isClientError(500) == false)
+@Test("HTTPStatus.isClientError identifies client error codes",
+      arguments: [
+          (code: 400, expected: true),
+          (code: 401, expected: true),
+          (code: 404, expected: true),
+          (code: 429, expected: true),
+          (code: 499, expected: true),
+          (code: 200, expected: false),
+          (code: 300, expected: false),
+          (code: 500, expected: false),
+      ])
+func testHTTPStatusIsClientError(code: Int, expected: Bool) {
+    #expect(HTTPStatus.isClientError(code) == expected)
 }
 
-@Test("HTTPStatus.isServerError identifies server error codes")
-func testHTTPStatusIsServerError() {
-    #expect(HTTPStatus.isServerError(500) == true)
-    #expect(HTTPStatus.isServerError(502) == true)
-    #expect(HTTPStatus.isServerError(503) == true)
-    #expect(HTTPStatus.isServerError(504) == true)
-    #expect(HTTPStatus.isServerError(599) == true)
-
-    #expect(HTTPStatus.isServerError(200) == false)
-    #expect(HTTPStatus.isServerError(400) == false)
-    #expect(HTTPStatus.isServerError(600) == false)
+@Test("HTTPStatus.isServerError identifies server error codes",
+      arguments: [
+          (code: 500, expected: true),
+          (code: 502, expected: true),
+          (code: 503, expected: true),
+          (code: 504, expected: true),
+          (code: 599, expected: true),
+          (code: 200, expected: false),
+          (code: 400, expected: false),
+          (code: 600, expected: false),
+      ])
+func testHTTPStatusIsServerError(code: Int, expected: Bool) {
+    #expect(HTTPStatus.isServerError(code) == expected)
 }
 
-@Test("HTTPStatus constants have correct values")
-func testHTTPStatusConstants() {
-    #expect(HTTPStatus.ok == 200)
-    #expect(HTTPStatus.created == 201)
-    #expect(HTTPStatus.noContent == 204)
-    #expect(HTTPStatus.notModified == 304)
-    #expect(HTTPStatus.badRequest == 400)
-    #expect(HTTPStatus.unauthorized == 401)
-    #expect(HTTPStatus.forbidden == 403)
-    #expect(HTTPStatus.notFound == 404)
-    #expect(HTTPStatus.tooManyRequests == 429)
-    #expect(HTTPStatus.internalServerError == 500)
-    #expect(HTTPStatus.badGateway == 502)
-    #expect(HTTPStatus.serviceUnavailable == 503)
+@Test("HTTPStatus constants have correct values",
+      arguments: [
+          (name: "ok", value: HTTPStatus.ok, expected: 200),
+          (name: "created", value: HTTPStatus.created, expected: 201),
+          (name: "noContent", value: HTTPStatus.noContent, expected: 204),
+          (name: "notModified", value: HTTPStatus.notModified, expected: 304),
+          (name: "badRequest", value: HTTPStatus.badRequest, expected: 400),
+          (name: "unauthorized", value: HTTPStatus.unauthorized, expected: 401),
+          (name: "forbidden", value: HTTPStatus.forbidden, expected: 403),
+          (name: "notFound", value: HTTPStatus.notFound, expected: 404),
+          (name: "tooManyRequests", value: HTTPStatus.tooManyRequests, expected: 429),
+          (name: "internalServerError", value: HTTPStatus.internalServerError, expected: 500),
+          (name: "badGateway", value: HTTPStatus.badGateway, expected: 502),
+          (name: "serviceUnavailable", value: HTTPStatus.serviceUnavailable, expected: 503),
+      ])
+func testHTTPStatusConstants(name: String, value: Int, expected: Int) {
+    #expect(value == expected, "HTTPStatus.\(name) should be \(expected)")
 }

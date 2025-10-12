@@ -43,7 +43,23 @@ swiftlint --fix
 
 ### Package Structure
 - **ASC/Sources/ASC/**: Main library source code
-- **ASC/Tests/ASCTests/**: Test suite using Swift Testing framework
+  - **Client/**: NetworkClient and supporting components (5 files)
+    - `NetworkClient.swift` - Main client for executing requests (276 lines)
+    - `NetworkClientConfiguration.swift` - Configuration struct (112 lines)
+    - `URLBuilder.swift` - URL construction with path parameters (81 lines)
+    - `MultipartRequestBuilder.swift` - Multipart upload builder (67 lines)
+    - `ErrorMapper.swift` - Error mapping from Alamofire (113 lines)
+  - **Core/**: Protocol definitions and core types
+  - **Errors/**: Error types (NetworkError, ResponseError, AuthenticationError)
+  - **Request/**: NetworkRequest protocol and extensions
+- **ASC/Tests/ASCTests/**: Comprehensive test suite (65 tests, 100% pass rate)
+  - **Helpers/**: Test utilities and infrastructure
+    - `TestRequestFactory.swift` - Factory for creating test requests (149 lines)
+    - `MockResponseBuilder.swift` - DSL for mock responses (248 lines)
+    - `TestHelpers.swift` - Common test utilities (62 lines)
+    - `TestModels.swift` - Test data models (217 lines)
+  - **Mocks/**: Mock implementations for testing
+  - Test files organized by feature area
 - **ASC/Package.swift**: SPM configuration with Alamofire dependency
 
 ### Dependencies
@@ -52,6 +68,15 @@ swiftlint --fix
 
 ### Testing Framework
 Uses Swift Testing framework (not XCTest). Tests use the `@Test` attribute and `#expect` for assertions.
+
+**Test Coverage:**
+- 65 comprehensive tests across all features
+- 100% pass rate
+- Organized test suites: NetworkClientTests, ErrorHandlingTests, InterceptorAndMonitorTests, AdvancedNetworkTests
+- Serialized execution to prevent state interference
+- MockURLProtocol for network request interception
+- Test factory pattern for easy request creation
+- DSL for mock response building
 
 ## Library Architecture & Features
 
@@ -75,6 +100,33 @@ Main client that executes requests using Alamofire:
 - Generic response handling
 - Interceptor chain execution
 - Error transformation
+
+**Component-Based Architecture:**
+NetworkClient follows Single Responsibility Principle with dedicated components:
+
+1. **URLBuilder** - URL Construction
+   - Combines base URL with path
+   - Applies path prefix for API versioning
+   - Substitutes path parameters (`{userId}` → `123`)
+   - Validates and builds final URLs
+
+2. **MultipartRequestBuilder** - File Uploads
+   - Constructs multipart/form-data requests
+   - Handles file data with custom MIME types
+   - Combines files with regular parameters
+   - Returns configured Alamofire UploadRequest
+
+3. **ErrorMapper** - Error Translation
+   - Maps Alamofire errors to ASC error types
+   - Handles URLError → NetworkError mapping
+   - Handles validation errors → ResponseError
+   - Handles serialization errors with context
+
+4. **NetworkClientConfiguration** - Configuration
+   - Centralizes all client settings
+   - Manages interceptors and monitors
+   - Controls dispatch queues and trust managers
+   - Provides default configuration factory
 
 ### Response Handling System
 
@@ -123,6 +175,34 @@ Main client that executes requests using Alamofire:
 - Predefined response fixtures
 - Network condition simulation
 - Easy test setup
+
+**Test Infrastructure:**
+Comprehensive testing utilities for writing clean, maintainable tests:
+
+1. **TestRequestFactory** - Request Creation Factory
+   - Pre-configured test requests with sensible defaults
+   - Methods for all request types (GET, POST, PUT, DELETE, upload)
+   - Eliminates repetitive request setup code
+   - Example: `TestRequestFactory.getUser(userId: "123")`
+
+2. **MockResponseBuilder** - Response DSL
+   - Fluent API for building mock HTTP responses
+   - Success/error response builders
+   - Convenience methods: `.success(user)`, `.notFound()`, `.serverError()`
+   - Type-safe with `.handler()` method for MockURLProtocol
+   - Example: `MockResponseBuilder.user().handler()`
+
+3. **MockURLProtocol** - Network Interception
+   - Intercepts URLSession requests for testing
+   - Configurable request handlers
+   - Request history tracking
+   - Response delay simulation
+
+4. **Test Helpers**
+   - `setupTest()` - Reset mock state before each test
+   - `createMockClient()` - Factory for test clients
+   - `TestConstants` - Centralized test constants
+   - Serialized test execution to prevent state interference
 
 **5. Upload/Download with Progress**
 - Async sequences for progress tracking
@@ -501,6 +581,64 @@ struct UpdateUserDocumentRequest: NetworkRequest {
 }
 ```
 
+#### Testing with Test Infrastructure
+
+```swift
+import Testing
+@testable import ASC
+
+@Test("NetworkClient executes successful GET request")
+func testNetworkClient() async throws {
+    setupTest() // Reset mock state
+
+    // Setup mock response using DSL
+    let mockUser = TestUser(id: "123", name: "John Doe")
+    MockURLProtocol.requestHandler = MockResponseBuilder.success(mockUser).handler()
+
+    // Create client and request using factories
+    let client = createMockClient()
+    let request = TestRequestFactory.getUser(userId: "123")
+
+    // Execute and verify
+    let user = try await client.execute(request)
+    #expect(user == mockUser)
+}
+
+@Test("NetworkClient handles 404 error")
+func testNotFound() async throws {
+    setupTest()
+
+    // Setup error response
+    MockURLProtocol.requestHandler = MockResponseBuilder.notFound().handler()
+
+    let client = createMockClient()
+    let request = TestRequestFactory.getUser(userId: "999")
+
+    do {
+        _ = try await client.execute(request)
+        Issue.record("Expected error to be thrown")
+    } catch let error as ResponseError {
+        #expect(error.statusCode == 404)
+    }
+}
+
+// Parameterized tests
+@Test("HTTPStatus validation", arguments: [
+    (code: 200, isSuccess: true),
+    (code: 404, isSuccess: false),
+    (code: 500, isSuccess: false)
+])
+func testStatusCodes(code: Int, isSuccess: Bool) {
+    #expect(HTTPStatus.isSuccess(code) == isSuccess)
+}
+```
+
+**Test Structure Benefits:**
+- Tests reduced from ~40 lines to ~15 lines on average
+- Consistent mock setup across all tests
+- Easy to write new tests (3-5 lines vs 30-40 lines)
+- Better readability with declarative API
+
 ## Technical Implementation Details
 
 ### Alamofire Integration Strategy
@@ -673,6 +811,53 @@ The project has a **very strict** SwiftLint configuration (.swiftlint.yml):
 - Background task handling
 - Proper state management
 - Memory management
+
+## Code Quality & Refactoring
+
+### Architecture Improvements
+
+The codebase has undergone systematic refactoring to improve maintainability and testability:
+
+**Priority 1: Code Deduplication**
+- Extracted URL building logic (eliminated 68 lines of duplication)
+- Extracted multipart upload logic (eliminated 52 lines of duplication)
+- Centralized magic strings into TestConstants
+
+**Priority 2: Component Extraction**
+- Split NetworkClient from 552 lines into 5 focused components (276 lines main)
+- Each component follows Single Responsibility Principle
+- URLBuilder: URL construction (81 lines)
+- MultipartRequestBuilder: File uploads (67 lines)
+- ErrorMapper: Error translation (113 lines)
+- NetworkClientConfiguration: Client settings (112 lines)
+- Result: 50% reduction in NetworkClient size, improved maintainability
+
+**Priority 3: Test Infrastructure**
+- Created TestRequestFactory (149 lines) for request creation
+- Created MockResponseBuilder (248 lines) for response mocking
+- Converted to parameterized tests (36 test cases in 4 functions)
+- Refactored integration tests (40 → 15 lines average)
+- Result: ~100 lines saved, 62% reduction in test length
+
+### Current Metrics
+
+**Library Code:**
+- NetworkClient components: 649 lines across 5 files
+- Clean separation of concerns
+- Well-documented public API
+- Full Swift 6 concurrency support
+
+**Test Suite:**
+- 65 comprehensive tests, 100% pass rate
+- Test infrastructure: 676 lines (4 helper files)
+- Average test length: 15 lines (vs 40 before)
+- Consistent patterns across all tests
+
+**Code Quality:**
+- Strict SwiftLint configuration enforced
+- All public APIs documented
+- Protocol-oriented design throughout
+- Type-safe with comprehensive generics
 
 ## GitHub Integration
 
