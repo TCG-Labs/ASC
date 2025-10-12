@@ -94,7 +94,8 @@ public final class NetworkClient: Sendable {
             guard let response = try await performMultipartRequest(
                 request,
                 files: files,
-                responseType: Request.Response.self
+                responseType: Request.Response.self,
+                retryPolicy: request.retryPolicy
             ) else {
                 throw ResponseError.missingData
             }
@@ -102,7 +103,11 @@ public final class NetworkClient: Sendable {
         }
 
         let urlRequest = try buildURLRequest(from: request)
-        return try await performRequest(urlRequest, responseType: Request.Response.self)
+        return try await performRequest(
+            urlRequest,
+            responseType: Request.Response.self,
+            retryPolicy: request.retryPolicy
+        )
     }
 
     /// Executes a network request without expecting a response body.
@@ -119,13 +124,14 @@ public final class NetworkClient: Sendable {
             _ = try await performMultipartRequest(
                 request,
                 files: files,
-                responseType: nil as ASCEmptyResponse.Type?
+                responseType: nil as ASCEmptyResponse.Type?,
+                retryPolicy: request.retryPolicy
             )
             return
         }
 
         let urlRequest = try buildURLRequest(from: request)
-        try await performEmptyRequest(urlRequest)
+        try await performEmptyRequest(urlRequest, retryPolicy: request.retryPolicy)
     }
 
     // MARK: - Private Methods
@@ -157,10 +163,11 @@ public final class NetworkClient: Sendable {
 
     /// Performs the actual network request using Alamofire.
     private func performRequest<Response: Decodable & Sendable>(
-        _ request: URLRequest,
-        responseType: Response.Type
+        _ urlRequest: URLRequest,
+        responseType: Response.Type,
+        retryPolicy: Alamofire.RetryPolicy?
     ) async throws -> Response {
-        let dataTask = session.request(request)
+        let dataTask = session.request(urlRequest, interceptor: retryPolicy)
             .validate()
             .serializingDecodable(Response.self)
 
@@ -178,8 +185,11 @@ public final class NetworkClient: Sendable {
     }
 
     /// Performs a request without expecting a response body.
-    private func performEmptyRequest(_ request: URLRequest) async throws {
-        let dataTask = session.request(request)
+    private func performEmptyRequest(
+        _ urlRequest: URLRequest,
+        retryPolicy: Alamofire.RetryPolicy?
+    ) async throws {
+        let dataTask = session.request(urlRequest, interceptor: retryPolicy)
             .validate()
             .serializingData()
 
@@ -198,16 +208,19 @@ public final class NetworkClient: Sendable {
     private func performMultipartRequest<Request: NetworkRequest, Response: Decodable & Sendable>(
         _ request: Request,
         files: [String: Data],
-        responseType: Response.Type?
+        responseType: Response.Type?,
+        retryPolicy: Alamofire.RetryPolicy?
     ) async throws -> Response? {
         let url = try urlBuilder.buildURL(from: request, baseURL: configuration.baseURL)
         let headers = buildHeaders(for: request)
+
         let upload = multipartBuilder.buildUpload(
             for: request,
             files: files,
             url: url,
             session: session,
-            headers: headers
+            headers: headers,
+            interceptor: retryPolicy
         )
 
         // Handle response based on expected type

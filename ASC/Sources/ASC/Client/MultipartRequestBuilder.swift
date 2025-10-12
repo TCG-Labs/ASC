@@ -30,13 +30,15 @@ internal struct MultipartRequestBuilder {
     ///   - url: Target URL for upload
     ///   - session: Alamofire session to use for upload
     ///   - headers: HTTP headers for the request
+    ///   - interceptor: Optional request interceptor for retry logic
     /// - Returns: Configured UploadRequest ready to execute
     internal func buildUpload<Request: NetworkRequest>(
         for request: Request,
         files: [String: Data],
         url: URL,
         session: Session,
-        headers: HTTPHeaders
+        headers: HTTPHeaders,
+        interceptor: (any RequestInterceptor)? = nil
     ) -> UploadRequest {
         session.upload(
             multipartFormData: { multipartFormData in
@@ -61,7 +63,8 @@ internal struct MultipartRequestBuilder {
             },
             to: url,
             method: request.method,
-            headers: headers
+            headers: headers,
+            interceptor: interceptor
         )
     }
 

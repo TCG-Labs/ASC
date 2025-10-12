@@ -1,87 +1,77 @@
 // RetryPolicy.swift
 // ASC - Alamofire Swift Client
 
-// Retry policy configuration for failed requests.
+// Convenient extensions for Alamofire's RetryPolicy.
 
+import Alamofire
 import Foundation
 
-/// Configuration for request retry behavior.
+/// Extension providing convenient preset retry policies.
 ///
-/// Defines how and when failed requests should be retried.
-/// Use this to implement resilient network communication with
-/// automatic retry on transient failures.
-public struct RetryPolicy: Sendable {
-    /// Maximum number of retry attempts.
+/// Instead of creating a custom wrapper, we extend Alamofire's RetryPolicy
+/// with convenient factory methods for common use cases.
+public extension Alamofire.RetryPolicy {
+    /// No retry policy - fail immediately on errors.
     ///
-    /// After this many retries, the request will fail permanently.
-    /// Set to 0 to disable retries.
-    public let maxRetries: Int
-
-    /// Base delay between retries in seconds.
-    ///
-    /// The actual delay may be longer if exponential backoff is enabled.
-    public let retryDelay: TimeInterval
-
-    /// Whether to use exponential backoff for retry delays.
-    ///
-    /// When enabled, each subsequent retry waits longer:
-    /// - 1st retry: retryDelay
-    /// - 2nd retry: retryDelay * 2
-    /// - 3rd retry: retryDelay * 4
-    /// - etc.
-    public let exponentialBackoff: Bool
-
-    /// HTTP status codes that should trigger a retry.
-    ///
-    /// Common retryable codes: 408 (Request Timeout), 429 (Too Many Requests),
-    /// 500 (Internal Server Error), 502 (Bad Gateway), 503 (Service Unavailable), 504 (Gateway Timeout)
-    public let retryableStatusCodes: Set<HTTPStatusCode>
-
-    /// Whether to retry on network errors (no connection, timeout, etc.)
-    public let retryOnNetworkError: Bool
-
-    /// Creates a new retry policy.
-    ///
-    /// - Parameters:
-    ///   - maxRetries: Maximum number of retry attempts (default: 3)
-    ///   - retryDelay: Base delay between retries in seconds (default: 1.0)
-    ///   - exponentialBackoff: Use exponential backoff (default: true)
-    ///   - retryableStatusCodes: Status codes that trigger retry (default: 408, 429, 500, 502, 503, 504)
-    ///   - retryOnNetworkError: Retry on network errors (default: true)
-    public init(
-        maxRetries: Int = 3,
-        retryDelay: TimeInterval = 1.0,
-        exponentialBackoff: Bool = true,
-        retryableStatusCodes: Set<HTTPStatusCode> = [408, 429, 500, 502, 503, 504],
-        retryOnNetworkError: Bool = true
-    ) {
-        self.maxRetries = maxRetries
-        self.retryDelay = retryDelay
-        self.exponentialBackoff = exponentialBackoff
-        self.retryableStatusCodes = retryableStatusCodes
-        self.retryOnNetworkError = retryOnNetworkError
+    /// Use this for requests that should not be retried, or in tests
+    /// to avoid unexpected retry behavior.
+    static var none: Alamofire.RetryPolicy? {
+        nil
     }
 
     /// Default retry policy with sensible defaults.
     ///
-    /// - 3 retry attempts
-    /// - 1 second base delay
-    /// - Exponential backoff enabled
-    /// - Retries on common server errors and network failures
-    public static let `default` = RetryPolicy()
-
-    /// No retry policy - fail immediately on errors.
-    public static let none = RetryPolicy(maxRetries: 0)
+    /// Configuration:
+    /// - 3 retry attempts (retryLimit: 3)
+    /// - Exponential backoff (base: 2, scale: 0.5)
+    /// - Retries on common server errors (408, 500, 502, 503, 504)
+    /// - Retries on network failures
+    /// - All idempotent HTTP methods
+    ///
+    /// Retry delays: 0.5s, 1.0s, 2.0s
+    static var `default`: Alamofire.RetryPolicy {
+        Alamofire.RetryPolicy(
+            retryLimit: 3,
+            exponentialBackoffBase: 2,
+            exponentialBackoffScale: 0.5
+        )
+    }
 
     /// Aggressive retry policy for critical requests.
     ///
-    /// - 5 retry attempts
-    /// - 2 second base delay
-    /// - Exponential backoff enabled
-    public static let aggressive = RetryPolicy(
-        maxRetries: 5,
-        retryDelay: 2.0
-    )
+    /// Configuration:
+    /// - 5 retry attempts (retryLimit: 5)
+    /// - Exponential backoff (base: 2, scale: 1.0)
+    /// - Retries on common server errors (408, 500, 502, 503, 504)
+    /// - Retries on network failures
+    /// - All idempotent HTTP methods
+    ///
+    /// Retry delays: 1.0s, 2.0s, 4.0s, 8.0s, 16.0s
+    static var aggressive: Alamofire.RetryPolicy {
+        Alamofire.RetryPolicy(
+            retryLimit: 5,
+            exponentialBackoffBase: 2,
+            exponentialBackoffScale: 1.0
+        )
+    }
+
+    /// Conservative retry policy for non-critical requests.
+    ///
+    /// Configuration:
+    /// - 2 retry attempts (retryLimit: 2)
+    /// - Exponential backoff (base: 2, scale: 0.5)
+    /// - Retries on common server errors (408, 500, 502, 503, 504)
+    /// - Retries on network failures
+    /// - All idempotent HTTP methods
+    ///
+    /// Retry delays: 0.5s, 1.0s
+    static var conservative: Alamofire.RetryPolicy {
+        Alamofire.RetryPolicy(
+            retryLimit: 2,
+            exponentialBackoffBase: 2,
+            exponentialBackoffScale: 0.5
+        )
+    }
 }
 
 /// Extension to add retry policy to NetworkRequest.
@@ -89,6 +79,13 @@ public extension NetworkRequest {
     /// Retry policy for this request.
     ///
     /// Override this to customize retry behavior for specific requests.
-    /// Default is `.default` (3 retries with exponential backoff).
-    var retryPolicy: RetryPolicy { .default }
+    /// Default is `nil` (no retries) to avoid unexpected behavior in tests.
+    ///
+    /// Example:
+    /// ```swift
+    /// struct MyRequest: NetworkRequest {
+    ///     var retryPolicy: Alamofire.RetryPolicy? { .default }
+    /// }
+    /// ```
+    var retryPolicy: Alamofire.RetryPolicy? { nil }
 }
