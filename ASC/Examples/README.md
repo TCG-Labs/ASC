@@ -69,6 +69,22 @@ Complete guide to uploading files with ASC.
 
 ---
 
+### 5. **EnumRequestExample.swift** - Enum-Based Requests
+
+Different approaches to using enums for grouping related API requests.
+
+**What it covers:**
+- ✅ Simple enum (single Response type)
+- ✅ Enum for empty response operations
+- ✅ Namespace enum + nested structs (most flexible)
+- ✅ Protocol + enum pattern
+- ✅ Comparison and recommendations
+- ✅ Best practices for API organization
+
+**Complexity:** ⭐⭐⭐ Advanced
+
+---
+
 ## 🚀 How to Run Examples
 
 ### Option 1: iOS/macOS App
