@@ -80,19 +80,75 @@ internal struct ErrorMapper {
         data: Data?
     ) -> ResponseError {
         if case .unacceptableStatusCode(let code) = reason {
+            // Try to extract error message from response
+            let errorMessage = extractErrorMessage(from: data)
+
             if code == HTTPStatus.unauthorized {
-                return ResponseError.clientError(code, "Unauthorized")
+                return ResponseError.clientError(code, errorMessage ?? "Unauthorized")
             }
             if HTTPStatus.isServerError(code) {
-                return ResponseError.serverError(code, "Server error")
+                return ResponseError.serverError(code, errorMessage ?? "Server error")
             }
             if HTTPStatus.isClientError(code) {
-                return ResponseError.clientError(code, nil)
+                return ResponseError.clientError(code, errorMessage)
             }
             return ResponseError.invalidStatusCode(code, data)
         }
 
         return ResponseError.validationFailed("Response validation failed")
+    }
+
+    // MARK: - Error Message Extraction
+
+    /// Extracts error message from response data.
+    ///
+    /// Attempts to parse common error response formats:
+    /// - `{"error": "message"}`
+    /// - `{"message": "message"}`
+    /// - `{"error_description": "message"}`
+    /// - `{"errors": ["message1", "message2"]}`
+    ///
+    /// - Parameter data: Response data to parse
+    /// - Returns: Extracted error message, or nil if parsing fails
+    private func extractErrorMessage(from data: Data?) -> String? {
+        guard let data = data,
+              !data.isEmpty,
+              let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else {
+            return nil
+        }
+
+        // Try common error message keys
+        if let message = json["message"] as? String {
+            return message
+        }
+
+        if let error = json["error"] as? String {
+            return error
+        }
+
+        if let errorDescription = json["error_description"] as? String {
+            return errorDescription
+        }
+
+        // Handle nested error object
+        if let errorObject = json["error"] as? [String: Any],
+           let message = errorObject["message"] as? String {
+            return message
+        }
+
+        // Handle array of errors
+        if let errors = json["errors"] as? [String], let firstError = errors.first {
+            return firstError
+        }
+
+        // Handle array of error objects
+        if let errors = json["errors"] as? [[String: Any]],
+           let firstError = errors.first,
+           let message = firstError["message"] as? String {
+            return message
+        }
+
+        return nil
     }
 
     /// Maps serialization failure to ResponseError.
