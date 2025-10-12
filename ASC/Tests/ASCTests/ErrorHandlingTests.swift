@@ -295,3 +295,146 @@ func testHTTPStatusIsServerError(code: Int, expected: Bool) {
 func testHTTPStatusConstants(name: String, value: Int, expected: Int) {
     #expect(value == expected, "HTTPStatus.\(name) should be \(expected)")
 }
+
+// MARK: - Additional ResponseError Coverage Tests
+
+@Test("ResponseError.invalidStatusCode with server error provides server recovery suggestion")
+func testResponseErrorInvalidStatusCodeServerError() {
+    let error = ResponseError.invalidStatusCode(500, nil)
+
+    #expect(error.recoverySuggestion == "The server encountered an error. Please try again later")
+}
+
+@Test("ResponseError.invalidStatusCode with client error provides client recovery suggestion")
+func testResponseErrorInvalidStatusCodeClientError() {
+    let error = ResponseError.invalidStatusCode(400, nil)
+
+    #expect(error.recoverySuggestion == "Please check your request and try again")
+}
+
+@Test("ResponseError.invalidStatusCode with non-standard code has nil recovery suggestion")
+func testResponseErrorInvalidStatusCodeNonStandard() {
+    let error = ResponseError.invalidStatusCode(300, nil)
+
+    #expect(error.recoverySuggestion == nil)
+}
+
+@Test("ResponseError.clientError with 400 has specific recovery suggestion")
+func testResponseErrorClientError400() {
+    let error = ResponseError.clientError(400, nil)
+
+    #expect(error.recoverySuggestion == "Please check your request parameters")
+}
+
+@Test("ResponseError.clientError with 404 has specific recovery suggestion")
+func testResponseErrorClientError404() {
+    let error = ResponseError.clientError(404, nil)
+
+    #expect(error.recoverySuggestion == "The requested resource was not found")
+}
+
+@Test("ResponseError.clientError with other code has generic recovery suggestion")
+func testResponseErrorClientErrorOther() {
+    let error = ResponseError.clientError(403, nil)
+
+    #expect(error.recoverySuggestion == "Please check your request and try again")
+}
+
+@Test("ResponseError.decodingFailed has recovery suggestion")
+func testResponseErrorDecodingFailedRecovery() {
+    let decodingError = NSError(domain: "test", code: 1)
+    let error = ResponseError.decodingFailed(decodingError, Data())
+
+    #expect(error.recoverySuggestion == "The server response format is unexpected. Please contact support")
+}
+
+@Test("ResponseError.missingData has nil statusCode")
+func testResponseErrorMissingDataStatusCode() {
+    let error = ResponseError.missingData
+
+    #expect(error.statusCode == nil)
+}
+
+@Test("ResponseError.missingData has nil responseData")
+func testResponseErrorMissingDataResponseData() {
+    let error = ResponseError.missingData
+
+    #expect(error.responseData == nil)
+}
+
+@Test("ResponseError.missingData has nil underlyingError")
+func testResponseErrorMissingDataUnderlyingError() {
+    let error = ResponseError.missingData
+
+    #expect(error.underlyingError == nil)
+}
+
+@Test("ResponseError.invalidFormat has nil statusCode")
+func testResponseErrorInvalidFormatStatusCode() {
+    let error = ResponseError.invalidFormat("test")
+
+    #expect(error.statusCode == nil)
+}
+
+@Test("ResponseError.invalidFormat has nil responseData")
+func testResponseErrorInvalidFormatResponseData() {
+    let error = ResponseError.invalidFormat("test")
+
+    #expect(error.responseData == nil)
+}
+
+@Test("ResponseError.invalidFormat has nil underlyingError")
+func testResponseErrorInvalidFormatUnderlyingError() {
+    let error = ResponseError.invalidFormat("test")
+
+    #expect(error.underlyingError == nil)
+}
+
+@Test("ResponseError.serverError has nil responseData")
+func testResponseErrorServerErrorResponseData() {
+    let error = ResponseError.serverError(500, "test")
+
+    #expect(error.responseData == nil)
+}
+
+@Test("ResponseError.serverError has nil underlyingError")
+func testResponseErrorServerErrorUnderlyingError() {
+    let error = ResponseError.serverError(500, "test")
+
+    #expect(error.underlyingError == nil)
+}
+
+@Test("ResponseError.clientError has nil responseData")
+func testResponseErrorClientErrorResponseData() {
+    let error = ResponseError.clientError(400, nil)
+
+    #expect(error.responseData == nil)
+}
+
+@Test("ResponseError.clientError has nil underlyingError")
+func testResponseErrorClientErrorUnderlyingError() {
+    let error = ResponseError.clientError(400, nil)
+
+    #expect(error.underlyingError == nil)
+}
+
+@Test("ResponseError.validationFailed has nil statusCode")
+func testResponseErrorValidationFailedStatusCode() {
+    let error = ResponseError.validationFailed("test")
+
+    #expect(error.statusCode == nil)
+}
+
+@Test("ResponseError.validationFailed has nil responseData")
+func testResponseErrorValidationFailedResponseData() {
+    let error = ResponseError.validationFailed("test")
+
+    #expect(error.responseData == nil)
+}
+
+@Test("ResponseError.validationFailed has nil underlyingError")
+func testResponseErrorValidationFailedUnderlyingError() {
+    let error = ResponseError.validationFailed("test")
+
+    #expect(error.underlyingError == nil)
+}
