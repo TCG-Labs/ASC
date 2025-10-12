@@ -120,6 +120,7 @@ public enum ResponseError: ASCError {
         switch self {
         case .decodingFailed(let error, _):
             return error
+
         default:
             return nil
         }
@@ -134,6 +135,7 @@ public enum ResponseError: ASCError {
              .serverError(let code, _),
              .clientError(let code, _):
             return code
+
         default:
             return nil
         }
@@ -144,8 +146,10 @@ public enum ResponseError: ASCError {
         switch self {
         case .invalidStatusCode(_, let data):
             return data
+
         case .decodingFailed(_, let data):
             return data
+
         default:
             return nil
         }

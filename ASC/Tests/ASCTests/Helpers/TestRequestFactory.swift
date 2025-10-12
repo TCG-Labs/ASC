@@ -3,8 +3,8 @@
 //
 // Factory for creating test requests with sensible defaults.
 
-import Foundation
 @testable import ASC
+import Foundation
 
 /// Factory for creating test requests with default values.
 ///
@@ -31,7 +31,7 @@ public enum TestRequestFactory {
     public static let defaultToken = "test-token-abc123"
 
     /// Default test file data.
-    public static let defaultFileData = "Test file content".data(using: .utf8)!
+    public static let defaultFileData = Data("Test file content".utf8)
 
     // MARK: - GET Requests
 

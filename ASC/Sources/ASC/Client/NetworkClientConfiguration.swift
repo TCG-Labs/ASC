@@ -3,8 +3,8 @@
 //
 // Configuration for NetworkClient.
 
-import Foundation
 import Alamofire
+import Foundation
 
 /// Configuration for NetworkClient.
 ///

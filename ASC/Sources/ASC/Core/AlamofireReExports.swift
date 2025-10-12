@@ -3,8 +3,8 @@
 //
 // Re-exports of Alamofire types for convenience and consistency.
 
-import Foundation
 import Alamofire
+import Foundation
 
 // MARK: - HTTP Types
 

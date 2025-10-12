@@ -3,10 +3,10 @@
 //
 // Integration tests for NetworkClient.
 
-import Testing
-import Foundation
 import Alamofire
 @testable import ASC
+import Foundation
+import Testing
 
 // MARK: - NetworkClient Integration Tests
 
@@ -14,7 +14,6 @@ import Alamofire
 struct IntegrationTests {}
 
 extension IntegrationTests {
-
 @Test("NetworkClient executes successful GET request")
 func testNetworkClientSuccessfulGET() async throws {
     setupTest()
@@ -241,8 +240,8 @@ func testNetworkClientURLEncoding() async throws {
         let urlComponents = URLComponents(url: request.url!, resolvingAgainstBaseURL: false)
         let queryItems = urlComponents?.queryItems
 
-        #expect(queryItems?.contains(where: { $0.name == "q" && $0.value == "test" }) == true)
-        #expect(queryItems?.contains(where: { $0.name == "limit" && $0.value == "20" }) == true)
+        #expect(queryItems?.contains { $0.name == "q" && $0.value == "test" } == true)
+        #expect(queryItems?.contains { $0.name == "limit" && $0.value == "20" } == true)
 
         let resultUser = TestUser(id: "1", name: "Result 1")
         let data = try JSONEncoder().encode([resultUser])
@@ -258,5 +257,4 @@ func testNetworkClientURLEncoding() async throws {
     // Verify
     #expect(results.count == 1)
 }
-
 }

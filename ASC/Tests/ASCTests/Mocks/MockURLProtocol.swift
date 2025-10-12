@@ -23,15 +23,15 @@ public final class MockURLProtocol: URLProtocol {
 
     // MARK: - URLProtocol Override
 
-    public override class func canInit(with request: URLRequest) -> Bool {
+    override public class func canInit(with request: URLRequest) -> Bool {
         true
     }
 
-    public override class func canonicalRequest(for request: URLRequest) -> URLRequest {
+    override public class func canonicalRequest(for request: URLRequest) -> URLRequest {
         request
     }
 
-    public override func startLoading() {
+    override public func startLoading() {
         // Record the request
         Self.requestHistory.append(request)
 
@@ -65,7 +65,7 @@ public final class MockURLProtocol: URLProtocol {
         }
     }
 
-    public override func stopLoading() {
+    override public func stopLoading() {
         // Nothing to stop in mock
     }
 

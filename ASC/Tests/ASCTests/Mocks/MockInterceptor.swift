@@ -3,9 +3,9 @@
 //
 // Mock request interceptor for testing.
 
-import Foundation
 import Alamofire
 @testable import ASC
+import Foundation
 
 /// Mock request interceptor for testing adapter and retry behavior.
 public final class MockInterceptor: RequestInterceptor, @unchecked Sendable {

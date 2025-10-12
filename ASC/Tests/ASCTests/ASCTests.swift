@@ -1,6 +1,6 @@
-import Testing
-import Foundation
 @testable import ASC
+import Foundation
+import Testing
 
 // MARK: - NetworkRequest with Path Parameters
 
@@ -27,7 +27,7 @@ func testNetworkRequestWithPathPrefix() async throws {
 
 @Test("NetworkRequest with file upload")
 func testNetworkRequestWithFileUpload() async throws {
-    let testData = "Hello, World!".data(using: .utf8)!
+    let testData = Data("Hello, World!".utf8)
     let request = UploadFileRequest(userId: "test", fileData: testData)
 
     #expect(request.files?["avatar"] == testData)

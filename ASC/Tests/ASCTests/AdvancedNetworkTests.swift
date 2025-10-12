@@ -3,15 +3,14 @@
 //
 // Tests for advanced networking scenarios: concurrency, retry, timeout, etc.
 
-import Testing
-import Foundation
 import Alamofire
 @testable import ASC
+import Foundation
+import Testing
 
 // MARK: - Retry Policy Tests
 
 extension IntegrationTests {
-
 @Test("RetryPolicy.default has correct values")
 func testRetryPolicyDefault() {
     let policy = RetryPolicy.default
@@ -73,7 +72,6 @@ func testConcurrentRequests() async throws {
     // Setup mock
     let configuration = createMockConfiguration()
 
-
     var requestCount = 0
     MockURLProtocol.requestHandler = { request in
         requestCount += 1
@@ -81,7 +79,7 @@ func testConcurrentRequests() async throws {
         let userId = request.url?.lastPathComponent ?? "unknown"
         let responseJSON: [String: Any] = [
             "id": userId,
-            "name": "User \(userId)",
+            "name": "User \(userId)"
         ]
 
         let (response, data) = try MockURLProtocol.mockJSONResponse(
@@ -125,13 +123,12 @@ func testConcurrentMixedRequests() async throws {
     setupTest()
     // Setup mock
     let configuration = createMockConfiguration()
-    
 
     MockURLProtocol.requestHandler = { request in
         if request.url?.path.contains("users") == true {
             let responseJSON: [String: Any] = [
                 "id": "1",
-                "name": "User 1",
+                "name": "User 1"
             ]
             let (response, data) = try MockURLProtocol.mockJSONResponse(
                 url: request.url!,
@@ -144,7 +141,7 @@ func testConcurrentMixedRequests() async throws {
                 "id": "post1",
                 "title": "Post",
                 "content": "Content",
-                "authorId": "1",
+                "authorId": "1"
             ]
             let (response, data) = try MockURLProtocol.mockJSONResponse(
                 url: request.url!,
@@ -182,14 +179,13 @@ func testCustomTimeout() async throws {
     setupTest()
     // Setup mock with delay
     let configuration = createMockConfiguration()
-    
 
     MockURLProtocol.responseDelay = 0.1 // Small delay for test speed
 
     MockURLProtocol.requestHandler = { request in
         let responseJSON: [String: Any] = [
             "id": "123",
-            "name": "Test User",
+            "name": "Test User"
         ]
 
         let (response, data) = try MockURLProtocol.mockJSONResponse(
@@ -225,9 +221,8 @@ func testMultipartFileUpload() async throws {
     setupTest()
     // Setup mock
     let configuration = createMockConfiguration()
-    
 
-    let testFileData = "Test file content".data(using: .utf8)!
+    let testFileData = Data("Test file content".utf8)
 
     MockURLProtocol.requestHandler = { request in
         // Verify Content-Type is multipart/form-data
@@ -239,11 +234,14 @@ func testMultipartFileUpload() async throws {
 
         let responseJSON: [String: Any] = [
             "id": "123",
-            "name": "User with avatar",
+            "name": "User with avatar"
         ]
 
+        guard let url = request.url else {
+            throw NSError(domain: "Test", code: -1, userInfo: nil)
+        }
         let (response, data) = try MockURLProtocol.mockJSONResponse(
-            url: request.url!,
+            url: url,
             statusCode: 200,
             json: responseJSON
         )
@@ -271,13 +269,15 @@ func testMultipartUploadEmptyResponse() async throws {
     setupTest()
     // Setup mock
     let configuration = createMockConfiguration()
-    
 
-    let testFileData = "Test file content".data(using: .utf8)!
+    let testFileData = Data("Test file content".utf8)
 
     MockURLProtocol.requestHandler = { request in
+        guard let url = request.url else {
+            throw NSError(domain: "Test", code: -1, userInfo: nil)
+        }
         let response = MockURLProtocol.mockResponse(
-            url: request.url!,
+            url: url,
             statusCode: 204
         )
         return (response, nil)
@@ -314,7 +314,6 @@ func testDefaultHeaders() async throws {
     setupTest()
     // Setup mock
     let configuration = createMockConfiguration()
-    
 
     let mockUser = TestUser(id: "123", name: "Test User")
 
@@ -325,7 +324,7 @@ func testDefaultHeaders() async throws {
 
         let responseJSON: [String: Any] = [
             "id": mockUser.id,
-            "name": mockUser.name,
+            "name": mockUser.name
         ]
 
         let (response, data) = try MockURLProtocol.mockJSONResponse(
@@ -338,7 +337,7 @@ func testDefaultHeaders() async throws {
 
     // Create client with default headers
     let defaultHeaders: HTTPHeaders = [
-        "X-App-Version": "1.0",
+        "X-App-Version": "1.0"
     ]
     let clientConfig = NetworkClientConfiguration(
         baseURL: "https://api.example.com",
@@ -356,7 +355,6 @@ func testHeaderOverride() async throws {
     setupTest()
     // Setup mock
     let configuration = createMockConfiguration()
-    
 
     let mockUser = TestUser(id: "me", name: "Current User")
 
@@ -371,7 +369,7 @@ func testHeaderOverride() async throws {
 
         let responseJSON: [String: Any] = [
             "id": mockUser.id,
-            "name": mockUser.name,
+            "name": mockUser.name
         ]
 
         let (response, data) = try MockURLProtocol.mockJSONResponse(
@@ -385,7 +383,7 @@ func testHeaderOverride() async throws {
     // Create client with default headers
     let defaultHeaders: HTTPHeaders = [
         "X-App-Version": "1.0",
-        "Authorization": "Bearer default-token",
+        "Authorization": "Bearer default-token"
     ]
     let clientConfig = NetworkClientConfiguration(
         baseURL: "https://api.example.com",
@@ -415,12 +413,11 @@ func testEmptyResponseCodable() throws {
     // Should encode to JSON
     let encoder = JSONEncoder()
     let data = try encoder.encode(emptyResponse)
-    #expect(data.count > 0)
+    #expect(!data.isEmpty)
 
     // Should decode from JSON
     let decoder = JSONDecoder()
     let decoded = try decoder.decode(ASCEmptyResponse.self, from: data)
     _ = decoded
 }
-
 }

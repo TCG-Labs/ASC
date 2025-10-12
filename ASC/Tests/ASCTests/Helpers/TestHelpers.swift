@@ -3,8 +3,8 @@
 //
 // Helper functions and utilities for tests.
 
-import Foundation
 @testable import ASC
+import Foundation
 
 // MARK: - Test Constants
 

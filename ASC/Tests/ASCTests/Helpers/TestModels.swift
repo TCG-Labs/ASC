@@ -3,8 +3,8 @@
 //
 // Test models and request types for testing.
 
-import Foundation
 @testable import ASC
+import Foundation
 
 // MARK: - Test Models
 
@@ -104,7 +104,7 @@ public struct CreatePostRequest: NetworkRequest {
         [
             "title": title,
             "content": content,
-            "authorId": authorId,
+            "authorId": authorId
         ]
     }
 

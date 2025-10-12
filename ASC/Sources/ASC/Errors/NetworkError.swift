@@ -86,6 +86,7 @@ public enum NetworkError: ASCError {
         switch self {
         case .networkFailure(let error):
             return error
+
         default:
             return nil
         }

@@ -3,9 +3,9 @@
 //
 // Tests for error handling system.
 
-import Testing
-import Foundation
 @testable import ASC
+import Foundation
+import Testing
 
 // MARK: - NetworkError Tests
 
@@ -67,7 +67,7 @@ func testNetworkErrorNetworkFailure() {
 
 @Test("ResponseError.invalidStatusCode provides status code")
 func testResponseErrorInvalidStatusCode() {
-    let data = "Error data".data(using: .utf8)
+    let data = Data("Error data".utf8)
     let error = ResponseError.invalidStatusCode(404, data)
 
     #expect(error.errorDescription == "Invalid HTTP status code: 404")
@@ -77,7 +77,7 @@ func testResponseErrorInvalidStatusCode() {
 
 @Test("ResponseError.decodingFailed wraps decoding error")
 func testResponseErrorDecodingFailed() {
-    let data = "Invalid JSON".data(using: .utf8)!
+    let data = Data("Invalid JSON".utf8)
     let decodingError = NSError(
         domain: "DecodingError",
         code: 1,
@@ -241,7 +241,7 @@ func testAuthenticationErrorMaxRetryAttemptsExceeded() {
           (code: 199, expected: false),
           (code: 300, expected: false),
           (code: 400, expected: false),
-          (code: 500, expected: false),
+          (code: 500, expected: false)
       ])
 func testHTTPStatusIsSuccess(code: Int, expected: Bool) {
     #expect(HTTPStatus.isSuccess(code) == expected)
@@ -256,7 +256,7 @@ func testHTTPStatusIsSuccess(code: Int, expected: Bool) {
           (code: 499, expected: true),
           (code: 200, expected: false),
           (code: 300, expected: false),
-          (code: 500, expected: false),
+          (code: 500, expected: false)
       ])
 func testHTTPStatusIsClientError(code: Int, expected: Bool) {
     #expect(HTTPStatus.isClientError(code) == expected)
@@ -271,7 +271,7 @@ func testHTTPStatusIsClientError(code: Int, expected: Bool) {
           (code: 599, expected: true),
           (code: 200, expected: false),
           (code: 400, expected: false),
-          (code: 600, expected: false),
+          (code: 600, expected: false)
       ])
 func testHTTPStatusIsServerError(code: Int, expected: Bool) {
     #expect(HTTPStatus.isServerError(code) == expected)
@@ -290,7 +290,7 @@ func testHTTPStatusIsServerError(code: Int, expected: Bool) {
           (name: "tooManyRequests", value: HTTPStatus.tooManyRequests, expected: 429),
           (name: "internalServerError", value: HTTPStatus.internalServerError, expected: 500),
           (name: "badGateway", value: HTTPStatus.badGateway, expected: 502),
-          (name: "serviceUnavailable", value: HTTPStatus.serviceUnavailable, expected: 503),
+          (name: "serviceUnavailable", value: HTTPStatus.serviceUnavailable, expected: 503)
       ])
 func testHTTPStatusConstants(name: String, value: Int, expected: Int) {
     #expect(value == expected, "HTTPStatus.\(name) should be \(expected)")

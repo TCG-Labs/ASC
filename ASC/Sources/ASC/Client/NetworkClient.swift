@@ -3,8 +3,8 @@
 //
 // Main network client for executing requests with advanced Alamofire features.
 
-import Foundation
 import Alamofire
+import Foundation
 
 /// Main network client for executing requests.
 ///
@@ -153,7 +153,6 @@ public final class NetworkClient: Sendable {
 
         return urlRequest
     }
-
 
     /// Performs the actual network request using Alamofire.
     private func performRequest<Response: Decodable & Sendable>(

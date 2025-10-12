@@ -3,21 +3,19 @@
 //
 // Tests for request interceptors and event monitors.
 
-import Testing
-import Foundation
 import Alamofire
 @testable import ASC
+import Foundation
+import Testing
 
 // MARK: - Request Interceptor Tests
 
 extension IntegrationTests {
-
 @Test("NetworkClient calls request interceptor adapt")
 func testRequestInterceptorAdapt() async throws {
     setupTest()
     // Setup mock
     let configuration = createMockConfiguration()
-    
 
     let mockUser = TestUser(id: "123", name: "Test User")
 
@@ -36,7 +34,7 @@ func testRequestInterceptorAdapt() async throws {
 
         let responseJSON: [String: Any] = [
             "id": mockUser.id,
-            "name": mockUser.name,
+            "name": mockUser.name
         ]
 
         let (response, data) = try MockURLProtocol.mockJSONResponse(
@@ -68,7 +66,6 @@ func testMultipleInterceptors() async throws {
     setupTest()
     // Setup mock
     let configuration = createMockConfiguration()
-    
 
     let mockUser = TestUser(id: "123", name: "Test User")
 
@@ -93,7 +90,7 @@ func testMultipleInterceptors() async throws {
 
         let responseJSON: [String: Any] = [
             "id": mockUser.id,
-            "name": mockUser.name,
+            "name": mockUser.name
         ]
 
         let (response, data) = try MockURLProtocol.mockJSONResponse(
@@ -127,7 +124,6 @@ func testEventMonitor() async throws {
     setupTest()
     // Setup mock
     let configuration = createMockConfiguration()
-    
 
     let mockUser = TestUser(id: "123", name: "Test User")
     let monitor = MockEventMonitor()
@@ -135,7 +131,7 @@ func testEventMonitor() async throws {
     MockURLProtocol.requestHandler = { request in
         let responseJSON: [String: Any] = [
             "id": mockUser.id,
-            "name": mockUser.name,
+            "name": mockUser.name
         ]
 
         let (response, data) = try MockURLProtocol.mockJSONResponse(
@@ -161,7 +157,7 @@ func testEventMonitor() async throws {
     try await Task.sleep(nanoseconds: TestConstants.monitorWaitTime)
 
     // Verify monitor recorded events
-    #expect(monitor.events.count > 0)
+    #expect(!monitor.events.isEmpty)
 
     // Check that specific events were recorded
     let hasResumeEvent = monitor.events.contains { event in
@@ -178,7 +174,6 @@ func testMultipleEventMonitors() async throws {
     setupTest()
     // Setup mock
     let configuration = createMockConfiguration()
-    
 
     let mockUser = TestUser(id: "123", name: "Test User")
     let monitor1 = MockEventMonitor()
@@ -187,7 +182,7 @@ func testMultipleEventMonitors() async throws {
     MockURLProtocol.requestHandler = { request in
         let responseJSON: [String: Any] = [
             "id": mockUser.id,
-            "name": mockUser.name,
+            "name": mockUser.name
         ]
 
         let (response, data) = try MockURLProtocol.mockJSONResponse(
@@ -213,8 +208,8 @@ func testMultipleEventMonitors() async throws {
     try await Task.sleep(nanoseconds: TestConstants.monitorWaitTime)
 
     // Verify both monitors recorded events
-    #expect(monitor1.events.count > 0)
-    #expect(monitor2.events.count > 0)
+    #expect(!monitor1.events.isEmpty)
+    #expect(!monitor2.events.isEmpty)
 }
 
 @Test("EventMonitor records request completion")
@@ -222,7 +217,6 @@ func testEventMonitorRecordsCompletion() async throws {
     setupTest()
     // Setup mock
     let configuration = createMockConfiguration()
-    
 
     let mockUser = TestUser(id: "123", name: "Test User")
     let monitor = MockEventMonitor()
@@ -230,7 +224,7 @@ func testEventMonitorRecordsCompletion() async throws {
     MockURLProtocol.requestHandler = { request in
         let responseJSON: [String: Any] = [
             "id": mockUser.id,
-            "name": mockUser.name,
+            "name": mockUser.name
         ]
 
         let (response, data) = try MockURLProtocol.mockJSONResponse(
@@ -285,7 +279,6 @@ func testEventMonitorRecordsError() async throws {
     setupTest()
     // Setup mock
     let configuration = createMockConfiguration()
-    
 
     let monitor = MockEventMonitor()
 
@@ -316,7 +309,7 @@ func testEventMonitorRecordsError() async throws {
     try await Task.sleep(nanoseconds: TestConstants.monitorWaitTime)
 
     // Verify monitor recorded events including error
-    #expect(monitor.events.count > 0)
+    #expect(!monitor.events.isEmpty)
 }
 
 // MARK: - Interceptor and Monitor Integration Tests
@@ -326,7 +319,6 @@ func testInterceptorAndMonitorTogether() async throws {
     setupTest()
     // Setup mock
     let configuration = createMockConfiguration()
-    
 
     let mockUser = TestUser(id: "123", name: "Test User")
     let interceptor = MockInterceptor()
@@ -344,7 +336,7 @@ func testInterceptorAndMonitorTogether() async throws {
 
         let responseJSON: [String: Any] = [
             "id": mockUser.id,
-            "name": mockUser.name,
+            "name": mockUser.name
         ]
 
         let (response, data) = try MockURLProtocol.mockJSONResponse(
@@ -372,7 +364,6 @@ func testInterceptorAndMonitorTogether() async throws {
 
     // Verify both worked
     #expect(interceptor.adaptCallCount == 1)
-    #expect(monitor.events.count > 0)
+    #expect(!monitor.events.isEmpty)
 }
-
 }

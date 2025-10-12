@@ -3,8 +3,8 @@
 //
 // DSL for building mock HTTP responses in tests.
 
-import Foundation
 @testable import ASC
+import Foundation
 
 /// Builder for creating mock HTTP responses with a fluent API.
 ///
@@ -74,7 +74,7 @@ public struct MockResponseBuilder {
         let errorDict: [String: Any] = [
             "error": "Error",
             "message": message,
-            "code": code,
+            "code": code
         ]
         let data = try? JSONSerialization.data(withJSONObject: errorDict)
         return MockResponseBuilder(data: data, statusCode: code)
@@ -123,7 +123,7 @@ public struct MockResponseBuilder {
     ///
     /// - Returns: MockResponseBuilder instance
     public static func invalidJSON() -> MockResponseBuilder {
-        let invalidData = "{ invalid json }".data(using: .utf8)
+        let invalidData = Data("{ invalid json }".utf8)
         return MockResponseBuilder(data: invalidData, statusCode: 200)
     }
 

@@ -3,8 +3,8 @@
 //
 // Multipart form data request builder.
 
-import Foundation
 import Alamofire
+import Foundation
 
 /// Builds multipart upload requests.
 ///
@@ -53,9 +53,8 @@ internal struct MultipartRequestBuilder {
                 // Add regular parameters as form fields
                 if let parameters = request.parameters {
                     for (key, value) in parameters {
-                        if let data = "\(value)".data(using: .utf8) {
-                            multipartFormData.append(data, withName: key)
-                        }
+                        let data = Data("\(value)".utf8)
+                        multipartFormData.append(data, withName: key)
                     }
                 }
             },

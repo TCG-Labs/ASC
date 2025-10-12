@@ -3,16 +3,16 @@
 //
 // Mock event monitor for testing request lifecycle observation.
 
-import Foundation
 import Alamofire
 @testable import ASC
+import Foundation
 
 /// Mock event monitor for testing request lifecycle events.
 public final class MockEventMonitor: EventMonitor, @unchecked Sendable {
     // MARK: - Properties
 
     /// Queue for event monitoring.
-    public let queue: DispatchQueue = DispatchQueue(label: "com.asc.tests.mockEventMonitor")
+    public let queue = DispatchQueue(label: "com.asc.tests.mockEventMonitor")
 
     /// Events that have been recorded (private for thread safety).
     private var _events: [Event] = []

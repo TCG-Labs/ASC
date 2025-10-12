@@ -114,6 +114,7 @@ public enum AuthenticationError: ASCError {
         switch self {
         case .tokenRefreshFailed(let error):
             return error
+
         default:
             return nil
         }
