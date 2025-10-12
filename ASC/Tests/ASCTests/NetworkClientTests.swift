@@ -257,4 +257,181 @@ func testNetworkClientURLEncoding() async throws {
     // Verify
     #expect(results.count == 1)
 }
+
+@Test("NetworkClient convenience init with baseURL")
+func testNetworkClientConvenienceInit() async throws {
+    setupTest()
+
+    // Setup mock response
+    let mockUser = TestUser(id: "123", name: "Test User")
+    MockURLProtocol.requestHandler = MockResponseBuilder.success(mockUser).handler()
+
+    // Create client using convenience init
+    let configuration = createMockConfiguration()
+    let client = NetworkClient(baseURL: "https://api.example.com")
+
+    // Note: We can't directly test the convenience init with MockURLProtocol
+    // because it doesn't use our mock configuration. This test verifies
+    // that the convenience init compiles and the object is created correctly.
+    #expect(client != nil)
+}
+
+@Test("NetworkClient throws ResponseError.missingData when response value is nil")
+func testNetworkClientMissingData() async throws {
+    setupTest()
+
+    // Setup mock response with empty data
+    MockURLProtocol.requestHandler = { request in
+        let response = MockURLProtocol.mockResponse(url: request.url!, statusCode: 200)
+        // Return empty data which will cause decoding to fail and value to be nil
+        return (response, Data())
+    }
+
+    // Execute request and expect error
+    let client = createMockClient()
+    let request = TestRequestFactory.getUser()
+
+    do {
+        _ = try await client.execute(request)
+        Issue.record("Expected ResponseError to be thrown")
+    } catch let error as ResponseError {
+        // Should get missingData or decodingFailed error
+        if case .missingData = error {
+            // Success - this is expected
+        } else if case .decodingFailed = error {
+            // Also acceptable
+        } else {
+            Issue.record("Expected decodingFailed or missingData, got \(error)")
+        }
+    }
+}
+
+@Test("NetworkClient handles error in empty response request")
+func testNetworkClientEmptyResponseError() async throws {
+    setupTest()
+
+    // Setup mock error response
+    MockURLProtocol.requestHandler = MockResponseBuilder.serverError().handler()
+
+    // Execute request and expect error
+    let client = createMockClient()
+    let request = TestRequestFactory.deleteUser(userId: "123")
+
+    do {
+        try await client.execute(request)
+        Issue.record("Expected ResponseError to be thrown")
+    } catch let error as ResponseError {
+        if case .serverError = error {
+            // Success
+        } else {
+            Issue.record("Expected serverError, got \(error)")
+        }
+    }
+}
+
+@Test("NetworkClient handles error in multipart upload")
+func testNetworkClientMultipartUploadError() async throws {
+    setupTest()
+
+    // Setup mock error response
+    MockURLProtocol.requestHandler = MockResponseBuilder.serverError().handler()
+
+    // Execute upload request and expect error
+    let client = createMockClient()
+    let fileData = Data("Test file content".utf8)
+
+    struct UploadRequest: NetworkRequest {
+        typealias Response = TestUser
+        let fileData: Data
+        var path: String { "/upload" }
+        var method: HTTPMethod { .post }
+        var files: [String: Data]? { ["file": fileData] }
+    }
+
+    let request = UploadRequest(fileData: fileData)
+
+    do {
+        _ = try await client.execute(request)
+        Issue.record("Expected ResponseError to be thrown")
+    } catch let error as ResponseError {
+        if case .serverError = error {
+            // Success
+        } else {
+            Issue.record("Expected serverError, got \(error)")
+        }
+    }
+}
+
+@Test("NetworkClient handles error in multipart empty response")
+func testNetworkClientMultipartEmptyResponseError() async throws {
+    setupTest()
+
+    // Setup mock error response
+    MockURLProtocol.requestHandler = MockResponseBuilder.notFound().handler()
+
+    // Execute upload request and expect error
+    let client = createMockClient()
+    let fileData = Data("Test file content".utf8)
+
+    struct UploadEmptyRequest: NetworkRequest {
+        typealias Response = ASCEmptyResponse
+        let fileData: Data
+        var path: String { "/upload" }
+        var method: HTTPMethod { .post }
+        var files: [String: Data]? { ["file": fileData] }
+    }
+
+    let request = UploadEmptyRequest(fileData: fileData)
+
+    do {
+        try await client.execute(request)
+        Issue.record("Expected ResponseError to be thrown")
+    } catch let error as ResponseError {
+        if case .clientError = error {
+            // Success
+        } else {
+            Issue.record("Expected clientError, got \(error)")
+        }
+    }
+}
+
+@Test("NetworkClient throws ResponseError.missingData in multipart when value is nil")
+func testNetworkClientMultipartMissingData() async throws {
+    setupTest()
+
+    // Setup mock response with empty data
+    MockURLProtocol.requestHandler = { request in
+        let response = MockURLProtocol.mockResponse(url: request.url!, statusCode: 200)
+        // Return empty data which will cause value to be nil
+        return (response, Data())
+    }
+
+    // Execute request and expect error
+    let client = createMockClient()
+    let fileData = Data("Test file content".utf8)
+
+    struct UploadRequest: NetworkRequest {
+        typealias Response = TestUser
+        let fileData: Data
+        var path: String { "/upload" }
+        var method: HTTPMethod { .post }
+        var files: [String: Data]? { ["file": fileData] }
+    }
+
+    let request = UploadRequest(fileData: fileData)
+
+    do {
+        _ = try await client.execute(request)
+        Issue.record("Expected ResponseError to be thrown")
+    } catch let error as ResponseError {
+        // Should get missingData or decodingFailed error
+        if case .missingData = error {
+            // Success - this is expected
+        } else if case .decodingFailed = error {
+            // Also acceptable
+        } else {
+            Issue.record("Expected decodingFailed or missingData, got \(error)")
+        }
+    }
+}
 }

@@ -385,3 +385,25 @@ func testErrorMapperGenericAFError() {
         Issue.record("Expected networkFailure, got \(networkError)")
     }
 }
+
+@Test("ErrorMapper maps validation failure with non-status-code reason to ResponseError.validationFailed")
+func testErrorMapperValidationFailureGeneric() {
+    let mapper = ErrorMapper(defaultTimeout: 30.0)
+    // Use a validation failure reason that is not unacceptableStatusCode
+    let afError = AFError.responseValidationFailed(
+        reason: .dataFileNil
+    )
+
+    let mappedError = mapper.mapError(afError, data: nil)
+
+    guard let responseError = mappedError as? ResponseError else {
+        Issue.record("Expected ResponseError")
+        return
+    }
+
+    if case .validationFailed(let message) = responseError {
+        #expect(message == "Response validation failed")
+    } else {
+        Issue.record("Expected validationFailed, got \(responseError)")
+    }
+}

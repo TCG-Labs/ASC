@@ -364,6 +364,70 @@ func testMultipartUploadWithParameters() async throws {
     #expect(user.id == "123")
 }
 
+@Test("NetworkClient handles multipart upload with custom headers")
+func testMultipartUploadWithCustomHeaders() async throws {
+    setupTest()
+    // Setup mock
+    let configuration = createMockConfiguration()
+
+    let testFileData = Data("Test file content".utf8)
+
+    MockURLProtocol.requestHandler = { request in
+        // Verify Content-Type is multipart/form-data
+        let contentType = request.value(forHTTPHeaderField: "Content-Type")
+        #expect(contentType?.contains("multipart/form-data") == true)
+
+        // Verify custom header
+        let customHeader = request.value(forHTTPHeaderField: "X-Upload-Source")
+        #expect(customHeader == "mobile-app")
+
+        let responseJSON: [String: Any] = [
+            "id": "123",
+            "name": "User with avatar"
+        ]
+
+        guard let url = request.url else {
+            throw NSError(domain: "Test", code: -1, userInfo: nil)
+        }
+        let (response, data) = try MockURLProtocol.mockJSONResponse(
+            url: url,
+            statusCode: 200,
+            json: responseJSON
+        )
+        return (response, data)
+    }
+
+    // Create client
+    let clientConfig = NetworkClientConfiguration(
+        baseURL: "https://api.example.com",
+        urlSessionConfiguration: configuration
+    )
+    let client = NetworkClient(configuration: clientConfig)
+
+    // Define upload request with custom headers
+    struct UploadWithHeadersRequest: NetworkRequest {
+        typealias Response = TestUser
+        let fileData: Data
+
+        var path: String { "/upload" }
+        var method: HTTPMethod { .post }
+        var files: [String: Data]? { ["file": fileData] }
+        var headers: HTTPHeaders? {
+            HTTPHeaders([
+                HTTPHeader(name: "X-Upload-Source", value: "mobile-app")
+            ])
+        }
+    }
+
+    // Execute upload request
+    let user = try await client.execute(
+        UploadWithHeadersRequest(fileData: testFileData)
+    )
+
+    // Verify
+    #expect(user.id == "123")
+}
+
 // MARK: - Default Headers Tests
 
 @Test("NetworkClient uses default headers")

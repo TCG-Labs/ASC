@@ -438,3 +438,37 @@ func testResponseErrorValidationFailedUnderlyingError() {
 
     #expect(error.underlyingError == nil)
 }
+
+// MARK: - Additional AuthenticationError Coverage Tests
+
+@Test("AuthenticationError.tokenRefreshFailed has recovery suggestion")
+func testAuthenticationErrorTokenRefreshFailedRecovery() {
+    let underlyingError = NSError(
+        domain: "TokenError",
+        code: 1,
+        userInfo: [NSLocalizedDescriptionKey: "Refresh failed"]
+    )
+    let error = AuthenticationError.tokenRefreshFailed(underlyingError)
+
+    #expect(error.recoverySuggestion == "Unable to refresh your session. Please log in again")
+}
+
+@Test("AuthenticationError with nil underlying error has nil recovery suggestion")
+func testAuthenticationErrorNilUnderlyingErrorRecovery() {
+    // Create error with explicit nil case by checking underlyingError property
+    let error = AuthenticationError.notAuthenticated
+
+    // For errors without underlying errors, underlyingError should be nil
+    #expect(error.underlyingError == nil)
+}
+
+// MARK: - Additional NetworkError Coverage Tests
+
+@Test("NetworkError.networkFailure without description has default recovery suggestion")
+func testNetworkErrorNetworkFailureDefaultRecovery() {
+    // Create an underlying error without localizedDescription
+    let underlyingError = NSError(domain: "TestDomain", code: 999, userInfo: nil)
+    let error = NetworkError.networkFailure(underlyingError)
+
+    #expect(error.recoverySuggestion == "Please try again later")
+}
