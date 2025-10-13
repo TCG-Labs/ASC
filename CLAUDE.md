@@ -62,12 +62,12 @@ swiftlint --fix
 ## Architecture
 
 ### Package Structure
-- **Sources/ASC/**: Main library source code (13 files, 1,645 lines)
-  - **Client/**: NetworkClient and supporting components (5 files, 843 lines)
-    - `NetworkClient.swift` - Main client for executing requests (282 lines)
+- **Sources/ASC/**: Main library source code (13 files, 1,646 lines)
+  - **Client/**: NetworkClient and supporting components (5 files, 844 lines)
+    - `NetworkClient.swift` - Main client for executing requests (292 lines)
     - `ErrorMapper.swift` - Error mapping from Alamofire (169 lines)
     - `URLBuilder.swift` - URL construction with path parameters (145 lines)
-    - `MultipartRequestBuilder.swift` - Multipart upload builder (135 lines)
+    - `MultipartRequestBuilder.swift` - Multipart upload builder (126 lines)
     - `NetworkClientConfiguration.swift` - Configuration struct (112 lines)
   - **Core/**: Protocol definitions and core types (4 files, 397 lines)
     - `NetworkRequest.swift` - Main request protocol (121 lines)
@@ -1016,14 +1016,15 @@ The codebase has undergone systematic refactoring to improve maintainability and
 - Extracted multipart upload logic (eliminated 52 lines of duplication)
 - Centralized magic strings into TestConstants
 
-**Priority 2: Component Extraction**
-- Split NetworkClient from 552 lines into 5 focused components (282 lines main)
+**Priority 2: Component Extraction + Refactoring**
+- Split NetworkClient from 552 lines into 5 focused components (292 lines main)
+- Refactored to eliminate code duplication (October 2025)
 - Each component follows Single Responsibility Principle
 - URLBuilder: URL construction (145 lines)
-- MultipartRequestBuilder: File uploads (135 lines)
+- MultipartRequestBuilder: File uploads (126 lines, refactored from 135)
 - ErrorMapper: Error translation (169 lines)
 - NetworkClientConfiguration: Client settings (112 lines)
-- Result: 49% reduction in NetworkClient size, improved maintainability
+- Result: 47% reduction in NetworkClient size, zero duplication, improved maintainability
 
 **Priority 3: Test Infrastructure**
 - Created TestRequestFactory (149 lines) for request creation
@@ -1042,12 +1043,12 @@ The codebase has undergone systematic refactoring to improve maintainability and
 ### Current Metrics
 
 **Library Code:**
-- **Total**: 1,645 lines across 13 files
-- **Client components**: 843 lines across 5 files
-  - NetworkClient.swift: 282 lines (main client implementation)
+- **Total**: 1,646 lines across 13 files
+- **Client components**: 844 lines across 5 files
+  - NetworkClient.swift: 292 lines (main client implementation, refactored)
   - ErrorMapper.swift: 169 lines (error translation)
   - URLBuilder.swift: 145 lines (URL construction)
-  - MultipartRequestBuilder.swift: 135 lines (file uploads)
+  - MultipartRequestBuilder.swift: 126 lines (file uploads, refactored)
   - NetworkClientConfiguration.swift: 112 lines (configuration)
 - **Core types**: 397 lines across 4 files
 - **Error types**: 405 lines across 4 files
@@ -1104,12 +1105,13 @@ The repository has GitHub Actions configured for Claude Code:
 - `95e5b44` - Enhances ASC library with comprehensive examples
 
 **Code Metrics:**
-- 1,645 lines of library code (13 files)
+- 1,646 lines of library code (13 files)
 - 3,527 lines of test code (15 test files)
 - 131 tests (100% pass rate)
-- 5 Client components (843 lines)
+- 5 Client components (844 lines, refactored October 2025)
 - 4 Core type files (397 lines)
 - 4 Error type files (405 lines)
+- Zero code duplication (after Priority 2 refactoring)
 
 ---
 

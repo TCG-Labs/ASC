@@ -74,45 +74,36 @@ internal struct MultipartRequestBuilder {
     ///
     /// Handles different parameter types appropriately:
     /// - Strings: Direct UTF-8 encoding
-    /// - Numbers: String representation
     /// - Booleans: "true" or "false"
+    /// - Numbers: String representation
     /// - Arrays/Dictionaries: JSON encoding
     /// - nil: Skipped (returns nil)
     ///
     /// - Parameter value: The parameter value to encode
     /// - Returns: Encoded data, or nil if value should be skipped
     private func encodeParameter(_ value: Any) -> Data? {
-        // Handle nil values
-        if value is NSNull {
+        switch value {
+        case is NSNull:
             return nil
-        }
 
-        // Handle strings
-        if let string = value as? String {
+        case let string as String:
             return Data(string.utf8)
-        }
 
-        // Handle numbers (Int, Double, Float, etc.)
-        if let number = value as? NSNumber {
-            return Data(number.stringValue.utf8)
-        }
-
-        // Handle booleans explicitly (before NSNumber check)
-        if let bool = value as? Bool {
+        case let bool as Bool:
             return Data(bool.description.utf8)
-        }
 
-        // Handle arrays and dictionaries with JSON encoding
-        if let array = value as? [Any] {
+        case let number as NSNumber:
+            return Data(number.stringValue.utf8)
+
+        case let array as [Any]:
             return encodeJSON(array)
-        }
 
-        if let dictionary = value as? [String: Any] {
+        case let dictionary as [String: Any]:
             return encodeJSON(dictionary)
-        }
 
-        // Fallback for other types
-        return Data("\(value)".utf8)
+        default:
+            return Data("\(value)".utf8)
+        }
     }
 
     /// Encodes a value as JSON data.

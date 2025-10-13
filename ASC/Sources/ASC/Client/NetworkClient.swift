@@ -89,25 +89,10 @@ public final class NetworkClient: Sendable {
     public func execute<Request: NetworkRequest>(
         _ request: Request
     ) async throws -> Request.Response {
-        // Check if this is a multipart request
-        if let files = request.files, !files.isEmpty {
-            guard let response = try await performMultipartRequest(
-                request,
-                files: files,
-                responseType: Request.Response.self,
-                retryPolicy: request.retryPolicy
-            ) else {
-                throw ResponseError.missingData
-            }
-            return response
+        guard let response = try await executeRequest(request, responseType: Request.Response.self) else {
+            throw ResponseError.missingData
         }
-
-        let urlRequest = try buildURLRequest(from: request)
-        return try await performRequest(
-            urlRequest,
-            responseType: Request.Response.self,
-            retryPolicy: request.retryPolicy
-        )
+        return response
     }
 
     /// Executes a network request without expecting a response body.
@@ -119,22 +104,47 @@ public final class NetworkClient: Sendable {
     public func execute<Request: NetworkRequest>(
         _ request: Request
     ) async throws where Request.Response == ASCEmptyResponse {
-        // Check if this is a multipart request
-        if let files = request.files, !files.isEmpty {
-            _ = try await performMultipartRequest(
-                request,
-                files: files,
-                responseType: nil as ASCEmptyResponse.Type?,
-                retryPolicy: request.retryPolicy
-            )
-            return
-        }
-
-        let urlRequest = try buildURLRequest(from: request)
-        try await performEmptyRequest(urlRequest, retryPolicy: request.retryPolicy)
+        _ = try await executeRequest(request, responseType: nil as ASCEmptyResponse.Type?)
     }
 
     // MARK: - Private Methods
+
+    /// Executes a network request, handling both multipart and standard requests.
+    ///
+    /// Centralized request execution that routes to appropriate handler based on request type.
+    /// - Parameters:
+    ///   - request: The network request to execute
+    ///   - responseType: Expected response type, or nil for empty response
+    /// - Returns: Decoded response, or nil for empty response
+    /// - Throws: `NetworkError`, `ResponseError`, or `AuthenticationError`
+    private func executeRequest<Request: NetworkRequest, Response: Decodable & Sendable>(
+        _ request: Request,
+        responseType: Response.Type?
+    ) async throws -> Response? {
+        // Check if this is a multipart request
+        if let files = request.files, !files.isEmpty {
+            return try await performMultipartRequest(
+                request,
+                files: files,
+                responseType: responseType,
+                retryPolicy: request.retryPolicy
+            )
+        }
+
+        // Standard request
+        let urlRequest = try buildURLRequest(from: request)
+
+        if let responseType = responseType {
+            return try await performRequest(
+                urlRequest,
+                responseType: responseType,
+                retryPolicy: request.retryPolicy
+            )
+        } else {
+            try await performEmptyRequest(urlRequest, retryPolicy: request.retryPolicy)
+            return nil
+        }
+    }
 
     /// Builds a URLRequest from a NetworkRequest.
     private func buildURLRequest<Request: NetworkRequest>(
