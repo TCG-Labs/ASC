@@ -16,29 +16,32 @@ struct Post: Codable, Sendable {
 
 // MARK: - 2. Create Network Requests
 
-/// Fetch all posts
-struct GetPostsRequest: NetworkRequest {
-    typealias Response = [Post]
-    var path: String { "/posts" }
-    var method: HTTPMethod { .get }
-}
+/// Organize requests using Namespace Enum pattern
+enum PostAPI {
+    /// Fetch all posts
+    struct GetAll: NetworkRequest {
+        typealias Response = [Post]
+        var path: String { "/posts" }
+        var method: HTTPMethod { .get }
+    }
 
-/// Create a new post
-struct CreatePostRequest: NetworkRequest {
-    typealias Response = Post
+    /// Create a new post
+    struct Create: NetworkRequest {
+        typealias Response = Post
 
-    let title: String
-    let body: String
-    let userId: Int
+        let title: String
+        let body: String
+        let userId: Int
 
-    var path: String { "/posts" }
-    var method: HTTPMethod { .post }
-    var parameters: Parameters? {
-        [
-            "title": title,
-            "body": body,
-            "userId": userId
-        ]
+        var path: String { "/posts" }
+        var method: HTTPMethod { .post }
+        var parameters: Parameters? {
+            [
+                "title": title,
+                "body": body,
+                "userId": userId
+            ]
+        }
     }
 }
 
@@ -51,13 +54,13 @@ func quickStartExample() async throws {
 
     // GET request - Fetch posts
     debugPrint("Fetching posts...")
-    let posts = try await client.execute(GetPostsRequest())
+    let posts = try await client.execute(PostAPI.GetAll())
     debugPrint("✅ Fetched \(posts.count) posts")
 
     // POST request - Create a post
     debugPrint("\nCreating a new post...")
     let newPost = try await client.execute(
-        CreatePostRequest(
+        PostAPI.Create(
             title: "Hello from ASC!",
             body: "This is my first request using ASC library",
             userId: 1

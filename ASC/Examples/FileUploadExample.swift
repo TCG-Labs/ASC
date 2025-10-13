@@ -30,82 +30,77 @@ struct UserProfile: Codable, Sendable {
 
 // MARK: - Upload Requests
 
-/// Upload a single image file
-struct UploadAvatarRequest: NetworkRequest {
-    typealias Response = UserProfile
+/// Upload API using Namespace Enum pattern
+enum UploadAPI {
+    /// Upload a single image file
+    struct Avatar: NetworkRequest {
+        typealias Response = UserProfile
+        let userId: Int
+        let imageData: Data
+        let fileName: String
 
-    let userId: Int
-    let imageData: Data
-    let fileName: String
+        var path: String { "/users/{userId}/avatar" }
+        var method: HTTPMethod { .post }
+        var pathParameters: [String: String]? {
+            ["userId": String(userId)]
+        }
 
-    var path: String { "/users/{userId}/avatar" }
-    var method: HTTPMethod { .post }
+        // Files to upload (multipart/form-data)
+        var files: [String: Data]? {
+            ["avatar": imageData]
+        }
 
-    var pathParameters: [String: String]? {
-        ["userId": String(userId)]
+        // Custom headers for upload
+        var headers: HTTPHeaders? {
+            HTTPHeaders([
+                HTTPHeader(name: "X-File-Name", value: fileName),
+                .accept("application/json")
+            ])
+        }
+
+        // Longer timeout for uploads
+        var timeout: TimeInterval? { 120.0 }
     }
 
-    // Files to upload (multipart/form-data)
-    var files: [String: Data]? {
-        ["avatar": imageData]
+    /// Upload multiple files at once
+    struct Documents: NetworkRequest {
+        typealias Response = UploadResponse
+        let documents: [String: Data]
+        let description: String
+
+        var path: String { "/documents/upload" }
+        var method: HTTPMethod { .post }
+
+        // Multiple files
+        var files: [String: Data]? { documents }
+
+        // Additional form parameters
+        var parameters: Parameters? {
+            [
+                "description": description,
+                "uploadedAt": ISO8601DateFormatter().string(from: Date())
+            ]
+        }
+
+        var timeout: TimeInterval? { 180.0 }
     }
 
-    // Custom headers for upload
-    var headers: HTTPHeaders? {
-        HTTPHeaders([
-            HTTPHeader(name: "X-File-Name", value: fileName),
-            .accept("application/json")
-        ])
-    }
+    /// Upload with empty response (204 No Content)
+    struct File: NetworkRequest {
+        typealias Response = ASCEmptyResponse
+        let fileData: Data
+        let fileType: String
 
-    // Longer timeout for uploads
-    var timeout: TimeInterval? { 120.0 }
-}
-
-/// Upload multiple files at once
-struct UploadDocumentsRequest: NetworkRequest {
-    typealias Response = UploadResponse
-
-    let documents: [String: Data]
-    let description: String
-
-    var path: String { "/documents/upload" }
-    var method: HTTPMethod { .post }
-
-    // Multiple files
-    var files: [String: Data]? {
-        documents
-    }
-
-    // Additional form parameters
-    var parameters: Parameters? {
-        [
-            "description": description,
-            "uploadedAt": ISO8601DateFormatter().string(from: Date())
-        ]
-    }
-
-    var timeout: TimeInterval? { 180.0 }
-}
-
-/// Upload with empty response (204 No Content)
-struct UploadFileRequest: NetworkRequest {
-    typealias Response = ASCEmptyResponse
-
-    let fileData: Data
-    let fileType: String
-
-    var path: String { "/upload" }
-    var method: HTTPMethod { .post }
-
-    var files: [String: Data]? {
-        ["file": fileData]
-    }
-
-    var headers: HTTPHeaders? {
-        HTTPHeaders([
-            HTTPHeader(name: "X-File-Type", value: fileType)
-        ])
+        var path: String { "/upload" }
+        var method: HTTPMethod { .post }
+        var files: [String: Data]? {
+            ["file": fileData]
+        }
+        var headers: HTTPHeaders? {
+            HTTPHeaders([
+                HTTPHeader(name: "X-File-Type", value: fileType)
+            ])
+        }
     }
 }
 
@@ -136,7 +131,7 @@ class FileUploadService {
         // In production, you'd use your actual API endpoint
 
         // For demo, we'll show the request structure
-        let request = UploadAvatarRequest(
+        let request = UploadAPI.Avatar(
             userId: userId,
             imageData: imageData,
             fileName: fileName
@@ -179,7 +174,7 @@ class FileUploadService {
         }
         debugPrint()
 
-        let request = UploadDocumentsRequest(
+        let request = UploadAPI.Documents(
             documents: documents,
             description: "Batch upload of documents"
         )

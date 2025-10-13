@@ -144,51 +144,40 @@ final class PerformanceMonitor: EventMonitor {
 
 // MARK: - Requests
 
-enum GetPostRequest: NetworkRequest {
-    typealias Response = Post
+/// Post API using Namespace Enum pattern
+enum PostAPI {
+    struct Get: NetworkRequest {
+        typealias Response = Post
+        let postId: Int
 
-    let postId: Int
+        var path: String { "/posts/{id}" }
+        var method: HTTPMethod { .get }
+        var pathParameters: [String: String]? {
+            ["id": String(postId)]
+        }
 
-    var path: String { "/posts/{id}" }
-    var method: HTTPMethod { .get }
-    var pathParameters: [String: String]? {
-        ["id": String(postId)]
+        // Custom retry policy for this specific request
+        var retryPolicy: Alamofire.RetryPolicy? { .default }
     }
 
-    // Custom retry policy for this specific request
-    var retryPolicy: RetryPolicy {
-        RetryPolicy(
-            maxRetries: 3,
-            retryDelay: 1.0,
-            exponentialBackoff: true,
-            retryableStatusCodes: [408, 429, 500, 502, 503, 504],
-            retryOnNetworkError: true
-        )
+    struct Create: NetworkRequest {
+        typealias Response = Post
+        let userId: Int
+        let title: String
+        let body: String
+
+        var path: String { "/posts" }
+        var method: HTTPMethod { .post }
+        var parameters: Parameters? {
+            ["userId": userId, "title": title, "body": body]
+        }
+
+        // Custom timeout for this request
+        var timeout: TimeInterval? { 30.0 }
+
+        // Aggressive retry policy
+        var retryPolicy: Alamofire.RetryPolicy? { .aggressive }
     }
-}
-
-struct CreatePostRequest: NetworkRequest {
-    typealias Response = Post
-
-    let userId: Int
-    let title: String
-    let body: String
-
-    var path: String { "/posts" }
-    var method: HTTPMethod { .post }
-    var parameters: Parameters? {
-        [
-            "userId": userId,
-            "title": title,
-            "body": body
-        ]
-    }
-
-    // Custom timeout for this request
-    var timeout: TimeInterval? { 30.0 }
-
-    // Aggressive retry policy
-    var retryPolicy: RetryPolicy { .aggressive }
 }
 
 // MARK: - Advanced Service
@@ -242,7 +231,7 @@ class AdvancedAPIService {
         debugPrint("   • Timeout: 60s")
         debugPrint()
 
-        let post = try await client.execute(GetPostRequest(postId: id))
+        let post = try await client.execute(PostAPI.Get(postId: id))
 
         debugPrint("\n✅ Successfully fetched post:")
         debugPrint("   • Title: \(post.title)")
@@ -260,7 +249,7 @@ class AdvancedAPIService {
         debugPrint()
 
         let post = try await client.execute(
-            CreatePostRequest(userId: 1, title: title, body: body)
+            PostAPI.Create(userId: 1, title: title, body: body)
         )
 
         debugPrint("\n✅ Successfully created post:")
@@ -298,7 +287,7 @@ class AdvancedAPIService {
         let posts = try await withThrowingTaskGroup(of: Post.self) { group in
             for postId in postIds {
                 group.addTask {
-                    try await self.client.execute(GetPostRequest(postId: postId))
+                    try await self.client.execute(PostAPI.Get(postId: postId))
                 }
             }
 
@@ -325,7 +314,7 @@ class AdvancedAPIService {
 
         do {
             // This will fail with 404, but won't retry (404 is not retryable)
-            _ = try await client.execute(GetPostRequest(postId: 99999))
+            _ = try await client.execute(PostAPI.Get(postId: 99999))
         } catch let error as ResponseError {
             debugPrint("\n❌ Request failed (as expected):")
             debugPrint("   • Error: \(error.errorDescription ?? "Unknown")")

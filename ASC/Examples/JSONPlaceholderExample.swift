@@ -36,121 +36,111 @@ struct Comment: Codable, Sendable {
 
 // MARK: - Network Requests
 
-/// Fetch all posts
-struct GetPostsRequest: NetworkRequest {
-    typealias Response = [Post]
+/// Post API endpoints using Namespace Enum pattern
+enum PostAPI {
+    /// Fetch all posts
+    struct GetAll: NetworkRequest {
+        typealias Response = [Post]
+        var path: String { "/posts" }
+        var method: HTTPMethod { .get }
+    }
 
-    var path: String { "/posts" }
-    var method: HTTPMethod { .get }
-}
+    /// Fetch a single post by ID
+    struct Get: NetworkRequest {
+        typealias Response = Post
+        let postId: Int
 
-/// Fetch a single post by ID
-struct GetPostRequest: NetworkRequest {
-    typealias Response = Post
+        var path: String { "/posts/{id}" }
+        var method: HTTPMethod { .get }
+        var pathParameters: [String: String]? {
+            ["id": String(postId)]
+        }
+    }
 
-    let postId: Int
+    /// Create a new post
+    struct Create: NetworkRequest {
+        typealias Response = Post
+        let userId: Int
+        let title: String
+        let body: String
 
-    var path: String { "/posts/{id}" }
-    var method: HTTPMethod { .get }
-    var pathParameters: [String: String]? {
-        ["id": String(postId)]
+        var path: String { "/posts" }
+        var method: HTTPMethod { .post }
+        var parameters: Parameters? {
+            ["userId": userId, "title": title, "body": body]
+        }
+    }
+
+    /// Update an existing post
+    struct Update: NetworkRequest {
+        typealias Response = Post
+        let postId: Int
+        let userId: Int
+        let title: String
+        let body: String
+
+        var path: String { "/posts/{id}" }
+        var method: HTTPMethod { .put }
+        var pathParameters: [String: String]? {
+            ["id": String(postId)]
+        }
+        var parameters: Parameters? {
+            ["userId": userId, "title": title, "body": body]
+        }
+    }
+
+    /// Delete a post
+    struct Delete: NetworkRequest {
+        typealias Response = ASCEmptyResponse
+        let postId: Int
+
+        var path: String { "/posts/{id}" }
+        var method: HTTPMethod { .delete }
+        var pathParameters: [String: String]? {
+            ["id": String(postId)]
+        }
+    }
+
+    /// Fetch posts for a specific user
+    struct GetByUser: NetworkRequest {
+        typealias Response = [Post]
+        let userId: Int
+
+        var path: String { "/posts" }
+        var method: HTTPMethod { .get }
+        var parameters: Parameters? {
+            ["userId": userId]
+        }
+        var parameterEncoding: any ParameterEncoding {
+            URLEncoding.default
+        }
+    }
+
+    /// Fetch comments for a specific post
+    struct GetComments: NetworkRequest {
+        typealias Response = [Comment]
+        let postId: Int
+
+        var path: String { "/posts/{id}/comments" }
+        var method: HTTPMethod { .get }
+        var pathParameters: [String: String]? {
+            ["id": String(postId)]
+        }
     }
 }
 
-/// Create a new post
-struct CreatePostRequest: NetworkRequest {
-    typealias Response = Post
+/// User API endpoints
+enum UserAPI {
+    /// Fetch a user by ID
+    struct Get: NetworkRequest {
+        typealias Response = User
+        let userId: Int
 
-    let userId: Int
-    let title: String
-    let body: String
-
-    var path: String { "/posts" }
-    var method: HTTPMethod { .post }
-    var parameters: Parameters? {
-        [
-            "userId": userId,
-            "title": title,
-            "body": body
-        ]
-    }
-}
-
-/// Update an existing post
-struct UpdatePostRequest: NetworkRequest {
-    typealias Response = Post
-
-    let postId: Int
-    let userId: Int
-    let title: String
-    let body: String
-
-    var path: String { "/posts/{id}" }
-    var method: HTTPMethod { .put }
-    var pathParameters: [String: String]? {
-        ["id": String(postId)]
-    }
-    var parameters: Parameters? {
-        [
-            "userId": userId,
-            "title": title,
-            "body": body
-        ]
-    }
-}
-
-/// Delete a post
-struct DeletePostRequest: NetworkRequest {
-    typealias Response = ASCEmptyResponse
-
-    let postId: Int
-
-    var path: String { "/posts/{id}" }
-    var method: HTTPMethod { .delete }
-    var pathParameters: [String: String]? {
-        ["id": String(postId)]
-    }
-}
-
-/// Fetch posts for a specific user
-struct GetUserPostsRequest: NetworkRequest {
-    typealias Response = [Post]
-
-    let userId: Int
-
-    var path: String { "/posts" }
-    var method: HTTPMethod { .get }
-    var parameters: Parameters? {
-        ["userId": userId]
-    }
-    var parameterEncoding: any ParameterEncoding {
-        URLEncoding.default
-    }
-}
-
-/// Fetch comments for a specific post
-struct GetPostCommentsRequest: NetworkRequest {
-    typealias Response = [Comment]
-
-    let postId: Int
-
-    var path: String { "/posts/{id}/comments" }
-    var method: HTTPMethod { .get }
-    var pathParameters: [String: String]? {
-        ["id": String(postId)]
-    }
-}
-
-/// Fetch a user by ID
-struct GetUserRequest: NetworkRequest {
-    typealias Response = User
-
-    let userId: Int
-
-    var path: String { "/users/{id}" }
-    var method: HTTPMethod { .get }
-    var pathParameters: [String: String]? {
-        ["id": String(userId)]
+        var path: String { "/users/{id}" }
+        var method: HTTPMethod { .get }
+        var pathParameters: [String: String]? {
+            ["id": String(userId)]
+        }
     }
 }
 
@@ -171,7 +161,7 @@ class JSONPlaceholderService {
     func fetchAllPosts() async throws -> [Post] {
         debugPrint("📖 Fetching all posts...")
 
-        let posts = try await client.execute(GetPostsRequest())
+        let posts = try await client.execute(PostAPI.GetAll())
 
         debugPrint("✅ Fetched \(posts.count) posts")
         return posts
@@ -181,7 +171,7 @@ class JSONPlaceholderService {
     func fetchPost(id: Int) async throws -> Post {
         debugPrint("📄 Fetching post #\(id)...")
 
-        let post = try await client.execute(GetPostRequest(postId: id))
+        let post = try await client.execute(PostAPI.Get(postId: id))
 
         debugPrint("✅ Fetched post: \"\(post.title)\"")
         return post
@@ -192,7 +182,7 @@ class JSONPlaceholderService {
         debugPrint("✍️  Creating new post...")
 
         let post = try await client.execute(
-            CreatePostRequest(userId: userId, title: title, body: body)
+            PostAPI.Create(userId: userId, title: title, body: body)
         )
 
         debugPrint("✅ Created post with ID: \(post.id ?? 0)")
@@ -204,7 +194,7 @@ class JSONPlaceholderService {
         debugPrint("📝 Updating post #\(id)...")
 
         let post = try await client.execute(
-            UpdatePostRequest(postId: id, userId: userId, title: title, body: body)
+            PostAPI.Update(postId: id, userId: userId, title: title, body: body)
         )
 
         debugPrint("✅ Updated post: \"\(post.title)\"")
@@ -215,7 +205,7 @@ class JSONPlaceholderService {
     func deletePost(id: Int) async throws {
         debugPrint("🗑️  Deleting post #\(id)...")
 
-        try await client.execute(DeletePostRequest(postId: id))
+        try await client.execute(PostAPI.Delete(postId: id))
 
         debugPrint("✅ Post deleted successfully")
     }
@@ -224,7 +214,7 @@ class JSONPlaceholderService {
     func fetchUserPosts(userId: Int) async throws -> [Post] {
         debugPrint("👤 Fetching posts for user #\(userId)...")
 
-        let posts = try await client.execute(GetUserPostsRequest(userId: userId))
+        let posts = try await client.execute(PostAPI.GetByUser(userId: userId))
 
         debugPrint("✅ Found \(posts.count) posts for user")
         return posts
@@ -234,7 +224,7 @@ class JSONPlaceholderService {
     func fetchPostComments(postId: Int) async throws -> [Comment] {
         debugPrint("💬 Fetching comments for post #\(postId)...")
 
-        let comments = try await client.execute(GetPostCommentsRequest(postId: postId))
+        let comments = try await client.execute(PostAPI.GetComments(postId: postId))
 
         debugPrint("✅ Found \(comments.count) comments")
         return comments
@@ -244,7 +234,7 @@ class JSONPlaceholderService {
     func fetchUser(id: Int) async throws -> User {
         debugPrint("👤 Fetching user #\(id)...")
 
-        let user = try await client.execute(GetUserRequest(userId: id))
+        let user = try await client.execute(UserAPI.Get(userId: id))
 
         debugPrint("✅ Fetched user: \(user.name) (@\(user.username))")
         return user
@@ -279,7 +269,7 @@ class JSONPlaceholderService {
         let posts = try await withThrowingTaskGroup(of: Post.self) { group in
             for postId in postIds {
                 group.addTask {
-                    try await self.client.execute(GetPostRequest(postId: postId))
+                    try await self.client.execute(PostAPI.Get(postId: postId))
                 }
             }
 
@@ -300,7 +290,7 @@ class JSONPlaceholderService {
 
         do {
             // Try to fetch a non-existent post
-            _ = try await client.execute(GetPostRequest(postId: 99999))
+            _ = try await client.execute(PostAPI.Get(postId: 99999))
         } catch let error as ResponseError {
             switch error {
             case .clientError(let statusCode, let message):
