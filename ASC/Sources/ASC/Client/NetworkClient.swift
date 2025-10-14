@@ -122,10 +122,13 @@ public final class NetworkClient: Sendable {
         responseType: Response.Type?
     ) async throws -> Response? {
         // Check if this is a multipart request
-        if let files = request.files, !files.isEmpty {
+        let hasFiles = request.files?.isEmpty == false
+        let hasFileUploads = request.fileUploads?.isEmpty == false
+        let hasLargeFileUploads = request.largeFileUploads?.isEmpty == false
+
+        if hasFiles || hasFileUploads || hasLargeFileUploads {
             return try await performMultipartRequest(
                 request,
-                files: files,
                 responseType: responseType,
                 retryPolicy: request.retryPolicy
             )
@@ -215,9 +218,11 @@ public final class NetworkClient: Sendable {
     /// Generic method that handles both regular and empty responses.
     /// When responseType is provided, decodes and returns the response.
     /// When responseType is nil, validates the response without decoding.
+    ///
+    /// Automatically selects between in-memory and file-based encoding
+    /// based on total file size.
     private func performMultipartRequest<Request: NetworkRequest, Response: Decodable & Sendable>(
         _ request: Request,
-        files: [String: Data],
         responseType: Response.Type?,
         retryPolicy: Alamofire.RetryPolicy?
     ) async throws -> Response? {
@@ -226,7 +231,6 @@ public final class NetworkClient: Sendable {
 
         let upload = multipartBuilder.buildUpload(
             for: request,
-            files: files,
             url: url,
             session: session,
             headers: headers,

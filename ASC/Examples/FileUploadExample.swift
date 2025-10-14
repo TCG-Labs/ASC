@@ -32,7 +32,7 @@ struct UserProfile: Codable, Sendable {
 
 /// Upload API using Namespace Enum pattern
 enum UploadAPI {
-    /// Upload a single image file
+    /// Upload a single image file with custom MIME type
     struct Avatar: NetworkRequest {
         typealias Response = UserProfile
         let userId: Int
@@ -45,9 +45,9 @@ enum UploadAPI {
             ["userId": String(userId)]
         }
 
-        // Files to upload (multipart/form-data)
-        var files: [String: Data]? {
-            ["avatar": imageData]
+        // Use FileUpload for custom MIME type
+        var fileUploads: [String: FileUpload]? {
+            ["avatar": .jpeg(data: imageData, fileName: fileName)]
         }
 
         // Custom headers for upload
@@ -101,6 +101,65 @@ enum UploadAPI {
                 HTTPHeader(name: "X-File-Type", value: fileType)
             ])
         }
+    }
+
+    /// Upload large video file using file-based encoding (memory-efficient)
+    struct LargeVideo: NetworkRequest {
+        typealias Response = UploadResponse
+        let videoURL: URL
+        let title: String
+        let description: String
+
+        var path: String { "/videos/upload" }
+        var method: HTTPMethod { .post }
+
+        // Use largeFileUploads for files > 10MB
+        // This uses file-based encoding to avoid loading entire file into memory
+        var largeFileUploads: [LargeFileUpload]? {
+            [LargeFileUpload(
+                fileURL: videoURL,
+                fieldName: "video",
+                fileName: videoURL.lastPathComponent,
+                mimeType: "video/mp4"
+            )]
+        }
+
+        // Additional metadata as form parameters
+        var parameters: Parameters? {
+            [
+                "title": title,
+                "description": description,
+                "uploadedAt": ISO8601DateFormatter().string(from: Date())
+            ]
+        }
+
+        // Long timeout for large files (5 minutes)
+        var timeout: TimeInterval? { 300.0 }
+    }
+
+    /// Upload multiple photos with custom MIME types
+    struct Photos: NetworkRequest {
+        typealias Response = UploadResponse
+        let photos: [(data: Data, fileName: String, mimeType: String)]
+
+        var path: String { "/photos/batch" }
+        var method: HTTPMethod { .post }
+
+        // Use fileUploads for custom MIME types
+        var fileUploads: [String: FileUpload]? {
+            var uploads: [String: FileUpload] = [:]
+            for (index, photo) in photos.enumerated() {
+                let fieldName = "photo_\(index)"
+                uploads[fieldName] = FileUpload(
+                    data: photo.data,
+                    fileName: photo.fileName,
+                    mimeType: photo.mimeType
+                )
+            }
+            return uploads
+        }
+
+        var timeout: TimeInterval? { 180.0 }
     }
 }
 

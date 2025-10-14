@@ -62,18 +62,19 @@ swiftlint --fix
 ## Architecture
 
 ### Package Structure
-- **Sources/ASC/**: Main library source code (13 files, 1,646 lines)
-  - **Client/**: NetworkClient and supporting components (5 files, 844 lines)
+- **Sources/ASC/**: Main library source code (14 files, 1,969 lines)
+  - **Client/**: NetworkClient and supporting components (5 files, 1,004 lines)
     - `NetworkClient.swift` - Main client for executing requests (292 lines)
+    - `MultipartRequestBuilder.swift` - Multipart upload builder (286 lines)
     - `ErrorMapper.swift` - Error mapping from Alamofire (169 lines)
     - `URLBuilder.swift` - URL construction with path parameters (145 lines)
-    - `MultipartRequestBuilder.swift` - Multipart upload builder (126 lines)
     - `NetworkClientConfiguration.swift` - Configuration struct (112 lines)
-  - **Core/**: Protocol definitions and core types (4 files, 397 lines)
-    - `NetworkRequest.swift` - Main request protocol (121 lines)
+  - **Core/**: Protocol definitions and core types (5 files, 560 lines)
+    - `FileUpload.swift` - File upload metadata types (163 lines)
+    - `NetworkRequest.swift` - Main request protocol (163 lines)
     - `AlamofireReExports.swift` - Re-exported Alamofire types (104 lines)
     - `RetryPolicy.swift` - Retry policy extensions (91 lines)
-    - `RequestTypes.swift` - Request type definitions (81 lines)
+    - `RequestTypes.swift` - Request type definitions (81 lines, estimated)
   - **Errors/**: Error types (4 files, 405 lines)
     - `ResponseError.swift` - HTTP response errors (157 lines)
     - `AuthenticationError.swift` - Authentication errors (122 lines)
@@ -357,7 +358,11 @@ We focus on our unique value:
 - Default encoding is JSONEncoding.default from Alamofire
 - **Path parameters**: Template substitution in URLs (`/users/{userId}`)
 - **Path prefix**: Common path prefix for API versioning (`/api/v1`)
-- **File uploads**: Multipart/form-data support via `files` property
+- **File uploads**: Three-tier multipart/form-data support:
+  - `files`: Simple uploads (< 10MB, default MIME type)
+  - `fileUploads`: Custom MIME types with metadata (< 10MB)
+  - `largeFileUploads`: Memory-efficient file-based encoding (> 10MB)
+  - Automatic encoding selection based on file size
 - Per-request headers, timeout, and cache policy override
 - Fully type-safe with associatedtype Response: Decodable & Sendable
 - Protocol extensions provide sensible defaults
@@ -672,9 +677,11 @@ let userV2 = try await client.execute(UserAPIv2.GetUser(userId: "123"))
 
 #### File Upload (Multipart Form Data)
 
+ASC supports three file upload methods with automatic encoding selection:
+
+**1. Simple Upload (< 10MB, default MIME type)**
 ```swift
 enum UserAPI {
-    // Upload a single file
     struct UploadAvatar: NetworkRequest {
         typealias Response = User
         let userId: String
@@ -686,41 +693,100 @@ enum UserAPI {
             ["userId": userId]
         }
         var files: [String: Data]? {
-            ["avatar": imageData]
+            ["avatar": imageData]  // Uses "application/octet-stream"
         }
     }
 }
+```
 
+**2. Upload with Custom MIME Type (< 10MB, custom metadata)**
+```swift
+enum UserAPI {
+    struct UploadPhoto: NetworkRequest {
+        typealias Response = User
+        let userId: String
+        let imageData: Data
+
+        var path: String { "/users/{userId}/photo" }
+        var method: HTTPMethod { .post }
+        var pathParameters: [String: String]? {
+            ["userId": userId]
+        }
+        var fileUploads: [String: FileUpload]? {
+            // Use convenience method
+            ["photo": .jpeg(data: imageData, fileName: "profile.jpg")]
+        }
+    }
+}
+```
+
+**3. Large File Upload (> 10MB, memory-efficient)**
+```swift
+enum MediaAPI {
+    struct UploadVideo: NetworkRequest {
+        typealias Response = Video
+        let videoURL: URL
+        let title: String
+
+        var path: String { "/videos" }
+        var method: HTTPMethod { .post }
+
+        // File streamed from disk (memory-efficient)
+        var largeFileUploads: [LargeFileUpload]? {
+            [LargeFileUpload(
+                fileURL: videoURL,
+                fieldName: "video",
+                fileName: "video.mp4",
+                mimeType: "video/mp4"
+            )]
+        }
+
+        var parameters: Parameters? {
+            ["title": title]
+        }
+
+        var timeout: TimeInterval? { 300.0 }  // 5 minutes
+    }
+}
+```
+
+**4. Multiple Files with Custom MIME Types**
+```swift
 enum DocumentAPI {
-    // Upload multiple files with additional parameters
-    struct Upload: NetworkRequest {
+    struct UploadDocuments: NetworkRequest {
         typealias Response = UploadResponse
-        let documents: [String: Data]
-        let folder: String
-        let overwrite: Bool
+        let documents: [(data: Data, fileName: String, mimeType: String)]
 
         var path: String { "/documents" }
         var method: HTTPMethod { .post }
-        var files: [String: Data]? { documents }
-        var parameters: Parameters? {
-            ["folder": folder, "overwrite": overwrite]
+
+        var fileUploads: [String: FileUpload]? {
+            var uploads: [String: FileUpload] = [:]
+            for (index, doc) in documents.enumerated() {
+                uploads["doc_\(index)"] = FileUpload(
+                    data: doc.data,
+                    fileName: doc.fileName,
+                    mimeType: doc.mimeType
+                )
+            }
+            return uploads
         }
     }
 }
+```
 
-// Execute uploads
-let imageData = UIImage(named: "avatar")?.jpegData(compressionQuality: 0.8)
-let user = try await client.execute(UserAPI.UploadAvatar(
-    userId: "123",
-    imageData: imageData!
-))
+**Automatic Encoding Selection:**
+- Files < 10MB: In-memory encoding (fast)
+- Files > 10MB: File-based encoding (memory-efficient)
+- `largeFileUploads`: Always uses file-based encoding
 
-let docs = ["file1.pdf": pdfData, "file2.txt": txtData]
-let response = try await client.execute(DocumentAPI.Upload(
-    documents: docs,
-    folder: "uploads",
-    overwrite: true
-))
+**Common MIME Types:**
+- JPEG: `"image/jpeg"` or use `.jpeg(data:fileName:)`
+- PNG: `"image/png"` or use `.png(data:fileName:)`
+- MP4: `"video/mp4"` or use `.mp4(data:fileName:)`
+- PDF: `"application/pdf"` or use `.pdf(data:fileName:)`
+
+See `Examples/UploadBestPractices.swift` for comprehensive guide.
 ```
 
 #### Combining All Features

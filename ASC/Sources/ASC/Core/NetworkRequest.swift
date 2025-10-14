@@ -86,7 +86,43 @@ public protocol NetworkRequest: Sendable {
     ///
     /// Dictionary mapping field names to file data.
     /// When specified, the request automatically becomes a multipart/form-data request.
+    ///
+    /// **Note:** For small files only (< 10MB). For larger files, use `largeFileUploads`.
     var files: [String: Data]? { get }
+
+    /// Files with custom metadata (filename, MIME type).
+    ///
+    /// Use this when you need fine-grained control over file uploads,
+    /// including custom MIME types and filenames.
+    ///
+    /// Example:
+    /// ```swift
+    /// var fileUploads: [String: FileUpload]? {
+    ///     ["photo": .jpeg(data: imageData, fileName: "profile.jpg")]
+    /// }
+    /// ```
+    ///
+    /// **Note:** For small files only (< 10MB). For larger files, use `largeFileUploads`.
+    var fileUploads: [String: FileUpload]? { get }
+
+    /// Large files for file-based encoding.
+    ///
+    /// Use this for large files (> 10MB) to avoid loading all data into memory.
+    /// Files will be streamed from disk during upload, which is memory-efficient
+    /// for videos and other large files.
+    ///
+    /// Example:
+    /// ```swift
+    /// var largeFileUploads: [LargeFileUpload]? {
+    ///     [LargeFileUpload(
+    ///         fileURL: videoURL,
+    ///         fieldName: "video",
+    ///         fileName: "my-video.mp4",
+    ///         mimeType: "video/mp4"
+    ///     )]
+    /// }
+    /// ```
+    var largeFileUploads: [LargeFileUpload]? { get }
 }
 
 // MARK: - Default Implementations
@@ -118,4 +154,10 @@ public extension NetworkRequest {
 
     /// Default files are nil
     var files: [String: Data]? { nil }
+
+    /// Default file uploads are nil
+    var fileUploads: [String: FileUpload]? { nil }
+
+    /// Default large file uploads are nil
+    var largeFileUploads: [LargeFileUpload]? { nil }
 }
