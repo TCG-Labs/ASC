@@ -17,7 +17,7 @@ A modern, type-safe, protocol-oriented networking library built on top of Alamof
 - 📊 **Event Monitoring** - Track request lifecycle for analytics and debugging
 - 🔒 **SSL Pinning** - Certificate pinning support via ServerTrustManager
 - 🎨 **Clean Architecture** - Minimal wrapper, maximum Alamofire compatibility
-- 🧪 **Well Tested** - 65+ tests with 100% coverage of public API
+- 🧪 **Well Tested** - 131 tests with 100% pass rate and comprehensive coverage
 
 ## 📋 Requirements
 
@@ -400,112 +400,358 @@ do {
 }
 ```
 
-## 📚 Architecture
+## 💡 Best Practices
 
-ASC uses a clean, layered architecture:
+### Request Organization
 
-```
-┌─────────────────────────────────────┐
-│      NetworkRequest Protocol        │  ← Type-safe request definition
-└─────────────────────────────────────┘
-              ↓
-┌─────────────────────────────────────┐
-│         NetworkClient               │  ← Main client interface
-└─────────────────────────────────────┘
-              ↓
-┌─────────────────────────────────────┐
-│      Alamofire Session              │  ← Alamofire integration
-│  + Interceptors + Monitors          │
-└─────────────────────────────────────┘
-```
-
-**Core Components:**
-
-- **NetworkRequest** - Protocol defining request configuration
-- **NetworkClient** - Main client executing requests
-- **NetworkClientConfiguration** - Advanced configuration
-- **ErrorMapper** - Transforms Alamofire errors to ASC errors
-- **URLBuilder** - Builds URLs with path parameters
-- **MultipartRequestBuilder** - Handles file uploads
-
-**Re-exported Alamofire Types:**
-
-ASC re-exports key Alamofire types for convenience:
-- `HTTPHeaders`, `HTTPMethod`, `Parameters`
-- `RequestInterceptor`, `EventMonitor`
-- `ServerTrustManager`, `RedirectHandler`
-- And more...
-
-This allows full access to Alamofire's power while maintaining a simpler API.
-
-## 🧪 Testing
-
-ASC includes comprehensive test coverage with 65+ tests:
-
-```bash
-# Run all tests
-swift test
-
-# Run specific test
-swift test --filter ASCTests.testNetworkClientExecutesGET
-
-# Run with coverage
-swift test --enable-code-coverage
-```
-
-**Test Helpers:**
-
-ASC provides mock utilities for testing your network layer:
+Use enums to organize related requests:
 
 ```swift
-import ASCTests
-
-// Mock URL responses
-MockURLProtocol.requestHandler = { request in
-    let response = MockResponse.success(user).build(url: request.url!)
-    return response
+enum UserAPI {
+    case getUser(id: String)
+    case updateUser(id: String, name: String)
+    case deleteUser(id: String)
 }
 
-// Use with URLSession
-let config = URLSessionConfiguration.ephemeral
-config.protocolClasses = [MockURLProtocol.self]
+extension UserAPI: NetworkRequest {
+    typealias Response = User
+
+    var path: String {
+        switch self {
+        case .getUser(let id):
+            return "/users/\(id)"
+        case .updateUser(let id, _):
+            return "/users/\(id)"
+        case .deleteUser(let id):
+            return "/users/\(id)"
+        }
+    }
+
+    var method: HTTPMethod {
+        switch self {
+        case .getUser:
+            return .get
+        case .updateUser:
+            return .put
+        case .deleteUser:
+            return .delete
+        }
+    }
+
+    var parameters: Parameters? {
+        switch self {
+        case .updateUser(_, let name):
+            return ["name": name]
+        default:
+            return nil
+        }
+    }
+}
+
+// Usage
+let user = try await client.execute(UserAPI.getUser(id: "123"))
 ```
 
-## 🎨 Code Quality
+### Client Configuration Management
 
-ASC maintains high code quality standards:
+Create a single configured client for your app:
 
-- ✅ **SwiftLint** - Strict linting rules enforced
-- ✅ **Zero Warnings** - Clean codebase
-- ✅ **Documentation** - 100% coverage of public API
-- ✅ **Tests** - 65+ tests, 100% pass rate
-- ✅ **Swift 6** - Full Sendable conformance
+```swift
+// NetworkClientFactory.swift
+final class NetworkClientFactory {
+    static let shared = NetworkClientFactory()
 
-```bash
-# Run linter
-swiftlint
+    private(set) lazy var client: NetworkClient = {
+        let config = NetworkClientConfiguration(
+            baseURL: Configuration.apiBaseURL,
+            defaultHeaders: [
+                "X-App-Version": Bundle.main.appVersion,
+                "Accept-Language": Locale.current.languageCode ?? "en"
+            ],
+            interceptors: [AuthInterceptor.shared],
+            eventMonitors: [NetworkLogger.shared],
+            defaultTimeout: 30.0
+        )
+        return NetworkClient(configuration: config)
+    }()
 
-# Auto-fix issues
-swiftlint --fix
+    private init() {}
+}
+
+// Usage throughout app
+let user = try await NetworkClientFactory.shared.client.execute(request)
 ```
 
-## 📖 Documentation
+### Error Handling Strategy
 
-Full documentation is available in the code via DocC:
+Handle errors at appropriate levels:
 
-- All public types are documented
-- Usage examples in doc comments
-- See `CLAUDE.md` for architecture details
+```swift
+// Repository level - transform to domain errors
+class UserRepository {
+    func getUser(id: String) async throws -> User {
+        do {
+            return try await client.execute(UserAPI.getUser(id: id))
+        } catch let error as NetworkError {
+            throw DomainError.connectionFailed(reason: error.localizedDescription)
+        } catch let error as ResponseError {
+            switch error {
+            case .invalidStatusCode(404, _):
+                throw DomainError.userNotFound(id: id)
+            case .serverError(let code, _):
+                throw DomainError.serverUnavailable(code: code)
+            default:
+                throw DomainError.unknown(error)
+            }
+        }
+    }
+}
 
-## 🤝 Contributing
+// ViewModel level - prepare user-facing messages
+class UserViewModel {
+    func loadUser(id: String) async {
+        do {
+            self.user = try await repository.getUser(id: id)
+        } catch let error as DomainError {
+            self.errorMessage = error.userFacingMessage
+        }
+    }
+}
+```
 
-Contributions are welcome! Please:
+### File Upload Patterns
 
-1. Fork the repository
-2. Create a feature branch
-3. Make your changes with tests
-4. Ensure SwiftLint passes
-5. Submit a pull request
+Choose the right upload method based on file size:
+
+```swift
+// Small files (< 10MB) - use FileUpload with MIME types
+struct UploadPhotoRequest: NetworkRequest {
+    typealias Response = Photo
+    let imageData: Data
+
+    var path: String { "/photos" }
+    var method: HTTPMethod { .post }
+    var fileUploads: [String: FileUpload]? {
+        [
+            "photo": .jpeg(data: imageData, fileName: "photo.jpg")
+        ]
+    }
+}
+
+// Large files (> 10MB) - use LargeFileUpload with file URLs
+struct UploadVideoRequest: NetworkRequest {
+    typealias Response = Video
+    let videoURL: URL
+
+    var path: String { "/videos" }
+    var method: HTTPMethod { .post }
+    var largeFileUploads: [LargeFileUpload]? {
+        [
+            LargeFileUpload(
+                fileURL: videoURL,
+                fieldName: "video",
+                fileName: "video.mp4",
+                mimeType: "video/mp4"
+            )
+        ]
+    }
+}
+
+// Multiple files with metadata
+struct UploadDocumentsRequest: NetworkRequest {
+    typealias Response = UploadResult
+    let files: [URL]
+    let category: String
+
+    var path: String { "/documents" }
+    var method: HTTPMethod { .post }
+    var largeFileUploads: [LargeFileUpload]? {
+        files.map { url in
+            LargeFileUpload(
+                fileURL: url,
+                fieldName: "documents[]",  // Note: array syntax
+                fileName: url.lastPathComponent
+            )
+        }
+    }
+    var parameters: Parameters? {
+        ["category": category, "count": files.count]
+    }
+}
+```
+
+### Retry Policy Selection
+
+Choose retry policies based on request importance:
+
+```swift
+// Critical requests - aggressive retry
+struct PaymentRequest: NetworkRequest {
+    // ...
+    var retryPolicy: Alamofire.RetryPolicy? { .aggressive }  // 5 retries
+}
+
+// Standard requests - default retry
+struct GetFeedRequest: NetworkRequest {
+    // ...
+    var retryPolicy: Alamofire.RetryPolicy? { .default }  // 3 retries
+}
+
+// Non-critical requests - conservative retry
+struct LogAnalyticsRequest: NetworkRequest {
+    // ...
+    var retryPolicy: Alamofire.RetryPolicy? { .conservative }  // 2 retries
+}
+
+// Real-time requests - no retry
+struct SearchRequest: NetworkRequest {
+    // ...
+    var retryPolicy: Alamofire.RetryPolicy? { .none }  // No retries
+}
+```
+
+### Security Considerations
+
+Protect sensitive data in requests:
+
+```swift
+// 1. Don't log sensitive data
+final class SecureLogger: EventMonitor {
+    let sensitiveHeaders = ["Authorization", "X-API-Key", "Cookie"]
+
+    func request<Value>(
+        _ request: DataRequest,
+        didParseResponse response: DataResponse<Value, AFError>
+    ) {
+        var headers = request.request?.allHTTPHeaderFields ?? [:]
+        // Redact sensitive headers
+        for header in sensitiveHeaders {
+            if headers[header] != nil {
+                headers[header] = "[REDACTED]"
+            }
+        }
+        debugPrint("Response:", response.response?.statusCode ?? 0, "Headers:", headers)
+    }
+}
+
+// 2. Use HTTPS only in production
+let config = NetworkClientConfiguration(
+    baseURL: Configuration.isProduction ? "https://api.example.com" : "http://localhost:3000"
+)
+
+// 3. Implement certificate pinning for production
+let trustManager = ServerTrustManager(
+    evaluators: ["api.example.com": PinnedCertificatesTrustEvaluator()]
+)
+```
+
+### Testing Your Network Layer
+
+Mock network calls in tests:
+
+```swift
+import Testing
+@testable import YourApp
+@testable import ASC
+
+@Suite("User Repository Tests")
+struct UserRepositoryTests {
+    @Test("Repository returns user on success")
+    func testGetUserSuccess() async throws {
+        // Setup
+        let mockUser = User(id: "123", name: "John")
+        MockURLProtocol.requestHandler = MockResponseBuilder.success(mockUser).handler()
+
+        let config = URLSessionConfiguration.ephemeral
+        config.protocolClasses = [MockURLProtocol.self]
+        let client = NetworkClient(
+            configuration: NetworkClientConfiguration(
+                baseURL: "https://test.com",
+                session: Session(configuration: config)
+            )
+        )
+
+        let repository = UserRepository(client: client)
+
+        // Execute
+        let user = try await repository.getUser(id: "123")
+
+        // Verify
+        #expect(user.id == "123")
+        #expect(user.name == "John")
+    }
+
+    @Test("Repository throws domain error on 404")
+    func testGetUserNotFound() async throws {
+        // Setup
+        MockURLProtocol.requestHandler = MockResponseBuilder.notFound().handler()
+
+        let config = URLSessionConfiguration.ephemeral
+        config.protocolClasses = [MockURLProtocol.self]
+        let client = NetworkClient(
+            configuration: NetworkClientConfiguration(
+                baseURL: "https://test.com",
+                session: Session(configuration: config)
+            )
+        )
+
+        let repository = UserRepository(client: client)
+
+        // Execute & Verify
+        do {
+            _ = try await repository.getUser(id: "999")
+            Issue.record("Expected error to be thrown")
+        } catch let error as DomainError {
+            #expect(error == .userNotFound(id: "999"))
+        }
+    }
+}
+```
+
+### Performance Optimization
+
+Optimize based on usage patterns:
+
+```swift
+// 1. Reuse client instance (don't create new clients)
+// ✅ Good
+class APIService {
+    private let client = NetworkClientFactory.shared.client
+    func fetchData() async throws { /* ... */ }
+}
+
+// ❌ Bad - creates new session each time
+class APIService {
+    func fetchData() async throws {
+        let client = NetworkClient(baseURL: "...")  // Don't do this
+    }
+}
+
+// 2. Use appropriate cache policy
+struct GetCachedDataRequest: NetworkRequest {
+    // ...
+    var cachePolicy: URLRequest.CachePolicy? {
+        .returnCacheDataElseLoad  // Use cache when available
+    }
+}
+
+// 3. Batch requests when possible
+func loadUserDashboard(userId: String) async throws {
+    async let user = client.execute(UserAPI.getUser(id: userId))
+    async let posts = client.execute(PostAPI.getUserPosts(userId: userId))
+    async let stats = client.execute(StatsAPI.getUserStats(userId: userId))
+
+    // All requests execute in parallel
+    let (userData, postsData, statsData) = try await (user, posts, stats)
+}
+
+// 4. Use streaming for large responses (if backend supports)
+struct DownloadLargeFileRequest: NetworkRequest {
+    typealias Response = Data
+    // ...
+    var timeout: TimeInterval? { 300 }  // 5 minutes for large downloads
+}
+```
 
 ## 📄 License
 
