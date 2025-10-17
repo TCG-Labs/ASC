@@ -117,17 +117,12 @@ internal struct ErrorMapper {
             return nil
         }
 
-        // Try common error message keys
-        if let message = json["message"] as? String {
-            return message
-        }
-
-        if let error = json["error"] as? String {
-            return error
-        }
-
-        if let errorDescription = json["error_description"] as? String {
-            return errorDescription
+        // Try common error message keys in order of priority
+        let topLevelKeys = ["message", "error", "error_description"]
+        for key in topLevelKeys {
+            if let message = json[key] as? String {
+                return message
+            }
         }
 
         // Handle nested error object

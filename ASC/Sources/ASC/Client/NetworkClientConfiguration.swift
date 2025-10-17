@@ -50,6 +50,12 @@ public struct NetworkClientConfiguration: Sendable {
     /// Dispatch queue for serialization operations.
     public let serializationQueue: DispatchQueue
 
+    /// Threshold for using file-based multipart encoding (in bytes).
+    ///
+    /// Files larger than this threshold will use file-based encoding to avoid memory issues.
+    /// Default is 10MB (10,000,000 bytes).
+    public let multipartFileSizeThreshold: Int
+
     /// Creates a new network client configuration.
     ///
     /// - Parameters:
@@ -66,6 +72,7 @@ public struct NetworkClientConfiguration: Sendable {
     ///   - rootQueue: Root dispatch queue (default: custom queue)
     ///   - requestQueue: Request dispatch queue (default: custom queue)
     ///   - serializationQueue: Serialization dispatch queue (default: custom queue)
+    ///   - multipartFileSizeThreshold: Threshold for file-based encoding (default: 10MB)
     public init(
         baseURL: String,
         urlSessionConfiguration: URLSessionConfiguration = .default,
@@ -85,7 +92,8 @@ public struct NetworkClientConfiguration: Sendable {
         serializationQueue: DispatchQueue = DispatchQueue(
             label: "com.asc.networkClient.serializationQueue",
             qos: .userInitiated
-        )
+        ),
+        multipartFileSizeThreshold: Int = 10_000_000
     ) {
         self.baseURL = baseURL
         self.urlSessionConfiguration = urlSessionConfiguration
@@ -100,6 +108,7 @@ public struct NetworkClientConfiguration: Sendable {
         self.rootQueue = rootQueue
         self.requestQueue = requestQueue
         self.serializationQueue = serializationQueue
+        self.multipartFileSizeThreshold = multipartFileSizeThreshold
     }
 
     /// Creates a default configuration with the specified base URL.

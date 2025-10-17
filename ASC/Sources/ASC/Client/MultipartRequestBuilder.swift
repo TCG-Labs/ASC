@@ -37,19 +37,21 @@ internal struct MultipartRequestBuilder {
     ///   - session: Alamofire session to use for upload
     ///   - headers: HTTP headers for the request
     ///   - interceptor: Optional request interceptor for retry logic
+    ///   - fileSizeThreshold: Threshold for file-based encoding (default: 10MB)
     /// - Returns: Configured UploadRequest ready to execute
     internal func buildUpload<Request: NetworkRequest>(
         for request: Request,
         url: URL,
         session: Session,
         headers: HTTPHeaders,
-        interceptor: (any RequestInterceptor)? = nil
+        interceptor: (any RequestInterceptor)? = nil,
+        fileSizeThreshold: Int = Self.fileSizeThreshold
     ) -> UploadRequest {
         // Calculate total size to determine encoding method
         let totalSize = calculateTotalSize(for: request)
 
-        // Use file-based encoding for large uploads (> 10MB)
-        if totalSize > Self.fileSizeThreshold || request.largeFileUploads != nil {
+        // Use file-based encoding for large uploads
+        if totalSize > fileSizeThreshold || request.largeFileUploads != nil {
             return buildFileBasedUpload(
                 for: request,
                 url: url,
@@ -106,38 +108,8 @@ internal struct MultipartRequestBuilder {
     ) -> UploadRequest {
         session.upload(
             multipartFormData: { multipartFormData in
-                // Add simple files (without metadata)
-                if let files = request.files {
-                    for (name, data) in files {
-                        multipartFormData.append(
-                            data,
-                            withName: name,
-                            fileName: "\(name).\(Self.defaultFileExtension)",
-                            mimeType: Self.defaultMimeType
-                        )
-                    }
-                }
-
-                // Add file uploads with custom metadata
-                if let fileUploads = request.fileUploads {
-                    for (fieldName, upload) in fileUploads {
-                        multipartFormData.append(
-                            upload.data,
-                            withName: fieldName,
-                            fileName: upload.fileName,
-                            mimeType: upload.mimeType
-                        )
-                    }
-                }
-
-                // Add regular parameters as form fields
-                if let parameters = request.parameters {
-                    for (key, value) in parameters {
-                        if let data = self.encodeParameter(value) {
-                            multipartFormData.append(data, withName: key)
-                        }
-                    }
-                }
+                self.appendFiles(to: multipartFormData, from: request)
+                self.appendParameters(to: multipartFormData, from: request)
             },
             to: url,
             method: request.method,
@@ -167,6 +139,52 @@ internal struct MultipartRequestBuilder {
         // Build multipart form data
         let formData = MultipartFormData()
 
+        // Add files and parameters
+        appendFiles(to: formData, from: request)
+        appendParameters(to: formData, from: request)
+
+        // Add large file uploads from URLs
+        if let largeFileUploads = request.largeFileUploads {
+            for upload in largeFileUploads {
+                formData.append(
+                    upload.fileURL,
+                    withName: upload.fieldName,
+                    fileName: upload.fileName,
+                    mimeType: upload.mimeType
+                )
+            }
+        }
+
+        // Write to temporary file
+        do {
+            try formData.writeEncodedData(to: tempURL)
+        } catch {
+            debugPrint("⚠️ Failed to write multipart data to file: \(error)")
+        }
+
+        // Upload from file
+        return session.upload(
+            tempURL,
+            to: url,
+            method: request.method,
+            headers: headers,
+            interceptor: interceptor
+        )
+    }
+
+    // MARK: - Helper Methods
+
+    /// Appends files from the request to multipart form data.
+    ///
+    /// Adds both simple files and files with custom metadata to the form data.
+    ///
+    /// - Parameters:
+    ///   - formData: Multipart form data to append files to
+    ///   - request: Network request containing files to upload
+    private func appendFiles<Request: NetworkRequest>(
+        to formData: MultipartFormData,
+        from request: Request
+    ) {
         // Add simple files (without metadata)
         if let files = request.files {
             for (name, data) in files {
@@ -190,43 +208,26 @@ internal struct MultipartRequestBuilder {
                 )
             }
         }
+    }
 
-        // Add large file uploads from URLs
-        if let largeFileUploads = request.largeFileUploads {
-            for upload in largeFileUploads {
-                formData.append(
-                    upload.fileURL,
-                    withName: upload.fieldName,
-                    fileName: upload.fileName,
-                    mimeType: upload.mimeType
-                )
+    /// Appends parameters from the request to multipart form data.
+    ///
+    /// Converts request parameters to form fields and adds them to the multipart data.
+    ///
+    /// - Parameters:
+    ///   - formData: Multipart form data to append parameters to
+    ///   - request: Network request containing parameters
+    private func appendParameters<Request: NetworkRequest>(
+        to formData: MultipartFormData,
+        from request: Request
+    ) {
+        guard let parameters = request.parameters else { return }
+
+        for (key, value) in parameters {
+            if let data = encodeParameter(value) {
+                formData.append(data, withName: key)
             }
         }
-
-        // Add regular parameters as form fields
-        if let parameters = request.parameters {
-            for (key, value) in parameters {
-                if let data = encodeParameter(value) {
-                    formData.append(data, withName: key)
-                }
-            }
-        }
-
-        // Write to temporary file
-        do {
-            try formData.writeEncodedData(to: tempURL)
-        } catch {
-            debugPrint("⚠️ Failed to write multipart data to file: \(error)")
-        }
-
-        // Upload from file
-        return session.upload(
-            tempURL,
-            to: url,
-            method: request.method,
-            headers: headers,
-            interceptor: interceptor
-        )
     }
 
     // MARK: - Parameter Encoding

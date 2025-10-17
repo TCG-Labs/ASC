@@ -180,21 +180,12 @@ public final class NetworkClient: Sendable {
         responseType: Response.Type,
         retryPolicy: Alamofire.RetryPolicy?
     ) async throws -> Response {
-        let dataTask = session.request(urlRequest, interceptor: retryPolicy)
+        let response = await session.request(urlRequest, interceptor: retryPolicy)
             .validate()
             .serializingDecodable(Response.self)
+            .response
 
-        let response = await dataTask.response
-
-        if let error = response.error {
-            throw errorMapper.mapError(error, data: response.data)
-        }
-
-        guard let value = response.value else {
-            throw ResponseError.missingData
-        }
-
-        return value
+        return try handleResponse(response)
     }
 
     /// Performs a request without expecting a response body.
@@ -202,15 +193,12 @@ public final class NetworkClient: Sendable {
         _ urlRequest: URLRequest,
         retryPolicy: Alamofire.RetryPolicy?
     ) async throws {
-        let dataTask = session.request(urlRequest, interceptor: retryPolicy)
+        let response = await session.request(urlRequest, interceptor: retryPolicy)
             .validate()
             .serializingData()
+            .response
 
-        let response = await dataTask.response
-
-        if let error = response.error {
-            throw errorMapper.mapError(error, data: response.data)
-        }
+        try validateResponse(response)
     }
 
     /// Performs a multipart file upload request.
@@ -234,7 +222,8 @@ public final class NetworkClient: Sendable {
             url: url,
             session: session,
             headers: headers,
-            interceptor: retryPolicy
+            interceptor: retryPolicy,
+            fileSizeThreshold: configuration.multipartFileSizeThreshold
         )
 
         // Handle response based on expected type
@@ -244,28 +233,52 @@ public final class NetworkClient: Sendable {
                 .serializingDecodable(responseType)
                 .response
 
-            if let error = response.error {
-                throw errorMapper.mapError(error, data: response.data)
-            }
-
-            guard let value = response.value else {
-                throw ResponseError.missingData
-            }
-
-            return value
+            return try handleResponse(response)
         } else {
             let response = await upload
                 .validate()
                 .serializingData()
                 .response
 
-            if let error = response.error {
-                throw errorMapper.mapError(error, data: response.data)
-            }
-
+            try validateResponse(response)
             return nil
         }
     }
+
+    // MARK: - Response Handling
+
+    /// Validates response and extracts value.
+    ///
+    /// Checks for errors and ensures response value is present.
+    ///
+    /// - Parameter response: Data response from Alamofire
+    /// - Returns: Extracted response value
+    /// - Throws: Mapped error or ResponseError.missingData
+    private func handleResponse<T>(_ response: DataResponse<T, AFError>) throws -> T {
+        if let error = response.error {
+            throw errorMapper.mapError(error, data: response.data)
+        }
+
+        guard let value = response.value else {
+            throw ResponseError.missingData
+        }
+
+        return value
+    }
+
+    /// Validates response for empty responses.
+    ///
+    /// Checks for errors in responses without expected body.
+    ///
+    /// - Parameter response: Data response from Alamofire
+    /// - Throws: Mapped error if present
+    private func validateResponse(_ response: DataResponse<Data, AFError>) throws {
+        if let error = response.error {
+            throw errorMapper.mapError(error, data: response.data)
+        }
+    }
+
+    // MARK: - Header Building
 
     /// Builds HTTP headers for a request.
     private func buildHeaders<Request: NetworkRequest>(for request: Request) -> HTTPHeaders {

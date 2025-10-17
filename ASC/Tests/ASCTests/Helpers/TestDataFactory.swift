@@ -136,7 +136,7 @@ public enum TestDataFactory {
         try fileData.write(to: fileURL)
 
         let cleanup = {
-            try? FileManager.default.removeItem(at: fileURL)
+            _ = try? FileManager.default.removeItem(at: fileURL)
         }
 
         return TempFile(url: fileURL, cleanup: cleanup)
