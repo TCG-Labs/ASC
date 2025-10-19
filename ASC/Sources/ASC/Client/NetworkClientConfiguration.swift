@@ -93,7 +93,7 @@ public struct NetworkClientConfiguration: Sendable {
             label: "com.asc.networkClient.serializationQueue",
             qos: .userInitiated
         ),
-        multipartFileSizeThreshold: Int = 10_000_000
+        multipartFileSizeThreshold: Int = ASCConstants.FileUpload.defaultSizeThreshold
     ) {
         self.baseURL = baseURL
         self.urlSessionConfiguration = urlSessionConfiguration

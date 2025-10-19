@@ -11,18 +11,6 @@ import Foundation
 /// Handles construction of multipart/form-data requests with files and parameters.
 /// Supports both in-memory and file-based encoding for optimal memory usage.
 internal struct MultipartRequestBuilder {
-    // MARK: - Constants
-
-    /// Default file extension for uploaded files.
-    private static let defaultFileExtension = "dat"
-
-    /// Default MIME type for uploaded files.
-    private static let defaultMimeType = "application/octet-stream"
-
-    /// Threshold for using file-based encoding (10MB).
-    /// Files larger than this will use file-based encoding to avoid memory issues.
-    private static let fileSizeThreshold: Int = 10_000_000 // 10MB
-
     // MARK: - Public Methods
 
     /// Builds a multipart upload request.
@@ -45,12 +33,10 @@ internal struct MultipartRequestBuilder {
         session: Session,
         headers: HTTPHeaders,
         interceptor: (any RequestInterceptor)? = nil,
-        fileSizeThreshold: Int = Self.fileSizeThreshold
+        fileSizeThreshold: Int = ASCConstants.FileUpload.defaultSizeThreshold
     ) -> UploadRequest {
-        // Calculate total size to determine encoding method
         let totalSize = calculateTotalSize(for: request)
 
-        // Use file-based encoding for large uploads
         if totalSize > fileSizeThreshold || request.largeFileUploads != nil {
             return buildFileBasedUpload(
                 for: request,
@@ -61,7 +47,6 @@ internal struct MultipartRequestBuilder {
             )
         }
 
-        // Use in-memory encoding for small uploads
         return buildInMemoryUpload(
             for: request,
             url: url,
@@ -75,20 +60,16 @@ internal struct MultipartRequestBuilder {
 
     /// Calculates total size of all files in the request.
     private func calculateTotalSize<Request: NetworkRequest>(for request: Request) -> Int {
-        // Optimization: Large file uploads always trigger file-based encoding
-        // Return early to avoid unnecessary size calculations
         if request.largeFileUploads != nil {
             return Int.max
         }
 
         var totalSize = 0
 
-        // Add size from simple files
         if let files = request.files {
             totalSize += files.values.reduce(0) { $0 + $1.count }
         }
 
-        // Add size from file uploads with metadata
         if let fileUploads = request.fileUploads {
             totalSize += fileUploads.values.reduce(0) { $0 + $1.data.count }
         }
@@ -131,19 +112,15 @@ internal struct MultipartRequestBuilder {
         headers: HTTPHeaders,
         interceptor: (any RequestInterceptor)?
     ) -> UploadRequest {
-        // Create temporary file URL
         let tempURL = FileManager.default.temporaryDirectory
             .appendingPathComponent(UUID().uuidString)
             .appendingPathExtension("multipart")
 
-        // Build multipart form data
         let formData = MultipartFormData()
 
-        // Add files and parameters
         appendFiles(to: formData, from: request)
         appendParameters(to: formData, from: request)
 
-        // Add large file uploads from URLs
         if let largeFileUploads = request.largeFileUploads {
             for upload in largeFileUploads {
                 formData.append(
@@ -155,14 +132,12 @@ internal struct MultipartRequestBuilder {
             }
         }
 
-        // Write to temporary file
         do {
             try formData.writeEncodedData(to: tempURL)
         } catch {
             debugPrint("⚠️ Failed to write multipart data to file: \(error)")
         }
 
-        // Upload from file
         return session.upload(
             tempURL,
             to: url,
@@ -185,19 +160,17 @@ internal struct MultipartRequestBuilder {
         to formData: MultipartFormData,
         from request: Request
     ) {
-        // Add simple files (without metadata)
         if let files = request.files {
             for (name, data) in files {
                 formData.append(
                     data,
                     withName: name,
-                    fileName: "\(name).\(Self.defaultFileExtension)",
-                    mimeType: Self.defaultMimeType
+                    fileName: "\(name).\(ASCConstants.FileUpload.defaultExtension)",
+                    mimeType: ASCConstants.FileUpload.defaultMimeType
                 )
             }
         }
 
-        // Add file uploads with custom metadata
         if let fileUploads = request.fileUploads {
             for (fieldName, upload) in fileUploads {
                 formData.append(
@@ -274,14 +247,12 @@ internal struct MultipartRequestBuilder {
     /// - Returns: JSON-encoded data, or nil if encoding fails
     private func encodeJSON(_ value: Any) -> Data? {
         guard JSONSerialization.isValidJSONObject(value) else {
-            // Not a valid JSON object, use string representation
             return Data("\(value)".utf8)
         }
 
         do {
             return try JSONSerialization.data(withJSONObject: value, options: [])
         } catch {
-            // JSON encoding failed, use string representation as fallback
             return Data("\(value)".utf8)
         }
     }

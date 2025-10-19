@@ -54,60 +54,103 @@ public struct FileUpload: Sendable {
         self.mimeType = mimeType
     }
 
-    // MARK: - Convenience Initializers
+    // MARK: - Convenience Factory
 
-    /// Creates a file upload for a JPEG image.
+    /// Creates a file upload for a specific file type.
     ///
     /// - Parameters:
-    ///   - data: The JPEG image data
-    ///   - fileName: The filename (defaults to "image.jpg")
+    ///   - data: The file data
+    ///   - type: The file type (determines MIME type and default filename)
+    ///   - fileName: Optional custom filename (uses type's default if nil)
+    /// - Returns: Configured FileUpload instance
+    public static func create(data: Data, type: FileType, fileName: String? = nil) -> FileUpload {
+        FileUpload(
+            data: data,
+            fileName: fileName ?? type.defaultFileName,
+            mimeType: type.mimeType
+        )
+    }
+
+    /// Convenience initializers for common file types.
     public static func jpeg(data: Data, fileName: String = "image.jpg") -> FileUpload {
-        FileUpload(data: data, fileName: fileName, mimeType: "image/jpeg")
+        create(data: data, type: .jpeg, fileName: fileName)
     }
 
-    /// Creates a file upload for a PNG image.
-    ///
-    /// - Parameters:
-    ///   - data: The PNG image data
-    ///   - fileName: The filename (defaults to "image.png")
     public static func png(data: Data, fileName: String = "image.png") -> FileUpload {
-        FileUpload(data: data, fileName: fileName, mimeType: "image/png")
+        create(data: data, type: .png, fileName: fileName)
     }
 
-    /// Creates a file upload for a HEIC image.
-    ///
-    /// - Parameters:
-    ///   - data: The HEIC image data
-    ///   - fileName: The filename (defaults to "image.heic")
     public static func heic(data: Data, fileName: String = "image.heic") -> FileUpload {
-        FileUpload(data: data, fileName: fileName, mimeType: "image/heic")
+        create(data: data, type: .heic, fileName: fileName)
     }
 
-    /// Creates a file upload for an MP4 video.
-    ///
-    /// - Parameters:
-    ///   - data: The MP4 video data
-    ///   - fileName: The filename (defaults to "video.mp4")
     public static func mp4(data: Data, fileName: String = "video.mp4") -> FileUpload {
-        FileUpload(data: data, fileName: fileName, mimeType: "video/mp4")
+        create(data: data, type: .mp4, fileName: fileName)
     }
 
-    /// Creates a file upload for a PDF document.
-    ///
-    /// - Parameters:
-    ///   - data: The PDF document data
-    ///   - fileName: The filename (defaults to "document.pdf")
     public static func pdf(data: Data, fileName: String = "document.pdf") -> FileUpload {
-        FileUpload(data: data, fileName: fileName, mimeType: "application/pdf")
+        create(data: data, type: .pdf, fileName: fileName)
     }
 
-    /// Creates a file upload for a ZIP archive.
-    ///
-    /// - Parameters:
-    ///   - data: The ZIP archive data
-    ///   - fileName: The filename (defaults to "archive.zip")
     public static func zip(data: Data, fileName: String = "archive.zip") -> FileUpload {
-        FileUpload(data: data, fileName: fileName, mimeType: "application/zip")
+        create(data: data, type: .zip, fileName: fileName)
+    }
+}
+
+// MARK: - FileType
+
+/// Enum representing common file types with their MIME types and default extensions.
+///
+/// Makes it easy to create file uploads with correct MIME types.
+public enum FileType: Sendable {
+    case jpeg
+    case png
+    case heic
+    case mp4
+    case pdf
+    case zip
+    case custom(mimeType: String, extension: String)
+
+    /// MIME type for this file type.
+    public var mimeType: String {
+        switch self {
+        case .jpeg: return "image/jpeg"
+        case .png: return "image/png"
+        case .heic: return "image/heic"
+        case .mp4: return "video/mp4"
+        case .pdf: return "application/pdf"
+        case .zip: return "application/zip"
+        case .custom(let mimeType, _): return mimeType
+        }
+    }
+
+    /// Default file extension for this file type.
+    public var fileExtension: String {
+        switch self {
+        case .jpeg: return "jpg"
+        case .png: return "png"
+        case .heic: return "heic"
+        case .mp4: return "mp4"
+        case .pdf: return "pdf"
+        case .zip: return "zip"
+        case .custom(_, let ext): return ext
+        }
+    }
+
+    /// Default filename for this file type.
+    public var defaultFileName: String {
+        switch self {
+        case .jpeg, .png, .heic:
+            return "image.\(fileExtension)"
+        case .mp4:
+            return "video.\(fileExtension)"
+        case .pdf:
+            return "document.\(fileExtension)"
+        case .zip:
+            return "archive.\(fileExtension)"
+        case .custom:
+            return "file.\(fileExtension)"
+        }
     }
 }
 

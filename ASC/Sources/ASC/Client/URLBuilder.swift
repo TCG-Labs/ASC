@@ -9,6 +9,17 @@ import Foundation
 ///
 /// Handles base URL combination, path prefix application, and path parameter substitution.
 internal struct URLBuilder {
+    // MARK: - Constants
+
+    /// Cached regex pattern for extracting path parameter placeholders.
+    ///
+    /// Matches placeholders in the format {parameterName}.
+    /// Compiled once and reused for performance.
+    private static let placeholderRegex: NSRegularExpression = {
+        // swiftlint:disable:next force_try
+        try! NSRegularExpression(pattern: #"\{([^}]+)\}"#, options: [])
+    }()
+
     // MARK: - Public Methods
 
     /// Builds full URL from a NetworkRequest.
@@ -24,16 +35,12 @@ internal struct URLBuilder {
         baseURL: String
     ) throws -> URL {
         let effectiveBaseURL = request.baseURL ?? baseURL
-
-        // Build full path with prefix and parameter substitution
         var fullPath = request.path
 
-        // Apply path prefix if specified
         if let pathPrefix = request.pathPrefix {
             fullPath = pathPrefix + fullPath
         }
 
-        // Substitute path parameters
         if let pathParameters = request.pathParameters {
             fullPath = try substitutePath(fullPath, with: pathParameters)
         }
@@ -59,10 +66,7 @@ internal struct URLBuilder {
     /// - Returns: Path with substituted values
     /// - Throws: URLBuildError.missingPathParameters if required parameters are missing
     private func substitutePath(_ path: String, with parameters: [String: String]) throws -> String {
-        // Find all placeholders in the path
         let requiredKeys = extractPlaceholders(from: path)
-
-        // Check for missing parameters
         let providedKeys = Set(parameters.keys)
         let missingKeys = requiredKeys.subtracting(providedKeys)
 
@@ -70,7 +74,6 @@ internal struct URLBuilder {
             throw URLBuildError.missingPathParameters(Array(missingKeys).sorted())
         }
 
-        // Substitute parameters
         var result = path
         for (key, value) in parameters {
             result = result.replacingOccurrences(of: "{\(key)}", with: value)
@@ -82,20 +85,18 @@ internal struct URLBuilder {
     /// Extracts placeholder names from a path template.
     ///
     /// Finds all placeholders in the format {parameterName}.
+    /// Uses cached regex pattern for optimal performance.
     /// - Parameter path: Path template
     /// - Returns: Set of placeholder names found in the path
     private func extractPlaceholders(from path: String) -> Set<String> {
         var placeholders = Set<String>()
 
-        // Regex pattern to match {parameterName}
-        let pattern = #"\{([^}]+)\}"#
-
-        guard let regex = try? NSRegularExpression(pattern: pattern, options: []) else {
-            return placeholders
-        }
-
         let nsPath = path as NSString
-        let matches = regex.matches(in: path, options: [], range: NSRange(location: 0, length: nsPath.length))
+        let matches = Self.placeholderRegex.matches(
+            in: path,
+            options: [],
+            range: NSRange(location: 0, length: nsPath.length)
+        )
 
         for match in matches where match.numberOfRanges > 1 {
             let range = match.range(at: 1)

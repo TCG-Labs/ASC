@@ -79,3 +79,55 @@ public enum HTTPStatus {
         (500...599).contains(code)
     }
 }
+
+// MARK: - StatusCodeCategory
+
+/// Categorizes HTTP status codes for consistent error handling.
+///
+/// Provides structured categories with appropriate recovery suggestions.
+public enum StatusCodeCategory: Sendable {
+    case success
+    case clientError(HTTPStatusCode, String?)
+    case serverError(HTTPStatusCode, String?)
+    case other(HTTPStatusCode)
+
+    /// Creates a category from a status code and optional error message.
+    ///
+    /// - Parameters:
+    ///   - code: HTTP status code
+    ///   - message: Optional error message from response
+    /// - Returns: Appropriate status code category
+    public init(_ code: HTTPStatusCode, message: String? = nil) {
+        switch code {
+        case 200...299:
+            self = .success
+        case 400...499:
+            self = .clientError(code, message)
+        case 500...599:
+            self = .serverError(code, message)
+        default:
+            self = .other(code)
+        }
+    }
+
+    /// Suggested recovery action based on the category.
+    public var recoverySuggestion: String? {
+        switch self {
+        case .success:
+            return nil
+        case .clientError(let code, _):
+            switch code {
+            case 400:
+                return "Please check your request parameters"
+            case 404:
+                return "The requested resource was not found"
+            default:
+                return "Please check your request and try again"
+            }
+        case .serverError:
+            return "The server encountered an error. Please try again later"
+        case .other:
+            return nil
+        }
+    }
+}

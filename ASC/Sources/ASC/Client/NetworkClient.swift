@@ -47,18 +47,14 @@ public final class NetworkClient: Sendable {
     /// - Parameter configuration: Client configuration
     public init(configuration: NetworkClientConfiguration) {
         self.configuration = configuration
-
-        // Initialize components
         self.urlBuilder = URLBuilder()
         self.multipartBuilder = MultipartRequestBuilder()
         self.errorMapper = ErrorMapper(defaultTimeout: configuration.defaultTimeout)
 
-        // Configure URLSession
         let urlConfig = configuration.urlSessionConfiguration
         urlConfig.timeoutIntervalForRequest = configuration.defaultTimeout
         urlConfig.timeoutIntervalForResource = configuration.defaultTimeout * 2
 
-        // Create Alamofire Session with advanced configuration
         self.session = Session(
             configuration: urlConfig,
             rootQueue: configuration.rootQueue,
@@ -109,6 +105,16 @@ public final class NetworkClient: Sendable {
 
     // MARK: - Private Methods
 
+    /// Checks if a request contains files and should use multipart encoding.
+    ///
+    /// - Parameter request: The network request to check
+    /// - Returns: True if request contains any files, false otherwise
+    private func isMultipartRequest<Request: NetworkRequest>(_ request: Request) -> Bool {
+        request.files?.isEmpty == false ||
+        request.fileUploads?.isEmpty == false ||
+        request.largeFileUploads?.isEmpty == false
+    }
+
     /// Executes a network request, handling both multipart and standard requests.
     ///
     /// Centralized request execution that routes to appropriate handler based on request type.
@@ -121,12 +127,7 @@ public final class NetworkClient: Sendable {
         _ request: Request,
         responseType: Response.Type?
     ) async throws -> Response? {
-        // Check if this is a multipart request
-        let hasFiles = request.files?.isEmpty == false
-        let hasFileUploads = request.fileUploads?.isEmpty == false
-        let hasLargeFileUploads = request.largeFileUploads?.isEmpty == false
-
-        if hasFiles || hasFileUploads || hasLargeFileUploads {
+        if isMultipartRequest(request) {
             return try await performMultipartRequest(
                 request,
                 responseType: responseType,
@@ -134,7 +135,6 @@ public final class NetworkClient: Sendable {
             )
         }
 
-        // Standard request
         let urlRequest = try buildURLRequest(from: request)
 
         if let responseType = responseType {
@@ -160,13 +160,11 @@ public final class NetworkClient: Sendable {
         urlRequest.timeoutInterval = request.timeout ?? configuration.defaultTimeout
         urlRequest.cachePolicy = request.cachePolicy ?? configuration.defaultCachePolicy
 
-        // Add headers using consolidated method
         let headers = buildHeaders(for: request)
         for header in headers {
             urlRequest.setValue(header.value, forHTTPHeaderField: header.name)
         }
 
-        // Encode parameters (only if not multipart)
         if request.files == nil, let parameters = request.parameters {
             urlRequest = try request.parameterEncoding.encode(urlRequest, with: parameters)
         }
@@ -226,7 +224,6 @@ public final class NetworkClient: Sendable {
             fileSizeThreshold: configuration.multipartFileSizeThreshold
         )
 
-        // Handle response based on expected type
         if let responseType = responseType {
             let response = await upload
                 .validate()
@@ -284,7 +281,6 @@ public final class NetworkClient: Sendable {
     private func buildHeaders<Request: NetworkRequest>(for request: Request) -> HTTPHeaders {
         var headers = configuration.defaultHeaders
 
-        // Add request-specific headers (overrides defaults)
         if let requestHeaders = request.headers {
             for header in requestHeaders {
                 headers.add(header)
