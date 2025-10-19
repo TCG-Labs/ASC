@@ -140,16 +140,11 @@ public enum FileType: Sendable {
     /// Default filename for this file type.
     public var defaultFileName: String {
         switch self {
-        case .jpeg, .png, .heic:
-            return "image.\(fileExtension)"
-        case .mp4:
-            return "video.\(fileExtension)"
-        case .pdf:
-            return "document.\(fileExtension)"
-        case .zip:
-            return "archive.\(fileExtension)"
-        case .custom:
-            return "file.\(fileExtension)"
+        case .jpeg, .png, .heic: return "image.\(fileExtension)"
+        case .mp4: return "video.\(fileExtension)"
+        case .pdf: return "document.\(fileExtension)"
+        case .zip: return "archive.\(fileExtension)"
+        case .custom: return "file.\(fileExtension)"
         }
     }
 }
