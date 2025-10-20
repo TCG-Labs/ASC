@@ -75,6 +75,13 @@ public final class NetworkClient: Sendable {
         self.init(configuration: .default(baseURL: baseURL))
     }
 
+    /// Convenience initializer without base URL.
+    ///
+    /// Use this when each request will provide its own baseURL.
+    public convenience init() {
+        self.init(configuration: NetworkClientConfiguration())
+    }
+
     // MARK: - Public Methods
 
     /// Executes a network request and returns the decoded response.
@@ -103,6 +110,94 @@ public final class NetworkClient: Sendable {
         _ = try await executeRequest(request, responseType: nil as ASCEmptyResponse.Type?)
     }
 
+    // MARK: - Progress Tracking
+
+    /// Executes a network request with progress tracking.
+    ///
+    /// Returns an async stream that emits progress updates and the final response.
+    /// Particularly useful for file uploads/downloads to show user feedback.
+    ///
+    /// Example:
+    /// ```swift
+    /// for try await update in client.executeWithProgress(uploadRequest) {
+    ///     switch update {
+    ///     case .progress(let value):
+    ///         progressBar.progress = value // 0.0 to 1.0
+    ///     case .completed(let response):
+    ///         print("Upload complete: \(response)")
+    ///     }
+    /// }
+    /// ```
+    ///
+    /// - Parameter request: The request to execute
+    /// - Returns: AsyncThrowingStream emitting progress updates and final response
+    public func executeWithProgress<Request: NetworkRequest>(
+        _ request: Request
+    ) -> AsyncThrowingStream<ProgressUpdate<Request.Response>, Error> {
+        AsyncThrowingStream { continuation in
+            let task = Task {
+                do {
+                    let response = try await executeRequestWithProgress(
+                        request,
+                        responseType: Request.Response.self
+                    ) { progress in
+                        continuation.yield(.progress(progress))
+                    }
+
+                    guard let response = response else {
+                        throw ResponseError.missingData
+                    }
+
+                    continuation.yield(.completed(response))
+                    continuation.finish()
+                } catch {
+                    continuation.finish(throwing: error)
+                }
+            }
+
+            continuation.onTermination = { @Sendable termination in
+                if case .cancelled = termination {
+                    task.cancel()
+                }
+            }
+        }
+    }
+
+    /// Executes a network request with progress tracking for empty responses.
+    ///
+    /// Useful for DELETE or other requests that return 204 No Content
+    /// but you still want to track upload progress.
+    ///
+    /// - Parameter request: The request to execute
+    /// - Returns: AsyncThrowingStream emitting progress updates
+    public func executeWithProgress<Request: NetworkRequest>(
+        _ request: Request
+    ) -> AsyncThrowingStream<ProgressUpdate<ASCEmptyResponse>, Error> where Request.Response == ASCEmptyResponse {
+        AsyncThrowingStream { continuation in
+            let task = Task {
+                do {
+                    _ = try await executeRequestWithProgress(
+                        request,
+                        responseType: nil as ASCEmptyResponse.Type?
+                    ) { progress in
+                        continuation.yield(.progress(progress))
+                    }
+
+                    continuation.yield(.completed(ASCEmptyResponse()))
+                    continuation.finish()
+                } catch {
+                    continuation.finish(throwing: error)
+                }
+            }
+
+            continuation.onTermination = { @Sendable termination in
+                if case .cancelled = termination {
+                    task.cancel()
+                }
+            }
+        }
+    }
+
     // MARK: - Private Methods
 
     /// Checks if a request contains files and should use multipart encoding.
@@ -126,12 +221,13 @@ public final class NetworkClient: Sendable {
     private func executeRequest<Request: NetworkRequest, Response: Decodable & Sendable>(
         _ request: Request,
         responseType: Response.Type?
-    ) async throws -> Response? {
+    ) async throws -> Response? where Request.Response == Response {
         if isMultipartRequest(request) {
             return try await performMultipartRequest(
                 request,
                 responseType: responseType,
-                retryPolicy: request.retryPolicy
+                retryPolicy: request.retryPolicy,
+                progressHandler: nil
             )
         }
 
@@ -139,9 +235,50 @@ public final class NetworkClient: Sendable {
 
         if let responseType = responseType {
             return try await performRequest(
-                urlRequest,
+                request,
+                urlRequest: urlRequest,
                 responseType: responseType,
-                retryPolicy: request.retryPolicy
+                retryPolicy: request.retryPolicy,
+                progressHandler: nil
+            )
+        } else {
+            try await performEmptyRequest(urlRequest, retryPolicy: request.retryPolicy)
+            return nil
+        }
+    }
+
+    /// Executes a network request with progress tracking.
+    ///
+    /// Similar to executeRequest, but reports progress via progressHandler callback.
+    /// - Parameters:
+    ///   - request: The network request to execute
+    ///   - responseType: Expected response type, or nil for empty response
+    ///   - progressHandler: Called with progress updates (0.0 to 1.0)
+    /// - Returns: Decoded response, or nil for empty response
+    /// - Throws: `NetworkError`, `ResponseError`, or `AuthenticationError`
+    private func executeRequestWithProgress<Request: NetworkRequest, Response: Decodable & Sendable>(
+        _ request: Request,
+        responseType: Response.Type?,
+        progressHandler: @escaping @Sendable (Double) -> Void
+    ) async throws -> Response? where Request.Response == Response {
+        if isMultipartRequest(request) {
+            return try await performMultipartRequest(
+                request,
+                responseType: responseType,
+                retryPolicy: request.retryPolicy,
+                progressHandler: progressHandler
+            )
+        }
+
+        let urlRequest = try buildURLRequest(from: request)
+
+        if let responseType = responseType {
+            return try await performRequest(
+                request,
+                urlRequest: urlRequest,
+                responseType: responseType,
+                retryPolicy: request.retryPolicy,
+                progressHandler: progressHandler
             )
         } else {
             try await performEmptyRequest(urlRequest, retryPolicy: request.retryPolicy)
@@ -173,30 +310,64 @@ public final class NetworkClient: Sendable {
     }
 
     /// Performs the actual network request using Alamofire.
-    private func performRequest<Response: Decodable & Sendable>(
-        _ urlRequest: URLRequest,
+    ///
+    /// Supports Task cancellation - when the Swift Task is cancelled,
+    /// the underlying Alamofire request is automatically cancelled.
+    ///
+    /// Optionally tracks download progress if progressHandler is provided.
+    /// Calls request.validate() on successful response.
+    private func performRequest<Request: NetworkRequest, Response: Decodable & Sendable>(
+        _ request: Request,
+        urlRequest: URLRequest,
         responseType: Response.Type,
-        retryPolicy: Alamofire.RetryPolicy?
-    ) async throws -> Response {
-        let response = await session.request(urlRequest, interceptor: retryPolicy)
-            .validate()
-            .serializingDecodable(Response.self)
-            .response
+        retryPolicy: Alamofire.RetryPolicy?,
+        progressHandler: (@Sendable (Double) -> Void)?
+    ) async throws -> Response where Request.Response == Response {
+        try Task.checkCancellation()
 
-        return try handleResponse(response)
+        let dataRequest = session.request(urlRequest, interceptor: retryPolicy)
+            .validate()
+
+        if let progressHandler = progressHandler {
+            dataRequest.downloadProgress { progress in
+                progressHandler(progress.fractionCompleted)
+            }
+        }
+
+        let serializedRequest = dataRequest.serializingDecodable(Response.self)
+
+        return try await withTaskCancellationHandler {
+            let response = await serializedRequest.response
+            let value = try handleResponse(response)
+
+            try request.validate(response: value)
+
+            return value
+        } onCancel: {
+            dataRequest.cancel()
+        }
     }
 
     /// Performs a request without expecting a response body.
+    ///
+    /// Supports Task cancellation - when the Swift Task is cancelled,
+    /// the underlying Alamofire request is automatically cancelled.
     private func performEmptyRequest(
         _ urlRequest: URLRequest,
         retryPolicy: Alamofire.RetryPolicy?
     ) async throws {
-        let response = await session.request(urlRequest, interceptor: retryPolicy)
+        try Task.checkCancellation()
+
+        let dataRequest = session.request(urlRequest, interceptor: retryPolicy)
             .validate()
             .serializingData()
-            .response
 
-        try validateResponse(response)
+        try await withTaskCancellationHandler {
+            let response = await dataRequest.response
+            try validateResponse(response)
+        } onCancel: {
+            dataRequest.cancel()
+        }
     }
 
     /// Performs a multipart file upload request.
@@ -207,11 +378,20 @@ public final class NetworkClient: Sendable {
     ///
     /// Automatically selects between in-memory and file-based encoding
     /// based on total file size.
+    ///
+    /// Supports Task cancellation - when the Swift Task is cancelled,
+    /// the underlying Alamofire upload request is automatically cancelled.
+    ///
+    /// Optionally tracks upload progress if progressHandler is provided.
+    /// Calls request.validate() on successful response.
     private func performMultipartRequest<Request: NetworkRequest, Response: Decodable & Sendable>(
         _ request: Request,
         responseType: Response.Type?,
-        retryPolicy: Alamofire.RetryPolicy?
-    ) async throws -> Response? {
+        retryPolicy: Alamofire.RetryPolicy?,
+        progressHandler: (@Sendable (Double) -> Void)?
+    ) async throws -> Response? where Request.Response == Response {
+        try Task.checkCancellation()
+
         let url = try urlBuilder.buildURL(from: request, baseURL: configuration.baseURL)
         let headers = buildHeaders(for: request)
 
@@ -224,20 +404,38 @@ public final class NetworkClient: Sendable {
             fileSizeThreshold: configuration.multipartFileSizeThreshold
         )
 
+        if let progressHandler = progressHandler {
+            upload.uploadProgress { progress in
+                progressHandler(progress.fractionCompleted)
+            }
+        }
+
         if let responseType = responseType {
-            let response = await upload
+            let uploadRequest = upload
                 .validate()
                 .serializingDecodable(responseType)
-                .response
 
-            return try handleResponse(response)
+            return try await withTaskCancellationHandler {
+                let response = await uploadRequest.response
+                let value = try handleResponse(response)
+
+                try request.validate(response: value)
+
+                return value
+            } onCancel: {
+                upload.cancel()
+            }
         } else {
-            let response = await upload
+            let uploadRequest = upload
                 .validate()
                 .serializingData()
-                .response
 
-            try validateResponse(response)
+            try await withTaskCancellationHandler {
+                let response = await uploadRequest.response
+                try validateResponse(response)
+            } onCancel: {
+                upload.cancel()
+            }
             return nil
         }
     }

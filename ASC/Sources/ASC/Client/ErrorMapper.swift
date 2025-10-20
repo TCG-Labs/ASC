@@ -34,6 +34,10 @@ internal struct ErrorMapper {
     ///   - data: Optional response data for context
     /// - Returns: Mapped ASC error
     internal func mapError(_ error: AFError, data: Data?) -> any Error {
+        if case .explicitlyCancelled = error {
+            return CancellationError()
+        }
+
         if let underlyingError = error.underlyingError as? URLError {
             return mapURLError(underlyingError)
         }
@@ -83,24 +87,20 @@ internal struct ErrorMapper {
             return ResponseError.validationFailed("Response validation failed")
         }
 
-        // Try to extract error message from response
         let errorMessage = extractErrorMessage(from: data)
-
-        // Categorize status code and return appropriate error
         let category = StatusCodeCategory(code, message: errorMessage)
 
         switch category {
         case .success:
-            // Should not happen with .unacceptableStatusCode, but handle safely
             return ResponseError.invalidStatusCode(code, data)
 
-        case .clientError(let statusCode, let message):
+        case let .clientError(statusCode, message):
             if statusCode == HTTPStatus.unauthorized {
                 return ResponseError.clientError(statusCode, message ?? "Unauthorized")
             }
             return ResponseError.clientError(statusCode, message)
 
-        case .serverError(let statusCode, let message):
+        case let .serverError(statusCode, message):
             return ResponseError.serverError(statusCode, message ?? "Server error")
 
         case .other:

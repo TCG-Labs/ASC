@@ -367,10 +367,21 @@ func testErrorMapperSerializationInvalidEmptyResponse() {
     }
 }
 
-@Test("ErrorMapper maps non-URLError without special cases to NetworkError.networkFailure")
-func testErrorMapperGenericAFError() {
+@Test("ErrorMapper maps AFError.explicitlyCancelled to CancellationError")
+func testErrorMapperExplicitlyCancelled() {
     let mapper = ErrorMapper(defaultTimeout: 30.0)
     let afError = AFError.explicitlyCancelled
+
+    let mappedError = mapper.mapError(afError, data: nil)
+
+    #expect(mappedError is CancellationError, "Expected CancellationError, got \(type(of: mappedError))")
+}
+
+@Test("ErrorMapper maps other AFError to NetworkError.networkFailure")
+func testErrorMapperGenericAFError() {
+    let mapper = ErrorMapper(defaultTimeout: 30.0)
+    let url = URL(string: "https://example.com")!
+    let afError = AFError.invalidURL(url: url)
 
     let mappedError = mapper.mapError(afError, data: nil)
 

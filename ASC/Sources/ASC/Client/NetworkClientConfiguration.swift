@@ -12,7 +12,9 @@ import Foundation
 /// advanced features including interceptors, monitors, handlers, and trust managers.
 public struct NetworkClientConfiguration: Sendable {
     /// Default base URL for all requests.
-    public let baseURL: String
+    ///
+    /// If nil, each request must provide its own baseURL.
+    public let baseURL: String?
 
     /// URLSession configuration.
     public let urlSessionConfiguration: URLSessionConfiguration
@@ -56,10 +58,16 @@ public struct NetworkClientConfiguration: Sendable {
     /// Default is 10MB (10,000,000 bytes).
     public let multipartFileSizeThreshold: Int
 
+    /// Log level for built-in logger.
+    ///
+    /// When set to anything other than .none, an ASCLogger is automatically added to eventMonitors.
+    /// Default is .none (no logging).
+    public let logLevel: ASCLogLevel
+
     /// Creates a new network client configuration.
     ///
     /// - Parameters:
-    ///   - baseURL: Default base URL for requests
+    ///   - baseURL: Default base URL for requests (optional - can be specified per request)
     ///   - urlSessionConfiguration: URLSession configuration (default: .default)
     ///   - defaultTimeout: Default request timeout (default: 60)
     ///   - defaultCachePolicy: Default cache policy (default: .useProtocolCachePolicy)
@@ -73,8 +81,9 @@ public struct NetworkClientConfiguration: Sendable {
     ///   - requestQueue: Request dispatch queue (default: custom queue)
     ///   - serializationQueue: Serialization dispatch queue (default: custom queue)
     ///   - multipartFileSizeThreshold: Threshold for file-based encoding (default: 10MB)
+    ///   - logLevel: Log level for built-in logger (default: .none)
     public init(
-        baseURL: String,
+        baseURL: String? = nil,
         urlSessionConfiguration: URLSessionConfiguration = .default,
         defaultTimeout: TimeInterval = 60,
         defaultCachePolicy: URLRequest.CachePolicy = .useProtocolCachePolicy,
@@ -93,7 +102,8 @@ public struct NetworkClientConfiguration: Sendable {
             label: "com.asc.networkClient.serializationQueue",
             qos: .userInitiated
         ),
-        multipartFileSizeThreshold: Int = ASCConstants.FileUpload.defaultSizeThreshold
+        multipartFileSizeThreshold: Int = ASCConstants.FileUpload.defaultSizeThreshold,
+        logLevel: ASCLogLevel = .none
     ) {
         self.baseURL = baseURL
         self.urlSessionConfiguration = urlSessionConfiguration
@@ -101,7 +111,17 @@ public struct NetworkClientConfiguration: Sendable {
         self.defaultCachePolicy = defaultCachePolicy
         self.defaultHeaders = defaultHeaders
         self.interceptors = interceptors
-        self.eventMonitors = eventMonitors
+        self.logLevel = logLevel
+
+        // Automatically add ASCLogger if logging is enabled
+        if logLevel != .none {
+            var monitors = eventMonitors
+            monitors.append(ASCLogger(logLevel: logLevel))
+            self.eventMonitors = monitors
+        } else {
+            self.eventMonitors = eventMonitors
+        }
+
         self.serverTrustManager = serverTrustManager
         self.redirectHandler = redirectHandler
         self.cachedResponseHandler = cachedResponseHandler

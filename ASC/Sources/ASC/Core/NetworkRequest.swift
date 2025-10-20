@@ -123,6 +123,38 @@ public protocol NetworkRequest: Sendable {
     /// }
     /// ```
     var largeFileUploads: [LargeFileUpload]? { get }
+
+    /// Validates the response after successful decoding.
+    ///
+    /// Override this method to implement custom business logic validation.
+    /// This is called after the response is successfully decoded but before
+    /// it's returned to the caller.
+    ///
+    /// Common use cases:
+    /// - Check for "success": false in API response
+    /// - Validate business rules (e.g., user is active)
+    /// - Check for required fields
+    /// - Verify checksums or signatures
+    ///
+    /// Example:
+    /// ```swift
+    /// struct GetUserRequest: NetworkRequest {
+    ///     typealias Response = UserResponse
+    ///
+    ///     func validate(response: UserResponse) throws {
+    ///         guard response.success else {
+    ///             throw ResponseError.validationFailed(response.errorMessage)
+    ///         }
+    ///         guard response.user.isActive else {
+    ///             throw AuthenticationError.unauthorized(resource: "User is inactive")
+    ///         }
+    ///     }
+    /// }
+    /// ```
+    ///
+    /// - Parameter response: The decoded response to validate
+    /// - Throws: Any error if validation fails
+    func validate(response: Response) throws
 }
 
 // MARK: - Default Implementations
@@ -160,4 +192,11 @@ public extension NetworkRequest {
 
     /// Default large file uploads are nil
     var largeFileUploads: [LargeFileUpload]? { nil }
+
+    /// Default implementation performs no validation.
+    ///
+    /// Override this method in your request to add custom validation logic.
+    func validate(response: Response) throws {
+        // No validation by default
+    }
 }

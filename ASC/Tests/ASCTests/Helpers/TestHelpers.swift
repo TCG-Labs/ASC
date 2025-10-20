@@ -116,3 +116,17 @@ public func createMockClient(
     )
     return NetworkClient(configuration: config)
 }
+
+/// Creates a NetworkClient without baseURL but with mock configuration.
+public func createMockClientWithoutBaseURL(
+    interceptors: [any RequestInterceptor] = [],
+    eventMonitors: [any EventMonitor] = []
+) -> NetworkClient {
+    let config = NetworkClientConfiguration(
+        baseURL: nil,
+        urlSessionConfiguration: createMockConfiguration(),
+        interceptors: interceptors,
+        eventMonitors: eventMonitors
+    )
+    return NetworkClient(configuration: config)
+}

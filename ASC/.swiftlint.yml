@@ -99,6 +99,7 @@ excluded:
   - "**/.build"
   - Tests  # Exclude all test files from linting
   - Package.swift  # Exclude Package.swift (SPM configuration file)
+  - Examples  # Exclude example files (demonstration code, not production)
 
 # ============================================================================
 # SEVERITY LEVELS
@@ -158,7 +159,7 @@ file_length:
 
 # Type length
 type_body_length:
-  warning: 250
+  warning: 300  # Allows for main coordinator classes with comprehensive docs
   error: 400
 
 # Complexity

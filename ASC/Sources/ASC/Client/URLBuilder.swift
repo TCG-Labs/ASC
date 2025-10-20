@@ -27,14 +27,17 @@ internal struct URLBuilder {
     /// Combines base URL, path prefix, path, and substitutes path parameters.
     /// - Parameters:
     ///   - request: The network request
-    ///   - baseURL: Base URL to use (from client configuration or request)
+    ///   - baseURL: Base URL from client configuration (optional)
     /// - Returns: Fully constructed URL
-    /// - Throws: URLBuildError if URL is invalid
+    /// - Throws: URLBuildError if URL is invalid or baseURL is missing
     internal func buildURL<Request: NetworkRequest>(
         from request: Request,
-        baseURL: String
+        baseURL: String?
     ) throws -> URL {
-        let effectiveBaseURL = request.baseURL ?? baseURL
+        guard let effectiveBaseURL = request.baseURL ?? baseURL else {
+            throw URLBuildError.missingBaseURL
+        }
+
         var fullPath = request.path
 
         if let pathPrefix = request.pathPrefix {
@@ -122,6 +125,9 @@ internal enum URLBuildError: Error, LocalizedError {
     /// - Parameter missingKeys: Array of missing parameter names
     case missingPathParameters([String])
 
+    /// Base URL is missing from both client configuration and request.
+    case missingBaseURL
+
     internal var errorDescription: String? {
         switch self {
         case .invalidURL(let urlString):
@@ -130,6 +136,9 @@ internal enum URLBuildError: Error, LocalizedError {
         case .missingPathParameters(let keys):
             let keysList = keys.joined(separator: ", ")
             return "Missing required path parameters: \(keysList)"
+
+        case .missingBaseURL:
+            return "Base URL is required but not provided"
         }
     }
 
@@ -141,6 +150,9 @@ internal enum URLBuildError: Error, LocalizedError {
         case .missingPathParameters(let keys):
             let keysList = keys.joined(separator: ", ")
             return "Provide values for these path parameters: \(keysList)"
+
+        case .missingBaseURL:
+            return "Provide baseURL either in NetworkClient configuration or in the request"
         }
     }
 }

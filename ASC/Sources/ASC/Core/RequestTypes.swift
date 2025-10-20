@@ -101,10 +101,13 @@ public enum StatusCodeCategory: Sendable {
         switch code {
         case 200...299:
             self = .success
+
         case 400...499:
             self = .clientError(code, message)
+
         case 500...599:
             self = .serverError(code, message)
+
         default:
             self = .other(code)
         }
@@ -115,17 +118,22 @@ public enum StatusCodeCategory: Sendable {
         switch self {
         case .success:
             return nil
+
         case .clientError(let code, _):
             switch code {
             case 400:
                 return "Please check your request parameters"
+
             case 404:
                 return "The requested resource was not found"
+
             default:
                 return "Please check your request and try again"
             }
+
         case .serverError:
             return "The server encountered an error. Please try again later"
+
         case .other:
             return nil
         }

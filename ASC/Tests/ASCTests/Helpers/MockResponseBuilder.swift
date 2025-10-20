@@ -26,13 +26,15 @@ public struct MockResponseBuilder {
     private let data: Data?
     private let statusCode: Int
     private let headers: [String: String]
+    private let delayInterval: TimeInterval
 
     // MARK: - Initialization
 
-    private init(data: Data?, statusCode: Int, headers: [String: String] = [:]) {
+    private init(data: Data?, statusCode: Int, headers: [String: String] = [:], delay: TimeInterval = 0) {
         self.data = data
         self.statusCode = statusCode
         self.headers = headers
+        self.delayInterval = delay
     }
 
     // MARK: - Factory Methods
@@ -144,7 +146,7 @@ public struct MockResponseBuilder {
     /// - Parameter code: HTTP status code
     /// - Returns: Updated MockResponseBuilder
     public func statusCode(_ code: Int) -> MockResponseBuilder {
-        MockResponseBuilder(data: data, statusCode: code, headers: headers)
+        MockResponseBuilder(data: data, statusCode: code, headers: headers, delay: delayInterval)
     }
 
     /// Adds a header to the response.
@@ -156,7 +158,7 @@ public struct MockResponseBuilder {
     public func header(_ name: String, _ value: String) -> MockResponseBuilder {
         var newHeaders = headers
         newHeaders[name] = value
-        return MockResponseBuilder(data: data, statusCode: statusCode, headers: newHeaders)
+        return MockResponseBuilder(data: data, statusCode: statusCode, headers: newHeaders, delay: delayInterval)
     }
 
     /// Adds multiple headers to the response.
@@ -168,7 +170,17 @@ public struct MockResponseBuilder {
         for (key, value) in headers {
             newHeaders[key] = value
         }
-        return MockResponseBuilder(data: data, statusCode: statusCode, headers: newHeaders)
+        return MockResponseBuilder(data: data, statusCode: statusCode, headers: newHeaders, delay: delayInterval)
+    }
+
+    /// Sets a delay before the response is returned.
+    ///
+    /// Useful for testing timeout and cancellation behavior.
+    ///
+    /// - Parameter interval: Delay in seconds
+    /// - Returns: Updated MockResponseBuilder
+    public func delay(_ interval: TimeInterval) -> MockResponseBuilder {
+        MockResponseBuilder(data: data, statusCode: statusCode, headers: headers, delay: interval)
     }
 
     // MARK: - Build
@@ -204,7 +216,10 @@ extension MockResponseBuilder {
     /// - Returns: Request handler closure
     public func handler() -> (URLRequest) throws -> (HTTPURLResponse, Data?) {
         { request in
-            try self.build(url: request.url!)
+            if self.delayInterval > 0 {
+                Thread.sleep(forTimeInterval: self.delayInterval)
+            }
+            return try self.build(url: request.url!)
         }
     }
 }
