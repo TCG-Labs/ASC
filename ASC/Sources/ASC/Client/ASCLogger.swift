@@ -38,7 +38,7 @@ public enum ASCLogLevel: Int, Sendable {
 /// )
 /// let client = NetworkClient(configuration: config)
 /// ```
-public final class ASCLogger: EventMonitor, @unchecked Sendable {
+public final class ASCLogger: EventMonitor, Sendable {
     // MARK: - Properties
 
     /// The log level for this logger.
@@ -47,8 +47,10 @@ public final class ASCLogger: EventMonitor, @unchecked Sendable {
     /// OSLog logger instance.
     private let logger: Logger
 
-    /// Dispatch queue for thread-safe logging.
-    public let queue: DispatchQueue
+    /// Dispatch queue for EventMonitor callbacks.
+    public var queue: DispatchQueue {
+        DispatchQueue(label: "com.asc.logger", qos: .utility)
+    }
 
     // MARK: - Initialization
 
@@ -65,7 +67,6 @@ public final class ASCLogger: EventMonitor, @unchecked Sendable {
     ) {
         self.logLevel = logLevel
         self.logger = Logger(subsystem: subsystem, category: category)
-        self.queue = DispatchQueue(label: "com.asc.logger", qos: .utility)
     }
 
     // MARK: - EventMonitor
