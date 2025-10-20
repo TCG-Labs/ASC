@@ -11,57 +11,61 @@ import Testing
 // MARK: - Retry Policy Tests
 
 extension IntegrationTests {
-@Test("RetryPolicy.default has correct values")
+@Test("Alamofire.RetryPolicy.default has correct configuration")
 func testRetryPolicyDefault() {
-    let policy = RetryPolicy.default
+    let policy = Alamofire.RetryPolicy.default
 
-    #expect(policy.maxRetries == 3)
-    #expect(policy.retryDelay == 1.0)
-    #expect(policy.exponentialBackoff == true)
-    #expect(policy.retryOnNetworkError == true)
-    #expect(policy.retryableStatusCodes.contains(500))
-    #expect(policy.retryableStatusCodes.contains(502))
-    #expect(policy.retryableStatusCodes.contains(503))
+    // Verify Alamofire's default retry policy configuration
+    #expect(policy.retryLimit == 3)
+    #expect(policy.exponentialBackoffBase == 2)
+    #expect(policy.exponentialBackoffScale == 0.5)
 }
 
-@Test("RetryPolicy.none disables retries")
+@Test("Alamofire.RetryPolicy.none disables retries")
 func testRetryPolicyNone() {
-    let policy = RetryPolicy.none
+    let policy = Alamofire.RetryPolicy.none
 
-    #expect(policy.maxRetries == 0)
+    // .none returns nil, which means no retry policy
+    #expect(policy == nil)
 }
 
-@Test("RetryPolicy.aggressive has more retries")
+@Test("Alamofire.RetryPolicy.aggressive has more retries")
 func testRetryPolicyAggressive() {
-    let policy = RetryPolicy.aggressive
+    let policy = Alamofire.RetryPolicy.aggressive
 
-    #expect(policy.maxRetries == 5)
-    #expect(policy.retryDelay == 2.0)
+    #expect(policy.retryLimit == 5)
+    #expect(policy.exponentialBackoffBase == 2)
+    #expect(policy.exponentialBackoffScale == 1.0)
 }
 
-@Test("RetryPolicy can be customized")
+@Test("Alamofire.RetryPolicy.conservative has fewer retries")
+func testRetryPolicyConservative() {
+    let policy = Alamofire.RetryPolicy.conservative
+
+    #expect(policy.retryLimit == 2)
+    #expect(policy.exponentialBackoffBase == 2)
+    #expect(policy.exponentialBackoffScale == 0.5)
+}
+
+@Test("Alamofire.RetryPolicy can be customized")
 func testRetryPolicyCustom() {
-    let customCodes: Set<HTTPStatusCode> = [408, 429]
-    let policy = RetryPolicy(
-        maxRetries: 2,
-        retryDelay: 0.5,
-        exponentialBackoff: false,
-        retryableStatusCodes: customCodes,
-        retryOnNetworkError: false
+    let policy = Alamofire.RetryPolicy(
+        retryLimit: 2,
+        exponentialBackoffBase: 3,
+        exponentialBackoffScale: 0.25
     )
 
-    #expect(policy.maxRetries == 2)
-    #expect(policy.retryDelay == 0.5)
-    #expect(policy.exponentialBackoff == false)
-    #expect(policy.retryableStatusCodes == customCodes)
-    #expect(policy.retryOnNetworkError == false)
+    #expect(policy.retryLimit == 2)
+    #expect(policy.exponentialBackoffBase == 3)
+    #expect(policy.exponentialBackoffScale == 0.25)
 }
 
-@Test("NetworkRequest has default retry policy")
+@Test("NetworkRequest has default retry policy of nil")
 func testNetworkRequestDefaultRetryPolicy() {
     let request = GetUserRequest(userId: "123")
 
-    #expect(request.retryPolicy.maxRetries == 3)
+    // Default is nil (no retries) to avoid unexpected retry behavior in tests
+    #expect(request.retryPolicy == nil)
 }
 
 // MARK: - Concurrent Requests Tests

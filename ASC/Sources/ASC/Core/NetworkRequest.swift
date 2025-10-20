@@ -86,7 +86,75 @@ public protocol NetworkRequest: Sendable {
     ///
     /// Dictionary mapping field names to file data.
     /// When specified, the request automatically becomes a multipart/form-data request.
+    ///
+    /// **Note:** For small files only (< 10MB). For larger files, use `largeFileUploads`.
     var files: [String: Data]? { get }
+
+    /// Files with custom metadata (filename, MIME type).
+    ///
+    /// Use this when you need fine-grained control over file uploads,
+    /// including custom MIME types and filenames.
+    ///
+    /// Example:
+    /// ```swift
+    /// var fileUploads: [String: FileUpload]? {
+    ///     ["photo": .jpeg(data: imageData, fileName: "profile.jpg")]
+    /// }
+    /// ```
+    ///
+    /// **Note:** For small files only (< 10MB). For larger files, use `largeFileUploads`.
+    var fileUploads: [String: FileUpload]? { get }
+
+    /// Large files for file-based encoding.
+    ///
+    /// Use this for large files (> 10MB) to avoid loading all data into memory.
+    /// Files will be streamed from disk during upload, which is memory-efficient
+    /// for videos and other large files.
+    ///
+    /// Example:
+    /// ```swift
+    /// var largeFileUploads: [LargeFileUpload]? {
+    ///     [LargeFileUpload(
+    ///         fileURL: videoURL,
+    ///         fieldName: "video",
+    ///         fileName: "my-video.mp4",
+    ///         mimeType: "video/mp4"
+    ///     )]
+    /// }
+    /// ```
+    var largeFileUploads: [LargeFileUpload]? { get }
+
+    /// Validates the response after successful decoding.
+    ///
+    /// Override this method to implement custom business logic validation.
+    /// This is called after the response is successfully decoded but before
+    /// it's returned to the caller.
+    ///
+    /// Common use cases:
+    /// - Check for "success": false in API response
+    /// - Validate business rules (e.g., user is active)
+    /// - Check for required fields
+    /// - Verify checksums or signatures
+    ///
+    /// Example:
+    /// ```swift
+    /// struct GetUserRequest: NetworkRequest {
+    ///     typealias Response = UserResponse
+    ///
+    ///     func validate(response: UserResponse) throws {
+    ///         guard response.success else {
+    ///             throw ResponseError.validationFailed(response.errorMessage)
+    ///         }
+    ///         guard response.user.isActive else {
+    ///             throw AuthenticationError.unauthorized(resource: "User is inactive")
+    ///         }
+    ///     }
+    /// }
+    /// ```
+    ///
+    /// - Parameter response: The decoded response to validate
+    /// - Throws: Any error if validation fails
+    func validate(response: Response) throws
 }
 
 // MARK: - Default Implementations
@@ -118,4 +186,17 @@ public extension NetworkRequest {
 
     /// Default files are nil
     var files: [String: Data]? { nil }
+
+    /// Default file uploads are nil
+    var fileUploads: [String: FileUpload]? { nil }
+
+    /// Default large file uploads are nil
+    var largeFileUploads: [LargeFileUpload]? { nil }
+
+    /// Default implementation performs no validation.
+    ///
+    /// Override this method in your request to add custom validation logic.
+    func validate(response: Response) throws {
+        // No validation by default
+    }
 }

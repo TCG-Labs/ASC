@@ -34,6 +34,10 @@ internal struct ErrorMapper {
     ///   - data: Optional response data for context
     /// - Returns: Mapped ASC error
     internal func mapError(_ error: AFError, data: Data?) -> any Error {
+        if case .explicitlyCancelled = error {
+            return CancellationError()
+        }
+
         if let underlyingError = error.underlyingError as? URLError {
             return mapURLError(underlyingError)
         }
@@ -79,20 +83,73 @@ internal struct ErrorMapper {
         _ reason: AFError.ResponseValidationFailureReason,
         data: Data?
     ) -> ResponseError {
-        if case .unacceptableStatusCode(let code) = reason {
-            if code == HTTPStatus.unauthorized {
-                return ResponseError.clientError(code, "Unauthorized")
-            }
-            if HTTPStatus.isServerError(code) {
-                return ResponseError.serverError(code, "Server error")
-            }
-            if HTTPStatus.isClientError(code) {
-                return ResponseError.clientError(code, nil)
-            }
-            return ResponseError.invalidStatusCode(code, data)
+        guard case .unacceptableStatusCode(let code) = reason else {
+            return ResponseError.validationFailed("Response validation failed")
         }
 
-        return ResponseError.validationFailed("Response validation failed")
+        let errorMessage = extractErrorMessage(from: data)
+        let category = StatusCodeCategory(code, message: errorMessage)
+
+        switch category {
+        case .success:
+            return ResponseError.invalidStatusCode(code, data)
+
+        case let .clientError(statusCode, message):
+            if statusCode == HTTPStatus.unauthorized {
+                return ResponseError.clientError(statusCode, message ?? "Unauthorized")
+            }
+            return ResponseError.clientError(statusCode, message)
+
+        case let .serverError(statusCode, message):
+            return ResponseError.serverError(statusCode, message ?? "Server error")
+
+        case .other:
+            return ResponseError.invalidStatusCode(code, data)
+        }
+    }
+
+    // MARK: - Error Message Extraction
+
+    /// Extracts error message from response data.
+    ///
+    /// Attempts to parse common error response formats:
+    /// - `{"error": "message"}`
+    /// - `{"message": "message"}`
+    /// - `{"error_description": "message"}`
+    /// - `{"errors": ["message1", "message2"]}`
+    ///
+    /// - Parameter data: Response data to parse
+    /// - Returns: Extracted error message, or nil if parsing fails
+    private func extractErrorMessage(from data: Data?) -> String? {
+        guard let data = data,
+              !data.isEmpty,
+              let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else {
+            return nil
+        }
+
+        let topLevelKeys = ["message", "error", "error_description"]
+        for key in topLevelKeys {
+            if let message = json[key] as? String {
+                return message
+            }
+        }
+
+        if let errorObject = json["error"] as? [String: Any],
+           let message = errorObject["message"] as? String {
+            return message
+        }
+
+        if let errors = json["errors"] as? [String], let firstError = errors.first {
+            return firstError
+        }
+
+        if let errors = json["errors"] as? [[String: Any]],
+           let firstError = errors.first,
+           let message = firstError["message"] as? String {
+            return message
+        }
+
+        return nil
     }
 
     /// Maps serialization failure to ResponseError.

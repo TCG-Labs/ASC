@@ -18,6 +18,11 @@ public final class MockURLProtocol: URLProtocol {
     /// Tracks all requests made during testing.
     nonisolated(unsafe) public static var requestHistory: [URLRequest] = []
 
+    /// Returns the last request made, or nil if no requests have been made.
+    public static var lastRequest: URLRequest? {
+        requestHistory.last
+    }
+
     /// Delay to simulate network latency.
     nonisolated(unsafe) public static var responseDelay: TimeInterval = 0.0
 

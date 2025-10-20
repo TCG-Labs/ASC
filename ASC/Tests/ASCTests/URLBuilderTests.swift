@@ -152,6 +152,33 @@ func testURLBuildErrorDescription() {
     #expect(error.errorDescription == "Invalid URL: http://bad url")
 }
 
+@Test("URLBuilder throws missingBaseURL when neither client nor request provides it")
+func testURLBuilderMissingBaseURL() throws {
+    let builder = URLBuilder()
+
+    struct RequestWithoutBaseURL: NetworkRequest {
+        typealias Response = String
+        var path: String { "/users" }
+        var method: HTTPMethod { .get }
+    }
+
+    do {
+        _ = try builder.buildURL(
+            from: RequestWithoutBaseURL(),
+            baseURL: nil
+        )
+        Issue.record("Expected URLBuildError.missingBaseURL to be thrown")
+    } catch let error as URLBuildError {
+        if case .missingBaseURL = error {
+            #expect(error.errorDescription == "Base URL is required but not provided")
+            #expect(error.recoverySuggestion ==
+                "Provide baseURL either in NetworkClient configuration or in the request")
+        } else {
+            Issue.record("Expected missingBaseURL error, got \(error)")
+        }
+    }
+}
+
 @Test("URLBuilder handles empty path parameters gracefully")
 func testURLBuilderEmptyPathParameters() throws {
     let builder = URLBuilder()
