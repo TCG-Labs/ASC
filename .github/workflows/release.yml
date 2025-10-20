@@ -9,6 +9,9 @@ jobs:
   validate:
     name: Validate Release
     runs-on: macos-latest
+    defaults:
+      run:
+        working-directory: ASC
 
     steps:
       - name: Checkout code
@@ -40,8 +43,8 @@ jobs:
       - name: Cache SPM dependencies
         uses: actions/cache@v4
         with:
-          path: .build
-          key: ${{ runner.os }}-spm-${{ hashFiles('**/Package.resolved') }}
+          path: ASC/.build
+          key: ${{ runner.os }}-spm-${{ hashFiles('**/ASC/Package.resolved') }}
           restore-keys: |
             ${{ runner.os }}-spm-
 
