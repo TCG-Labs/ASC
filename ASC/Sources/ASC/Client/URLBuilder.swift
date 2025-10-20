@@ -15,9 +15,8 @@ internal struct URLBuilder {
     ///
     /// Matches placeholders in the format {parameterName}.
     /// Compiled once and reused for performance.
-    private static let placeholderRegex: NSRegularExpression = {
-        // swiftlint:disable:next force_try
-        try! NSRegularExpression(pattern: #"\{([^}]+)\}"#, options: [])
+    private static let placeholderRegex: NSRegularExpression? = {
+        try? NSRegularExpression(pattern: #"\{([^}]+)\}"#, options: [])
     }()
 
     // MARK: - Public Methods
@@ -92,10 +91,12 @@ internal struct URLBuilder {
     /// - Parameter path: Path template
     /// - Returns: Set of placeholder names found in the path
     private func extractPlaceholders(from path: String) -> Set<String> {
+        guard let placeholderRegex = Self.placeholderRegex else { return .init() }
+
         var placeholders = Set<String>()
 
         let nsPath = path as NSString
-        let matches = Self.placeholderRegex.matches(
+        let matches = placeholderRegex.matches(
             in: path,
             options: [],
             range: NSRange(location: 0, length: nsPath.length)

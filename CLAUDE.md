@@ -130,6 +130,19 @@ Convenient factory methods for Alamofire.RetryPolicy:
 - `.aggressive` → 5 retries
 - `.conservative` → 2 retries
 
+**6. Built-in Debug Logger**
+ASCLogger with emoji-enhanced visual output:
+- OSLog integration for performance and privacy
+- 5 log levels: none, error, info, debug, verbose
+- Rich emoji visualization for better readability:
+  - HTTP methods: 📥 GET, 📤 POST, 🔄 PUT, ✏️ PATCH, 🗑️ DELETE
+  - Status codes: ✅ 200, 🎉 201, 🔐 401, 🔍 404, 💥 500
+  - Performance: ⚡ fast, 🐌 slow, 🐢 very slow
+  - Errors: 📡 no connection, ⏰ timeout, 🔒 SSL error
+  - Data types: 📄 JSON, 📝 text, 💾 binary
+- Privacy-aware: 🔒 auto-redacts sensitive headers
+- See `LOGGER_EMOJIS.md` for complete emoji guide
+
 ## Architecture Decision: Type Re-exports
 
 Instead of duplicating Alamofire types, ASC **re-exports them directly**:

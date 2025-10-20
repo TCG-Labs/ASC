@@ -77,8 +77,9 @@ public final class ASCLogger: EventMonitor, @unchecked Sendable {
         if let urlRequest = request.request {
             let method = urlRequest.httpMethod ?? "GET"
             let url = urlRequest.url?.absoluteString ?? "unknown"
+            let methodEmoji = methodEmoji(for: method)
 
-            logger.info("→ \(method) \(url)")
+            logger.info("\(methodEmoji) \(method) \(url)")
 
             if logLevel.rawValue >= ASCLogLevel.debug.rawValue {
                 logHeaders(urlRequest.allHTTPHeaderFields)
@@ -103,7 +104,8 @@ public final class ASCLogger: EventMonitor, @unchecked Sendable {
             let duration = response.metrics?.taskInterval.duration ?? 0
 
             let statusEmoji = statusEmoji(for: statusCode)
-            logger.info("← \(statusEmoji) \(statusCode) \(url) (\(String(format: "%.2f", duration))s)")
+            let durationEmoji = durationEmoji(for: duration)
+            logger.info("← \(statusEmoji) \(statusCode) \(url) \(durationEmoji) \(String(format: "%.2f", duration))s")
 
             if logLevel.rawValue >= ASCLogLevel.debug.rawValue {
                 logHeaders(httpResponse.allHeaderFields as? [String: String])
@@ -136,10 +138,9 @@ public final class ASCLogger: EventMonitor, @unchecked Sendable {
     private func logHeaders(_ headers: [String: String]?) {
         guard let headers = headers, !headers.isEmpty else { return }
 
-        logger.debug("  Headers:")
+        logger.debug("  📋 Headers:")
         for (key, value) in headers.sorted(by: { $0.key < $1.key }) {
-            // Redact sensitive headers
-            let sanitizedValue = shouldRedact(headerName: key) ? "<redacted>" : value
+            let sanitizedValue = shouldRedact(headerName: key) ? "🔒 <redacted>" : value
             logger.debug("    \(key): \(sanitizedValue)")
         }
     }
@@ -149,11 +150,11 @@ public final class ASCLogger: EventMonitor, @unchecked Sendable {
         guard let body = body else { return }
 
         if let jsonString = prettyPrintJSON(body) {
-            logger.debug("  Body:\n\(jsonString)")
+            logger.debug("  📦 Body (JSON):\n\(jsonString)")
         } else if let string = String(data: body, encoding: .utf8) {
-            logger.debug("  Body: \(string)")
+            logger.debug("  📝 Body (Text): \(string)")
         } else {
-            logger.debug("  Body: <binary data, \(body.count) bytes>")
+            logger.debug("  💾 Body (Binary): \(body.count) bytes")
         }
     }
 
@@ -162,11 +163,11 @@ public final class ASCLogger: EventMonitor, @unchecked Sendable {
         guard let data = data else { return }
 
         if let jsonString = prettyPrintJSON(data) {
-            logger.debug("  Response:\n\(jsonString)")
+            logger.debug("  📄 Response (JSON):\n\(jsonString)")
         } else if let string = String(data: data, encoding: .utf8) {
-            logger.debug("  Response: \(string)")
+            logger.debug("  📃 Response (Text): \(string)")
         } else {
-            logger.debug("  Response: <binary data, \(data.count) bytes>")
+            logger.debug("  💿 Response (Binary): \(data.count) bytes")
         }
     }
 
@@ -175,24 +176,89 @@ public final class ASCLogger: EventMonitor, @unchecked Sendable {
         guard logLevel.rawValue >= ASCLogLevel.error.rawValue else { return }
 
         let url = request.request?.url?.absoluteString ?? "unknown"
-        logger.error("✗ Error for \(url): \(error.localizedDescription)")
+        let errorEmoji = errorEmoji(for: error)
+        logger.error("\(errorEmoji) Error for \(url): \(error.localizedDescription)")
 
         if logLevel.rawValue >= ASCLogLevel.debug.rawValue {
             if let underlyingError = error.underlyingError {
-                logger.error("  Underlying error: \(underlyingError.localizedDescription)")
+                logger.error("  ⚙️ Underlying error: \(underlyingError.localizedDescription)")
             }
+        }
+    }
+
+    /// Returns emoji for HTTP method.
+    private func methodEmoji(for method: String) -> String {
+        switch method.uppercased() {
+        case "GET": return "📥"
+        case "POST": return "📤"
+        case "PUT": return "🔄"
+        case "PATCH": return "✏️"
+        case "DELETE": return "🗑️"
+        case "HEAD": return "👀"
+        case "OPTIONS": return "🔍"
+        default: return "📡"
         }
     }
 
     /// Returns emoji for HTTP status code.
     private func statusEmoji(for statusCode: Int) -> String {
         switch statusCode {
+        case 200: return "✅"
+        case 201: return "🎉"
+        case 202: return "👌"
+        case 204: return "🆗"
         case 200..<300: return "✓"
-        case 300..<400: return "↪"
-        case 400..<500: return "⚠"
-        case 500..<600: return "✗"
-        default: return "?"
+
+        case 301, 302, 303, 307, 308: return "🔀"
+        case 304: return "💾"
+        case 300..<400: return "↪️"
+
+        case 400: return "❌"
+        case 401: return "🔐"
+        case 403: return "🚫"
+        case 404: return "🔍"
+        case 429: return "⏸️"
+        case 400..<500: return "⚠️"
+
+        case 500: return "💥"
+        case 502: return "🚧"
+        case 503: return "⛔"
+        case 504: return "⏰"
+        case 500..<600: return "❗"
+
+        default: return "❓"
         }
+    }
+
+    /// Returns emoji for request duration.
+    private func durationEmoji(for duration: TimeInterval) -> String {
+        switch duration {
+        case 0..<0.1: return "⚡"
+        case 0.1..<0.5: return "🚀"
+        case 0.5..<1.0: return "⏱️"
+        case 1.0..<3.0: return "🐌"
+        default: return "🐢"
+        }
+    }
+
+    /// Returns emoji for error type.
+    private func errorEmoji(for error: AFError) -> String {
+        if let urlError = error.underlyingError as? URLError {
+            switch urlError.code {
+            case .notConnectedToInternet, .networkConnectionLost: return "📡"
+            case .timedOut: return "⏰"
+            case .cannotFindHost, .cannotConnectToHost: return "🔌"
+            case .serverCertificateUntrusted, .serverCertificateHasUnknownRoot: return "🔒"
+            case .cancelled: return "🛑"
+            default: return "⚠️"
+            }
+        }
+
+        if case .explicitlyCancelled = error {
+            return "🛑"
+        }
+
+        return "❌"
     }
 
     /// Checks if a header should be redacted for privacy.

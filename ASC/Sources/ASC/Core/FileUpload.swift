@@ -47,7 +47,7 @@ public struct FileUpload: Sendable {
     public init(
         data: Data,
         fileName: String,
-        mimeType: String = "application/octet-stream"
+        mimeType: String = ASCConstants.FileUpload.defaultMimeType
     ) {
         self.data = data
         self.fileName = fileName
@@ -191,7 +191,7 @@ public struct LargeFileUpload: Sendable {
         fileURL: URL,
         fieldName: String,
         fileName: String? = nil,
-        mimeType: String = "application/octet-stream"
+        mimeType: String = ASCConstants.FileUpload.defaultMimeType
     ) {
         self.fileURL = fileURL
         self.fieldName = fieldName

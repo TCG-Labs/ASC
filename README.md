@@ -115,6 +115,92 @@ let results = try await client.execute(
 )
 ```
 
+## 📚 Examples
+
+All runnable examples are located in the [`Examples/`](ASC/Examples/) directory.
+
+### [QuickStart.swift](ASC/Examples/QuickStart.swift) - 51 lines
+Minimal example to get started in 5 minutes.
+
+**What you'll learn:**
+- Define models and requests
+- Execute GET and POST requests
+- Use Namespace Enum pattern
+
+**Run:**
+```swift
+Task { try await quickStart() }
+```
+
+---
+
+### [JSONPlaceholderExample.swift](ASC/Examples/JSONPlaceholderExample.swift) - 121 lines
+Complete CRUD operations with real API (JSONPlaceholder).
+
+**What you'll learn:**
+- GET with path parameters (`/posts/{id}`)
+- POST with body parameters
+- PUT to update resources
+- DELETE with empty response
+- Nested paths (`/posts/{id}/comments`)
+- Error handling
+
+**Run:**
+```swift
+Task { try await runBasicExamples() }
+```
+
+---
+
+### [AdvancedExample.swift](ASC/Examples/AdvancedExample.swift) - 153 lines
+Production-ready patterns for authentication and monitoring.
+
+**What you'll learn:**
+- Custom `RequestInterceptor` for authentication
+- Automatic token refresh on 401
+- Custom `EventMonitor` for performance tracking
+- Advanced configuration with interceptors and monitors
+- Retry policies per request
+- Custom timeouts
+
+**Run:**
+```swift
+Task { try await runAdvancedExamples() }
+```
+
+---
+
+### [FileUploadExample.swift](ASC/Examples/FileUploadExample.swift) - 126 lines
+All three methods of uploading files.
+
+**What you'll learn:**
+- Simple uploads with `files`
+- Custom MIME types with `fileUploads`
+- Memory-efficient uploads with `largeFileUploads` (for files > 10MB)
+- Upload with metadata
+- Real uploads to httpbin.org
+
+**Run:**
+```swift
+Task { try await runFileUploadExamples() }
+```
+
+---
+
+### [EnumRequestExample.swift](ASC/Examples/EnumRequestExample.swift) - 114 lines
+Two ways to organize your API requests.
+
+**What you'll learn:**
+- **Namespace Enum** (recommended) - For different response types
+- **Simple Enum** - For same response type
+- When to use each pattern
+- Path parameters and URL encoding
+
+**Run:**
+```swift
+Task { try await demonstratePatterns() }
+```
+
 ## 🎯 Advanced Features
 
 ### Path Parameters

@@ -135,7 +135,7 @@ public struct NetworkClientConfiguration: Sendable {
     ///
     /// - Parameter baseURL: Default base URL for requests
     /// - Returns: A default configuration
-    public static func `default`(baseURL: String) -> NetworkClientConfiguration {
+    public static func `default`(baseURL: String? = nil) -> NetworkClientConfiguration {
         NetworkClientConfiguration(baseURL: baseURL)
     }
 }

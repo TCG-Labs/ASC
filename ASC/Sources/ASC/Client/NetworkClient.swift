@@ -79,7 +79,7 @@ public final class NetworkClient: Sendable {
     ///
     /// Use this when each request will provide its own baseURL.
     public convenience init() {
-        self.init(configuration: NetworkClientConfiguration())
+        self.init(configuration: .default(baseURL: nil))
     }
 
     // MARK: - Public Methods
