@@ -60,6 +60,14 @@ internal struct MultipartRequestBuilder {
     // MARK: - Private Methods - Encoding Selection
 
     /// Calculates total size of all files in the request.
+    ///
+    /// **Performance Note**: This method accesses `.count` on `Data` objects,
+    /// which loads the entire file data into memory. For large files (>10MB),
+    /// use `largeFileUploads` instead of `files` or `fileUploads` to avoid
+    /// loading file data into memory just for size calculation.
+    ///
+    /// - Parameter request: The network request containing files
+    /// - Returns: Total size in bytes, or Int.max if largeFileUploads are present
     private func calculateTotalSize<Request: NetworkRequest>(for request: Request) -> Int {
         if request.largeFileUploads != nil {
             return Int.max
@@ -89,9 +97,8 @@ internal struct MultipartRequestBuilder {
         interceptor: (any RequestInterceptor)?
     ) -> UploadRequest {
         session.upload(
-            multipartFormData: { multipartFormData in
-                self.appendFiles(to: multipartFormData, from: request)
-                self.appendParameters(to: multipartFormData, from: request)
+            multipartFormData: { formData in
+                self.populateMultipartFormData(formData, from: request)
             },
             to: url,
             method: request.method,
@@ -120,20 +127,7 @@ internal struct MultipartRequestBuilder {
             .appendingPathExtension("multipart")
 
         let formData = MultipartFormData()
-
-        appendFiles(to: formData, from: request)
-        appendParameters(to: formData, from: request)
-
-        if let largeFileUploads = request.largeFileUploads {
-            for upload in largeFileUploads {
-                formData.append(
-                    upload.fileURL,
-                    withName: upload.fieldName,
-                    fileName: upload.fileName,
-                    mimeType: upload.mimeType
-                )
-            }
-        }
+        populateMultipartFormData(formData, from: request, includeLargeFileUploads: true)
 
         try formData.writeEncodedData(to: tempURL)
 
@@ -147,6 +141,32 @@ internal struct MultipartRequestBuilder {
     }
 
     // MARK: - Helper Methods
+
+    /// Populates multipart form data with files and parameters from request.
+    ///
+    /// - Parameters:
+    ///   - formData: Multipart form data to populate
+    ///   - request: Network request containing data to upload
+    ///   - includeLargeFileUploads: Whether to include large file uploads (default: false)
+    private func populateMultipartFormData<Request: NetworkRequest>(
+        _ formData: MultipartFormData,
+        from request: Request,
+        includeLargeFileUploads: Bool = false
+    ) {
+        appendFiles(to: formData, from: request)
+        appendParameters(to: formData, from: request)
+
+        if includeLargeFileUploads, let largeFileUploads = request.largeFileUploads {
+            for upload in largeFileUploads {
+                formData.append(
+                    upload.fileURL,
+                    withName: upload.fieldName,
+                    fileName: upload.fileName,
+                    mimeType: upload.mimeType
+                )
+            }
+        }
+    }
 
     /// Appends files from the request to multipart form data.
     ///

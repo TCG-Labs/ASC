@@ -113,10 +113,13 @@ internal struct ErrorMapper {
     /// Extracts error message from response data.
     ///
     /// Attempts to parse common error response formats:
-    /// - `{"error": "message"}`
-    /// - `{"message": "message"}`
-    /// - `{"error_description": "message"}`
-    /// - `{"errors": ["message1", "message2"]}`
+    /// - `{"error": "message"}`, `{"message": "message"}`
+    /// - `{"error_description": "message"}`, `{"errorMessage": "message"}`
+    /// - `{"detail": "message"}` (Django REST Framework)
+    /// - `{"error": {"message": "message"}}` (nested error objects)
+    /// - `{"data": {"message": "message"}}`, `{"status": {"message": "message"}}`
+    /// - `{"errors": ["message1", "message2"]}` (array of strings)
+    /// - `{"errors": [{"message": "message"}]}` (array of objects)
     ///
     /// - Parameter data: Response data to parse
     /// - Returns: Extracted error message, or nil if parsing fails
@@ -127,28 +130,49 @@ internal struct ErrorMapper {
             return nil
         }
 
-        let topLevelKeys = ["message", "error", "error_description"]
+        // Check top-level string keys
+        let topLevelKeys = ["message", "error", "error_description", "errorMessage", "detail", "error_message"]
         for key in topLevelKeys {
             if let message = json[key] as? String {
                 return message
             }
         }
 
-        if let errorObject = json["error"] as? [String: Any],
-           let message = errorObject["message"] as? String {
-            return message
+        // Check nested error/data/status objects
+        let nestedKeys = ["error", "data", "status"]
+        for key in nestedKeys {
+            if let errorObject = json[key] as? [String: Any],
+               let message = findMessageInObject(errorObject) {
+                return message
+            }
         }
 
+        // Check errors array (strings)
         if let errors = json["errors"] as? [String], let firstError = errors.first {
             return firstError
         }
 
+        // Check errors array (objects)
         if let errors = json["errors"] as? [[String: Any]],
            let firstError = errors.first,
-           let message = firstError["message"] as? String {
+           let message = findMessageInObject(firstError) {
             return message
         }
 
+        return nil
+    }
+
+    /// Finds a message string in an object by checking common key names.
+    ///
+    /// - Parameter object: Dictionary to search for message
+    /// - Returns: Found message string, or nil if not found
+    private func findMessageInObject(_ object: [String: Any]) -> String? {
+        let messageKeys = ["message", "error_message", "errorMessage", "detail"]
+        for key in messageKeys {
+            if let message = object[key] as? String {
+                return message
+            }
+        }
         return nil
     }
 
