@@ -395,7 +395,7 @@ public final class NetworkClient: Sendable {
         let url = try urlBuilder.buildURL(from: request, baseURL: configuration.baseURL)
         let headers = buildHeaders(for: request)
 
-        let upload = multipartBuilder.buildUpload(
+        let upload = try multipartBuilder.buildUpload(
             for: request,
             url: url,
             session: session,

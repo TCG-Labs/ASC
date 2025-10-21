@@ -27,6 +27,7 @@ internal struct MultipartRequestBuilder {
     ///   - interceptor: Optional request interceptor for retry logic
     ///   - fileSizeThreshold: Threshold for file-based encoding (default: 10MB)
     /// - Returns: Configured UploadRequest ready to execute
+    /// - Throws: Error if file-based encoding fails to write temporary file
     internal func buildUpload<Request: NetworkRequest>(
         for request: Request,
         url: URL,
@@ -34,11 +35,11 @@ internal struct MultipartRequestBuilder {
         headers: HTTPHeaders,
         interceptor: (any RequestInterceptor)? = nil,
         fileSizeThreshold: Int = ASCConstants.FileUpload.defaultSizeThreshold
-    ) -> UploadRequest {
+    ) throws -> UploadRequest {
         let totalSize = calculateTotalSize(for: request)
 
         if totalSize > fileSizeThreshold || request.largeFileUploads != nil {
-            return buildFileBasedUpload(
+            return try buildFileBasedUpload(
                 for: request,
                 url: url,
                 session: session,
@@ -105,13 +106,15 @@ internal struct MultipartRequestBuilder {
     ///
     /// This method writes multipart data to a temporary file on disk,
     /// then uploads from that file. This is memory-efficient for large files.
+    ///
+    /// - Throws: Error if writing multipart data to temporary file fails
     private func buildFileBasedUpload<Request: NetworkRequest>(
         for request: Request,
         url: URL,
         session: Session,
         headers: HTTPHeaders,
         interceptor: (any RequestInterceptor)?
-    ) -> UploadRequest {
+    ) throws -> UploadRequest {
         let tempURL = FileManager.default.temporaryDirectory
             .appendingPathComponent(UUID().uuidString)
             .appendingPathExtension("multipart")
@@ -132,11 +135,7 @@ internal struct MultipartRequestBuilder {
             }
         }
 
-        do {
-            try formData.writeEncodedData(to: tempURL)
-        } catch {
-            debugPrint("⚠️ Failed to write multipart data to file: \(error)")
-        }
+        try formData.writeEncodedData(to: tempURL)
 
         return session.upload(
             tempURL,

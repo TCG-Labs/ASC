@@ -41,6 +41,9 @@ public enum ASCLogLevel: Int, Sendable {
 public final class ASCLogger: EventMonitor, Sendable {
     // MARK: - Properties
 
+    /// Shared dispatch queue for all logger instances.
+    private static let sharedQueue = DispatchQueue(label: "com.asc.logger", qos: .utility)
+
     /// The log level for this logger.
     private let logLevel: ASCLogLevel
 
@@ -49,7 +52,7 @@ public final class ASCLogger: EventMonitor, Sendable {
 
     /// Dispatch queue for EventMonitor callbacks.
     public var queue: DispatchQueue {
-        DispatchQueue(label: "com.asc.logger", qos: .utility)
+        Self.sharedQueue
     }
 
     // MARK: - Initialization
