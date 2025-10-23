@@ -36,7 +36,7 @@ swiftlint --fix
 ## Architecture
 
 ### Package Structure
-- **Sources/ASC/**: Main library (14 files, 2,034 lines)
+- **Sources/ASC/**: Main library (15 files, 2,250 lines)
   - **Client/**: NetworkClient and components (5 files, 1,027 lines)
     - `NetworkClient.swift` - Main client (309 lines)
     - `MultipartRequestBuilder.swift` - File uploads (288 lines)
@@ -45,6 +45,8 @@ swiftlint --fix
     - `NetworkClientConfiguration.swift` - Configuration (121 lines)
   - **Core/**: Protocols and types (5 files, 560 lines)
   - **Errors/**: Error types (4 files, 405 lines)
+  - **Utils/**: Utility classes (1 file, 216 lines)
+    - `NetworkReachability.swift` - Connectivity monitoring (216 lines)
 - **Tests/ASCTests/**: Test suite (135 tests, 3,527 lines)
   - **Helpers/**: Test infrastructure (676 lines)
   - **Mocks/**: Mock implementations (266 lines)
@@ -98,6 +100,13 @@ enum UserAPI {
 4. **NetworkClientConfiguration** - Configuration
    - Centralizes client settings
    - Manages interceptors, monitors, trust managers
+   - Connectivity checking configuration
+
+5. **NetworkReachability** - Connectivity Monitoring
+   - Real-time network status monitoring via NWPathMonitor
+   - Detects Wi-Fi, cellular, wired, and other connection types
+   - Provides both sync (currentStatus) and async (statusStream) APIs
+   - Automatic monitoring lifecycle (start/stop)
 
 ### Core Features
 
@@ -123,14 +132,22 @@ Three-tier multipart/form-data support:
 - `fileUploads`: Custom MIME types (< 10MB)
 - `largeFileUploads`: File-based encoding (> 10MB, memory-efficient)
 
-**5. RetryPolicy**
+**5. Network Connectivity Monitoring**
+Automatic connectivity checking before requests:
+- Real-time monitoring via Apple's Network.framework
+- Configurable via `connectivityCheckEnabled` (default: true)
+- Throws `NetworkError.noConnection` immediately when offline
+- Supports reactive monitoring via Combine and AsyncStream
+- Connection type detection (Wi-Fi, cellular, wired, other)
+
+**6. RetryPolicy**
 Convenient factory methods for Alamofire.RetryPolicy:
 - `.none` → No retry
 - `.default` → 3 retries with exponential backoff
 - `.aggressive` → 5 retries
 - `.conservative` → 2 retries
 
-**6. Built-in Debug Logger**
+**7. Built-in Debug Logger**
 ASCLogger with emoji-enhanced visual output:
 - OSLog integration for performance and privacy
 - 5 log levels: none, error, info, debug, verbose
@@ -195,6 +212,49 @@ let config = NetworkClientConfiguration(
     serverTrustManager: ServerTrustManager(evaluators: ["api.example.com": DefaultTrustEvaluator()])
 )
 let client = NetworkClient(configuration: config)
+```
+
+### Network Connectivity Monitoring
+
+```swift
+// Option 1: Automatic connectivity checking (enabled by default)
+let config = NetworkClientConfiguration(
+    baseURL: "https://api.example.com",
+    connectivityCheckEnabled: true  // default value
+)
+let client = NetworkClient(configuration: config)
+
+// Requests automatically fail fast when offline
+do {
+    let user = try await client.execute(UserAPI.GetUser(userId: "123"))
+} catch NetworkError.noConnection {
+    debugPrint("No internet connection available")
+}
+
+// Option 2: Manual monitoring with NetworkReachability
+let reachability = NetworkReachability()
+reachability.startMonitoring()
+
+// Check current status
+if case .reachable(let type) = reachability.currentStatus {
+    debugPrint("Connected via \(type)")
+}
+
+// Monitor status changes
+Task {
+    for await status in reachability.statusStream {
+        switch status {
+        case .reachable(.wifi):
+            debugPrint("Wi-Fi available")
+        case .reachable(.cellular):
+            debugPrint("Cellular available")
+        case .unreachable:
+            debugPrint("No connection")
+        default:
+            break
+        }
+    }
+}
 ```
 
 ### Path Parameters & Prefix

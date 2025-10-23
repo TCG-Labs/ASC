@@ -80,43 +80,167 @@ public enum HTTPStatus {
     }
 }
 
-// MARK: - StatusCodeCategory
+// MARK: - HTTPResponseType
 
-/// Categorizes HTTP status codes for consistent error handling.
+/// HTTP response type based on status code ranges.
 ///
-/// Provides structured categories with appropriate recovery suggestions.
-public enum StatusCodeCategory: Sendable {
-    case success
-    case clientError(HTTPStatusCode, String?)
-    case serverError(HTTPStatusCode, String?)
-    case other(HTTPStatusCode)
+/// Unified type that categorizes HTTP responses and provides error handling capabilities.
+/// Combines status code categorization with error messages and recovery suggestions.
+///
+/// Example:
+/// ```swift
+/// let response: HTTPURLResponse = ...
+/// let responseType = HTTPResponseType(statusCode: response.statusCode)
+///
+/// switch responseType {
+/// case .informational:
+///     debugPrint("Informational response")
+/// case .success:
+///     debugPrint("Success!")
+/// case .redirection:
+///     debugPrint("Redirect")
+/// case .clientError(let code, let message):
+///     debugPrint("Client error \(code): \(message ?? "Unknown")")
+/// case .serverError(let code, let message):
+///     debugPrint("Server error \(code): \(message ?? "Unknown")")
+/// case .undefined:
+///     debugPrint("Unknown status code")
+/// }
+///
+/// // Or use convenience properties
+/// if responseType.isSuccess {
+///     debugPrint("Request succeeded")
+/// } else if let suggestion = responseType.recoverySuggestion {
+///     debugPrint("Suggestion: \(suggestion)")
+/// }
+/// ```
+public enum HTTPResponseType: Sendable {
+    /// Informational responses (1xx)
+    ///
+    /// Indicates that the request was received and the process is continuing.
+    /// Examples: 100 Continue, 101 Switching Protocols, 102 Processing
+    case informational(HTTPStatusCode)
 
-    /// Creates a category from a status code and optional error message.
+    /// Successful responses (2xx)
+    ///
+    /// Indicates that the request was successfully received, understood, and accepted.
+    /// Examples: 200 OK, 201 Created, 204 No Content
+    case success(HTTPStatusCode)
+
+    /// Redirection messages (3xx)
+    ///
+    /// Indicates that further action needs to be taken to complete the request.
+    /// Examples: 301 Moved Permanently, 302 Found, 304 Not Modified
+    case redirection(HTTPStatusCode)
+
+    /// Client error responses (4xx)
+    ///
+    /// Indicates that the request contains bad syntax or cannot be fulfilled.
+    /// Examples: 400 Bad Request, 401 Unauthorized, 404 Not Found
     ///
     /// - Parameters:
-    ///   - code: HTTP status code
-    ///   - message: Optional error message from response
-    /// - Returns: Appropriate status code category
-    public init(_ code: HTTPStatusCode, message: String? = nil) {
-        switch code {
-        case 200...299:
-            self = .success
+    ///   - statusCode: The HTTP status code
+    ///   - message: Optional error message from the server
+    case clientError(HTTPStatusCode, message: String?)
 
-        case 400...499:
-            self = .clientError(code, message)
+    /// Server error responses (5xx)
+    ///
+    /// Indicates that the server failed to fulfill a valid request.
+    /// Examples: 500 Internal Server Error, 502 Bad Gateway, 503 Service Unavailable
+    ///
+    /// - Parameters:
+    ///   - statusCode: The HTTP status code
+    ///   - message: Optional error message from the server
+    case serverError(HTTPStatusCode, message: String?)
 
-        case 500...599:
-            self = .serverError(code, message)
+    /// Undefined or custom status codes
+    ///
+    /// Status codes outside of standard ranges (< 100 or >= 600)
+    case undefined(HTTPStatusCode)
+
+    /// Creates a response type from an HTTP status code.
+    ///
+    /// - Parameters:
+    ///   - statusCode: HTTP status code to categorize
+    ///   - message: Optional error message for error responses
+    /// - Returns: Appropriate response type category
+    public init(statusCode: HTTPStatusCode, message: String? = nil) {
+        switch statusCode {
+        case 100..<200:
+            self = .informational(statusCode)
+
+        case 200..<300:
+            self = .success(statusCode)
+
+        case 300..<400:
+            self = .redirection(statusCode)
+
+        case 400..<500:
+            self = .clientError(statusCode, message: message)
+
+        case 500..<600:
+            self = .serverError(statusCode, message: message)
 
         default:
-            self = .other(code)
+            self = .undefined(statusCode)
         }
     }
 
-    /// Suggested recovery action based on the category.
+    // MARK: - Computed Properties
+
+    /// The HTTP status code associated with this response type.
+    public var statusCode: HTTPStatusCode {
+        switch self {
+        case .informational(let code),
+             .success(let code),
+             .redirection(let code),
+             .clientError(let code, _),
+             .serverError(let code, _),
+             .undefined(let code):
+            return code
+        }
+    }
+
+    /// Error message associated with error responses.
+    ///
+    /// Returns the error message for client and server errors, or nil for other response types.
+    public var errorMessage: String? {
+        switch self {
+        case .clientError(_, let message),
+             .serverError(_, let message):
+            return message
+
+        default:
+            return nil
+        }
+    }
+
+    /// Indicates whether this response type represents a successful response.
+    public var isSuccess: Bool {
+        if case .success = self {
+            return true
+        }
+        return false
+    }
+
+    /// Indicates whether this response type represents an error.
+    public var isError: Bool {
+        switch self {
+        case .clientError, .serverError:
+            return true
+
+        default:
+            return false
+        }
+    }
+
+    /// Suggested recovery action based on the response type.
+    ///
+    /// Provides user-friendly suggestions for error recovery.
+    /// Returns nil for successful responses.
     public var recoverySuggestion: String? {
         switch self {
-        case .success:
+        case .informational, .success, .redirection:
             return nil
 
         case .clientError(let code, _):
@@ -124,8 +248,17 @@ public enum StatusCodeCategory: Sendable {
             case 400:
                 return "Please check your request parameters"
 
+            case 401:
+                return "Authentication required. Please log in again"
+
+            case 403:
+                return "You don't have permission to access this resource"
+
             case 404:
                 return "The requested resource was not found"
+
+            case 429:
+                return "Too many requests. Please try again later"
 
             default:
                 return "Please check your request and try again"
@@ -134,8 +267,29 @@ public enum StatusCodeCategory: Sendable {
         case .serverError:
             return "The server encountered an error. Please try again later"
 
-        case .other:
+        case .undefined:
             return nil
         }
+    }
+}
+
+// MARK: - HTTPURLResponse Extension
+
+public extension HTTPURLResponse {
+    /// The response type based on the HTTP status code.
+    ///
+    /// Categorizes the response into standard HTTP categories.
+    ///
+    /// Example:
+    /// ```swift
+    /// let response: HTTPURLResponse = ...
+    /// if response.responseType.isSuccess {
+    ///     debugPrint("Request succeeded")
+    /// } else if response.responseType.isError {
+    ///     debugPrint("Request failed")
+    /// }
+    /// ```
+    var responseType: HTTPResponseType {
+        HTTPResponseType(statusCode: statusCode)
     }
 }

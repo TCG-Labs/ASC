@@ -40,6 +40,9 @@ public final class NetworkClient: Sendable {
     /// Error mapper for translating Alamofire errors.
     private let errorMapper: ErrorMapper
 
+    /// Network reachability monitor (optional).
+    private let reachability: NetworkReachability?
+
     // MARK: - Initialization
 
     /// Creates a new network client with the specified configuration.
@@ -50,6 +53,14 @@ public final class NetworkClient: Sendable {
         self.urlBuilder = URLBuilder()
         self.multipartBuilder = MultipartRequestBuilder()
         self.errorMapper = ErrorMapper(defaultTimeout: configuration.defaultTimeout)
+
+        if configuration.connectivityCheckEnabled {
+            let reachability = NetworkReachability()
+            reachability.startMonitoring()
+            self.reachability = reachability
+        } else {
+            self.reachability = nil
+        }
 
         let urlConfig = configuration.urlSessionConfiguration
         urlConfig.timeoutIntervalForRequest = configuration.defaultTimeout
@@ -67,6 +78,8 @@ public final class NetworkClient: Sendable {
             eventMonitors: configuration.eventMonitors
         )
     }
+
+    deinit { reachability?.stopMonitoring() }
 
     /// Convenience initializer with base URL only.
     ///
@@ -324,6 +337,7 @@ public final class NetworkClient: Sendable {
         progressHandler: (@Sendable (Double) -> Void)?
     ) async throws -> Response where Request.Response == Response {
         try Task.checkCancellation()
+        try checkConnectivity()
 
         let dataRequest = session.request(urlRequest, interceptor: retryPolicy)
             .validate()
@@ -357,6 +371,7 @@ public final class NetworkClient: Sendable {
         retryPolicy: Alamofire.RetryPolicy?
     ) async throws {
         try Task.checkCancellation()
+        try checkConnectivity()
 
         let dataRequest = session.request(urlRequest, interceptor: retryPolicy)
             .validate()
@@ -391,6 +406,7 @@ public final class NetworkClient: Sendable {
         progressHandler: (@Sendable (Double) -> Void)?
     ) async throws -> Response? where Request.Response == Response {
         try Task.checkCancellation()
+        try checkConnectivity()
 
         let url = try urlBuilder.buildURL(from: request, baseURL: configuration.baseURL)
         let headers = buildHeaders(for: request)
@@ -470,6 +486,18 @@ public final class NetworkClient: Sendable {
     private func validateResponse(_ response: DataResponse<Data, AFError>) throws {
         if let error = response.error {
             throw errorMapper.mapError(error, data: response.data)
+        }
+    }
+
+    // MARK: - Connectivity Check
+
+    /// Checks network connectivity before making a request.
+    /// - Throws: NetworkError.noConnection if no connection available
+    private func checkConnectivity() throws {
+        guard let reachability = reachability else { return }
+
+        if case .unreachable = reachability.currentStatus {
+            throw NetworkError.noConnection
         }
     }
 

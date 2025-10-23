@@ -64,6 +64,14 @@ public struct NetworkClientConfiguration: Sendable {
     /// Default is .none (no logging).
     public let logLevel: ASCLogLevel
 
+    /// Enable automatic connectivity checking before requests.
+    ///
+    /// When enabled, the client will check network connectivity before executing requests.
+    /// If no connection is available, `NetworkError.noConnection` will be thrown immediately.
+    /// This helps provide faster feedback and better error messages.
+    /// Default is true.
+    public let connectivityCheckEnabled: Bool
+
     /// Creates a new network client configuration.
     ///
     /// - Parameters:
@@ -82,6 +90,7 @@ public struct NetworkClientConfiguration: Sendable {
     ///   - serializationQueue: Serialization dispatch queue (default: custom queue)
     ///   - multipartFileSizeThreshold: Threshold for file-based encoding (default: 10MB)
     ///   - logLevel: Log level for built-in logger (default: .none)
+    ///   - connectivityCheckEnabled: Enable automatic connectivity checking (default: true)
     public init(
         baseURL: String? = nil,
         urlSessionConfiguration: URLSessionConfiguration = .default,
@@ -103,7 +112,8 @@ public struct NetworkClientConfiguration: Sendable {
             qos: .userInitiated
         ),
         multipartFileSizeThreshold: Int = ASCConstants.FileUpload.defaultSizeThreshold,
-        logLevel: ASCLogLevel = .none
+        logLevel: ASCLogLevel = .none,
+        connectivityCheckEnabled: Bool = true
     ) {
         self.baseURL = baseURL
         self.urlSessionConfiguration = urlSessionConfiguration
@@ -129,6 +139,7 @@ public struct NetworkClientConfiguration: Sendable {
         self.requestQueue = requestQueue
         self.serializationQueue = serializationQueue
         self.multipartFileSizeThreshold = multipartFileSizeThreshold
+        self.connectivityCheckEnabled = connectivityCheckEnabled
     }
 
     /// Creates a default configuration with the specified base URL.

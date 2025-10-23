@@ -280,7 +280,16 @@ public final class ASCLogger: EventMonitor, Sendable {
     }
 
     /// Pretty prints JSON data.
+    ///
+    /// Skips pretty printing for large payloads to avoid performance issues.
+    /// - Parameter data: JSON data to format
+    /// - Returns: Pretty-printed JSON string, or size info for large payloads
     private func prettyPrintJSON(_ data: Data) -> String? {
+        // Skip pretty printing for large payloads (100KB limit)
+        guard data.count < 100_000 else {
+            return "JSON too large (\(data.count) bytes)"
+        }
+
         guard let json = try? JSONSerialization.jsonObject(with: data),
               let prettyData = try? JSONSerialization.data(
                 withJSONObject: json,
