@@ -1,0 +1,28 @@
+//
+//  Models.swift
+//  TestExample
+//
+//  Created by Claude on 25.10.2025.
+//
+
+import Foundation
+import ASC
+import Alamofire
+
+// MARK: - User Model
+
+struct User: Codable, Identifiable, Sendable {
+    let id: Int
+    let name: String
+    let email: String
+}
+
+// MARK: - API Request
+
+struct GetUsersRequest: NetworkRequest {
+    typealias Response = [User]
+
+    var baseURL: String? { "https://jsonplaceholder.typicode.com" }
+    var path: String { "/users" }
+    var method: HTTPMethod { .get }
+}
