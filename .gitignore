@@ -57,7 +57,7 @@ Carthage/Checkouts/
 .swiftpm/
 Packages/
 Package.resolved
-*.xcodeproj
+# *.xcodeproj
 !Package.swift
 .swiftpm/configuration/registries.json
 .swiftpm/xcode/package.xcworkspace/contents.xcworkspacedata
@@ -85,22 +85,6 @@ playground.xcworkspace
 # AppCode
 .idea/
 *.iml
-
-# Emacs
-*~
-\#*\#
-/.emacs.desktop
-/.emacs.desktop.lock
-*.elc
-
-# Vim
-*.swp
-*.swo
-*~
-
-# Sublime Text
-*.sublime-workspace
-*.sublime-project
 
 # ===========================
 # Testing & Coverage
@@ -155,6 +139,8 @@ fastlane/report.xml
 fastlane/Preview.html
 fastlane/screenshots/**/*.png
 fastlane/test_output
+fastlane/xcov_output
+fastlane/archive
 fastlane/README.md
 
 # ===========================
