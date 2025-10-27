@@ -29,7 +29,7 @@ import Foundation
 public final class AuthInterceptor: RequestInterceptor, @unchecked Sendable {
     // MARK: - Properties
 
-    private let storage: TokenStorage
+    private let storage: any TokenStorage
     private let tokenType: TokenType
 
     // MARK: - Initialization
@@ -39,7 +39,7 @@ public final class AuthInterceptor: RequestInterceptor, @unchecked Sendable {
     /// - Parameters:
     ///   - storage: Token storage
     ///   - tokenType: Token type (default: .bearer)
-    public init(storage: TokenStorage, tokenType: TokenType = .bearer) {
+    public init(storage: any TokenStorage, tokenType: TokenType = .bearer) {
         self.storage = storage
         self.tokenType = tokenType
     }

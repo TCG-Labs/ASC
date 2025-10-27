@@ -33,7 +33,7 @@ import Foundation
 public final class OAuthAuthenticator: Authenticator, @unchecked Sendable {
     // MARK: - Properties
 
-    private var storage: TokenStorage
+    private var storage: any TokenStorage
     private let client: NetworkClient
 
     // MARK: - Initialization
@@ -55,7 +55,7 @@ public final class OAuthAuthenticator: Authenticator, @unchecked Sendable {
     ///     client: refreshClient
     /// )
     /// ```
-    public init(storage: TokenStorage, client: NetworkClient) {
+    public init(storage: any TokenStorage, client: NetworkClient) {
         self.storage = storage
         self.client = client
     }
@@ -96,22 +96,18 @@ public final class OAuthAuthenticator: Authenticator, @unchecked Sendable {
         // MARK: - Swift 6 Concurrency Note
         // Alamofire's Authenticator completion is not @Sendable, causing strict concurrency issues with Task.
         // We use DispatchQueue.global for async execution to work around this limitation.
-        DispatchQueue.global(qos: .userInitiated).async { [self] in
+        DispatchQueue.global(qos: .userInitiated).async { [weak self] in
+            guard let self else { return }
+
             let task = Task {
                 do {
                     // Execute refresh via storage
-                    let response = try await self.storage.performRefresh(using: self.client)
-
-                    // Update storage with new tokens
-                    self.storage.accessToken = response.accessToken
-                    if let newRefreshToken = response.refreshToken {
-                        self.storage.refreshToken = newRefreshToken
-                    }
+                    try await self.storage.executeRefreshToken(with: self.client)
 
                     // Create new credential
                     let newCredential = OAuthCredential(
-                        accessToken: response.accessToken,
-                        refreshToken: response.refreshToken ?? credential.refreshToken,
+                        accessToken: self.storage.accessToken ?? credential.accessToken,
+                        refreshToken: self.storage.refreshToken ?? credential.refreshToken,
                         tokenType: credential.tokenType
                     )
 

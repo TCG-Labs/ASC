@@ -303,7 +303,12 @@ public final class NetworkClient: Sendable {
     private func buildURLRequest<Request: NetworkRequest>(
         from request: Request
     ) throws -> URLRequest {
-        let url = try urlBuilder.buildURL(from: request, baseURL: configuration.baseURL)
+        let url = try urlBuilder.buildURL(
+            from: request,
+            baseURL: configuration.baseURL,
+            defaultPathPrefix: configuration.defaultPathPrefix,
+            defaultQueryParameters: configuration.defaultQueryParameters
+        )
 
         var urlRequest = URLRequest(url: url)
         urlRequest.httpMethod = request.method.rawValue
@@ -339,16 +344,29 @@ public final class NetworkClient: Sendable {
         try Task.checkCancellation()
         try checkConnectivity()
 
-        let dataRequest = session.request(urlRequest, interceptor: retryPolicy)
-            .validate()
+        // Use request's retry policy, fallback to configuration default
+        let effectiveRetryPolicy = retryPolicy ?? configuration.defaultRetryPolicy
+
+        let dataRequest = session.request(urlRequest, interceptor: effectiveRetryPolicy)
+
+        // Set request priority
+        dataRequest.task?.priority = configuration.defaultPriority
+
+        // Apply automatic validation if enabled
+        let validatedRequest = configuration.automaticValidation
+            ? dataRequest.validate(statusCode: configuration.acceptableStatusCodes)
+            : dataRequest
 
         if let progressHandler = progressHandler {
-            dataRequest.downloadProgress { progress in
+            validatedRequest.downloadProgress { progress in
                 progressHandler(progress.fractionCompleted)
             }
         }
 
-        let serializedRequest = dataRequest.serializingDecodable(Response.self)
+        let serializedRequest = validatedRequest.serializingDecodable(
+            Response.self,
+            decoder: configuration.decoder
+        )
 
         return try await withTaskCancellationHandler {
             let response = await serializedRequest.response
@@ -373,12 +391,23 @@ public final class NetworkClient: Sendable {
         try Task.checkCancellation()
         try checkConnectivity()
 
-        let dataRequest = session.request(urlRequest, interceptor: retryPolicy)
-            .validate()
-            .serializingData()
+        // Use request's retry policy, fallback to configuration default
+        let effectiveRetryPolicy = retryPolicy ?? configuration.defaultRetryPolicy
+
+        let dataRequest = session.request(urlRequest, interceptor: effectiveRetryPolicy)
+
+        // Set request priority
+        dataRequest.task?.priority = configuration.defaultPriority
+
+        // Apply automatic validation if enabled
+        let validatedRequest = configuration.automaticValidation
+            ? dataRequest.validate(statusCode: configuration.acceptableStatusCodes)
+            : dataRequest
+
+        let serializedRequest = validatedRequest.serializingData()
 
         try await withTaskCancellationHandler {
-            let response = await dataRequest.response
+            let response = await serializedRequest.response
             try validateResponse(response)
         } onCancel: {
             dataRequest.cancel()
@@ -408,28 +437,45 @@ public final class NetworkClient: Sendable {
         try Task.checkCancellation()
         try checkConnectivity()
 
-        let url = try urlBuilder.buildURL(from: request, baseURL: configuration.baseURL)
+        let url = try urlBuilder.buildURL(
+            from: request,
+            baseURL: configuration.baseURL,
+            defaultPathPrefix: configuration.defaultPathPrefix,
+            defaultQueryParameters: configuration.defaultQueryParameters
+        )
         let headers = buildHeaders(for: request)
+
+        // Use request's retry policy, fallback to configuration default
+        let effectiveRetryPolicy = retryPolicy ?? configuration.defaultRetryPolicy
 
         let upload = try multipartBuilder.buildUpload(
             for: request,
             url: url,
             session: session,
             headers: headers,
-            interceptor: retryPolicy,
+            interceptor: effectiveRetryPolicy,
             fileSizeThreshold: configuration.multipartFileSizeThreshold
         )
 
+        // Set request priority
+        upload.task?.priority = configuration.defaultPriority
+
+        // Apply automatic validation if enabled
+        let validatedUpload = configuration.automaticValidation
+            ? upload.validate(statusCode: configuration.acceptableStatusCodes)
+            : upload
+
         if let progressHandler = progressHandler {
-            upload.uploadProgress { progress in
+            validatedUpload.uploadProgress { progress in
                 progressHandler(progress.fractionCompleted)
             }
         }
 
         if let responseType = responseType {
-            let uploadRequest = upload
-                .validate()
-                .serializingDecodable(responseType)
+            let uploadRequest = validatedUpload.serializingDecodable(
+                responseType,
+                decoder: configuration.decoder
+            )
 
             return try await withTaskCancellationHandler {
                 let response = await uploadRequest.response
@@ -442,9 +488,7 @@ public final class NetworkClient: Sendable {
                 upload.cancel()
             }
         } else {
-            let uploadRequest = upload
-                .validate()
-                .serializingData()
+            let uploadRequest = validatedUpload.serializingData()
 
             try await withTaskCancellationHandler {
                 let response = await uploadRequest.response

@@ -24,20 +24,30 @@ internal struct URLBuilder {
     /// Builds full URL from a NetworkRequest.
     ///
     /// Combines base URL, path prefix, path, and substitutes path parameters.
+    /// Also applies default query parameters from configuration.
     /// - Parameters:
     ///   - request: The network request
     ///   - baseURL: Base URL from client configuration (optional)
+    ///   - defaultPathPrefix: Default path prefix from configuration (optional)
+    ///   - defaultQueryParameters: Default query parameters from configuration (optional)
     /// - Returns: Fully constructed URL
     /// - Throws: URLBuildError if URL is invalid or baseURL is missing
     internal func buildURL<Request: NetworkRequest>(
         from request: Request,
-        baseURL: String?
+        baseURL: String?,
+        defaultPathPrefix: String? = nil,
+        defaultQueryParameters: [String: String]? = nil
     ) throws -> URL {
         guard let effectiveBaseURL = request.baseURL ?? baseURL else {
             throw URLBuildError.missingBaseURL
         }
 
         var fullPath = request.path
+
+        // Apply default path prefix first, then request-specific prefix
+        if let defaultPrefix = defaultPathPrefix {
+            fullPath = defaultPrefix + fullPath
+        }
 
         if let pathPrefix = request.pathPrefix {
             fullPath = pathPrefix + fullPath
@@ -49,7 +59,24 @@ internal struct URLBuilder {
 
         let fullURL = effectiveBaseURL + fullPath
 
-        guard let url = URL(string: fullURL) else {
+        guard var urlComponents = URLComponents(string: fullURL) else {
+            throw URLBuildError.invalidURL(fullURL)
+        }
+
+        // Apply default query parameters if provided
+        if let defaultQueryParams = defaultQueryParameters, !defaultQueryParams.isEmpty {
+            var queryItems = urlComponents.queryItems ?? []
+
+            // Add default query parameters (request-specific parameters take precedence)
+            let existingKeys = Set(queryItems.map { $0.name })
+            for (key, value) in defaultQueryParams where !existingKeys.contains(key) {
+                queryItems.append(URLQueryItem(name: key, value: value))
+            }
+
+            urlComponents.queryItems = queryItems.isEmpty ? nil : queryItems
+        }
+
+        guard let url = urlComponents.url else {
             throw URLBuildError.invalidURL(fullURL)
         }
 

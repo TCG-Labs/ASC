@@ -146,6 +146,17 @@ Convenient factory methods for Alamofire.RetryPolicy:
 - `.default` → 3 retries with exponential backoff
 - `.aggressive` → 5 retries
 - `.conservative` → 2 retries
+- Can be set globally via `defaultRetryPolicy` in configuration
+
+**8. Advanced Configuration Options**
+- **JSON Coding**: Custom JSONDecoder/JSONEncoder with configurable strategies
+- **Session Types**: Default, ephemeral (private), or background sessions
+- **Network Constraints**: Control cellular, expensive, and constrained network access
+- **Default Query Parameters**: Automatically added to all requests (API keys, etc.)
+- **Default Path Prefix**: Global API versioning without per-request configuration
+- **Automatic Validation**: HTTP status code validation with custom acceptable ranges
+- **Request Priority**: Set default priority for all network requests
+- **Preset Configurations**: `.development`, `.production`, `.testing` for quick setup
 
 **7. Built-in Debug Logger**
 ASCLogger with emoji-enhanced visual output:
@@ -192,9 +203,43 @@ enum UserAPI {
 let user = try await client.execute(UserAPI.GetUser(userId: "123"))
 ```
 
+### Preset Configurations
+
+ASC provides three preset configurations optimized for different environments:
+
+```swift
+// 1. Development - verbose logging, relaxed timeouts
+let client = NetworkClient(configuration: .development(baseURL: "https://dev-api.example.com"))
+// Features: verbose logging, 120s timeout, no retries
+
+// 2. Production - optimized for performance
+let client = NetworkClient(configuration: .production(baseURL: "https://api.example.com"))
+// Features: error-only logging, 30s timeout, conservative retries
+
+// 3. Testing - minimal overhead for unit tests
+let client = NetworkClient(configuration: .testing(baseURL: "http://localhost:8080"))
+// Features: no logging, 10s timeout, connectivity check disabled
+
+// 4. Default - customizable defaults
+let client = NetworkClient(configuration: .default(
+    baseURL: "https://api.example.com",
+    logLevel: .debug,
+    timeout: 90,
+    retryPolicy: .default
+))
+```
+
 ### Advanced Configuration
 
 ```swift
+// Custom JSON decoder/encoder (or use defaults)
+let decoder = JSONDecoder()
+decoder.dateDecodingStrategy = .secondsSince1970
+decoder.keyDecodingStrategy = .useDefaultKeys
+
+let encoder = JSONEncoder()
+encoder.dateEncodingStrategy = .secondsSince1970
+
 // Custom interceptor for authentication
 final class AuthInterceptor: RequestInterceptor {
     func adapt(_ urlRequest: URLRequest, for session: Session, completion: @escaping (Result<URLRequest, any Error>) -> Void) {
@@ -204,15 +249,54 @@ final class AuthInterceptor: RequestInterceptor {
     }
 }
 
-// Configure client
+// Network constraints configuration
+let networkConstraints = NetworkConstraints(
+    waitsForConnectivity: true,
+    allowsCellularAccess: true,
+    allowsExpensiveNetworkAccess: false,  // Save data on expensive networks
+    allowsConstrainedNetworkAccess: false   // Respect Low Data Mode
+)
+// Or use presets: .default, .restrictive
+
+// Validation configuration
+let validation = ValidationOptions(
+    isEnabled: true,
+    acceptableStatusCodes: 200..<300
+)
+// Or use presets: .default, .disabled
+
+// Full configuration with all options
 let config = NetworkClientConfiguration(
     baseURL: "https://api.example.com",
+    sessionType: .default,  // or .ephemeral, .background(identifier:)
+    defaultTimeout: 60,
+    defaultHeaders: .default,
     interceptors: [AuthInterceptor()],
     eventMonitors: [Logger()],
-    serverTrustManager: ServerTrustManager(evaluators: ["api.example.com": DefaultTrustEvaluator()])
+    serverTrustManager: ServerTrustManager(evaluators: ["api.example.com": DefaultTrustEvaluator()]),
+    logLevel: .debug,
+    decoder: decoder,  // or use NetworkClientConfigurationDefaults.decoder
+    encoder: encoder,  // or use NetworkClientConfigurationDefaults.encoder
+    defaultRetryPolicy: .conservative,
+    networkConstraints: networkConstraints,
+    defaultQueryParameters: ["api_key": "your-key", "client_id": "ios"],
+    defaultPathPrefix: "/api/v1",
+    validation: validation,
+    defaultPriority: 0.7  // Higher priority for important requests
 )
 let client = NetworkClient(configuration: config)
 ```
+
+**Key Configuration Features:**
+
+1. **SessionType**: Choose between default, ephemeral (private), or background sessions
+2. **JSON Coding**: Custom decoder/encoder or use `NetworkClientConfigurationDefaults` (ISO8601 + snake_case)
+3. **Default Retry Policy**: Applied to all requests unless overridden
+4. **NetworkConstraints**: Grouped network access settings with presets (`.default`, `.restrictive`)
+5. **Default Query Parameters**: Auto-added to all requests (e.g., API keys)
+6. **Default Path Prefix**: API versioning without modifying each request
+7. **ValidationOptions**: Grouped validation settings with presets (`.default`, `.disabled`)
+8. **Request Priority**: Set default priority for all requests (0.0-1.0)
 
 ### Network Connectivity Monitoring
 
