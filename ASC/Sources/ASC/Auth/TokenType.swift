@@ -47,3 +47,7 @@ public enum TokenType: Sendable, Equatable {
         }
     }
 }
+
+public enum HeaderKeys {
+    static let authorization: HTTPHeader = .init(name: "X-ASC-Auth-Required", value: "true")
+}

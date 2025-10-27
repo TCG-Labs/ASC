@@ -30,7 +30,6 @@ public final class AuthInterceptor: RequestInterceptor, @unchecked Sendable {
     // MARK: - Properties
 
     private let storage: any TokenStorage
-    private let tokenType: TokenType
 
     // MARK: - Initialization
 
@@ -39,9 +38,8 @@ public final class AuthInterceptor: RequestInterceptor, @unchecked Sendable {
     /// - Parameters:
     ///   - storage: Token storage
     ///   - tokenType: Token type (default: .bearer)
-    public init(storage: any TokenStorage, tokenType: TokenType = .bearer) {
+    public init(storage: any TokenStorage) {
         self.storage = storage
-        self.tokenType = tokenType
     }
 
     // MARK: - RequestInterceptor
@@ -52,14 +50,21 @@ public final class AuthInterceptor: RequestInterceptor, @unchecked Sendable {
         for session: Session,
         completion: @escaping (Result<URLRequest, any Error>) -> Void
     ) {
-        guard let accessToken = storage.accessToken else {
+        guard urlRequest.headers.contains(HeaderKeys.authorization) else {
             completion(.success(urlRequest))
             return
         }
 
         var urlRequest = urlRequest
-        let authValue = "\(tokenType.rawValue) \(accessToken)"
-        urlRequest.setValue(authValue, forHTTPHeaderField: "Authorization")
+        urlRequest.headers.remove(name: HeaderKeys.authorization.name)
+
+        guard let accessToken = storage.accessToken else {
+            completion(.failure(AuthenticationError.invalidToken))
+            return
+        }
+
+        let authValue = "\(storage.tokenType.rawValue) \(accessToken)"
+        urlRequest.headers.add(name: "Authorization", value: authValue)
 
         completion(.success(urlRequest))
     }

@@ -551,6 +551,10 @@ public final class NetworkClient: Sendable {
     private func buildHeaders<Request: NetworkRequest>(for request: Request) -> HTTPHeaders {
         var headers = configuration.defaultHeaders
 
+        if request.isAuthorized {
+            headers.add(HeaderKeys.authorization)
+        }
+
         if let requestHeaders = request.headers {
             for header in requestHeaders {
                 headers.add(header)

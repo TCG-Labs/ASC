@@ -25,9 +25,8 @@ enum UserAPI {
         typealias Response = User
         let userId: String
 
-        var path: String { "/users/{id}" }
+        var path: String { "/users/\(userId)" }
         var method: HTTPMethod { .get }
-        var pathParameters: [String: String]? { ["id": userId] }
     }
 
     struct List: NetworkRequest {

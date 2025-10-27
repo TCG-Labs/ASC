@@ -82,6 +82,8 @@ public protocol NetworkRequest: Sendable {
     /// results in "/api/v1/users"
     var pathPrefix: String? { get }
 
+    var isAuthorized: Bool { get }
+
     /// Files to upload in a multipart request.
     ///
     /// Dictionary mapping field names to file data.
@@ -183,6 +185,7 @@ public extension NetworkRequest {
 
     /// Default path prefix is nil
     var pathPrefix: String? { nil }
+    
 
     /// Default files are nil
     var files: [String: Data]? { nil }

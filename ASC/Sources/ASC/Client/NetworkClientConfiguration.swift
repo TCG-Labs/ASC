@@ -170,13 +170,13 @@ public struct NetworkClientConfiguration: Sendable {
     public let defaultCachePolicy: URLRequest.CachePolicy
 
     /// Default headers added to all requests.
-    public let defaultHeaders: HTTPHeaders
+    public var defaultHeaders: HTTPHeaders
 
     /// Request interceptors for adapting and retrying requests.
-    public let interceptors: [any RequestInterceptor]
+    public var interceptors: [any RequestInterceptor]
 
     /// Event monitors for observing request lifecycle.
-    public let eventMonitors: [any EventMonitor]
+    public var eventMonitors: [any EventMonitor]
 
     /// Server trust manager for SSL/TLS validation.
     public let serverTrustManager: ServerTrustManager?
@@ -201,6 +201,8 @@ public struct NetworkClientConfiguration: Sendable {
     /// Files larger than this threshold will use file-based encoding to avoid memory issues.
     /// Default is 10MB (10,000,000 bytes).
     public let multipartFileSizeThreshold: Int
+
+    public let tokenStorage: TokenStorage?
 
     /// Log level for built-in logger.
     ///
@@ -352,6 +354,7 @@ public struct NetworkClientConfiguration: Sendable {
         requestQueue: DispatchQueue = NetworkClientConfigurationDefaults.requestQueue,
         serializationQueue: DispatchQueue = NetworkClientConfigurationDefaults.serializationQueue,
         multipartFileSizeThreshold: Int = ASCConstants.FileUpload.defaultSizeThreshold,
+        tokenStorage: TokenStorage? = nil,
         logLevel: ASCLogLevel = .none,
         connectivityCheckEnabled: Bool = true,
         decoder: JSONDecoder = NetworkClientConfigurationDefaults.decoder,
@@ -379,6 +382,7 @@ public struct NetworkClientConfiguration: Sendable {
         self.defaultCachePolicy = defaultCachePolicy
         self.defaultHeaders = defaultHeaders
         self.interceptors = interceptors
+        self.tokenStorage = tokenStorage
         self.logLevel = logLevel
         self.decoder = decoder
         self.encoder = encoder
@@ -388,6 +392,11 @@ public struct NetworkClientConfiguration: Sendable {
         self.defaultPathPrefix = defaultPathPrefix
         self.validation = validation
         self.defaultPriority = defaultPriority
+
+        if let tokenStorage {
+            let authInterceptor = AuthInterceptor(storage: tokenStorage)
+            self.interceptors.append(authInterceptor)
+        }
 
         // Automatically add ASCLogger if logging is enabled
         if logLevel != .none {
