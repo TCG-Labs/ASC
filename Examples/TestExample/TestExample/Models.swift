@@ -7,7 +7,6 @@
 
 import Foundation
 import ASC
-import Alamofire
 
 // MARK: - User Model
 

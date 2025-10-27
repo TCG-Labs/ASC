@@ -195,8 +195,6 @@ public struct NetworkClientConfiguration: Sendable {
     /// Dispatch queue for serialization operations.
     public let serializationQueue: DispatchQueue
 
-    public let tokenStorage: TokenStorage?
-
     /// Log level for built-in logger.
     ///
     /// When set to anything other than .none, an ASCLogger is automatically added to eventMonitors.
@@ -293,6 +291,52 @@ public struct NetworkClientConfiguration: Sendable {
 
     /// Creates a new network client configuration.
     ///
+    /// **Adding Authentication:**
+    /// To add authentication, create an `AuthInterceptor` with your `TokenStorage` implementation:
+    /// ```swift
+    /// // 1. Implement TokenStorage
+    /// class BearerTokenStorage: TokenStorage {
+    ///     var authToken: AuthToken?
+    ///
+    ///     init(token: String) {
+    ///         self.authToken = .bearer(token: token)
+    ///     }
+    ///
+    ///     func flush() {
+    ///         authToken = nil
+    ///     }
+    /// }
+    ///
+    /// // 2. Create storage with token
+    /// let storage = BearerTokenStorage(token: "your-api-token")
+    ///
+    /// // 3. Create AuthInterceptor
+    /// let authInterceptor = AuthInterceptor(storage: storage)
+    ///
+    /// // 4. Pass to configuration
+    /// let config = NetworkClientConfiguration(
+    ///     baseURL: "https://api.example.com",
+    ///     interceptors: [authInterceptor]
+    /// )
+    /// ```
+    ///
+/// For Basic authentication:
+/// ```swift
+/// class BasicAuthStorage: TokenStorage {
+///     var authToken: AuthToken?
+///
+///     init(username: String, password: String) {
+///         self.authToken = .basic(username: username, password: password)
+///     }
+///
+///     func flush() {
+///         authToken = nil
+///     }
+/// }
+    ///
+    /// let storage = BasicAuthStorage(username: "user", password: "pass")
+    /// ```
+    ///
     /// - Parameters:
     ///   - baseURL: Default base URL for requests (optional - can be specified per request)
     ///   - sessionType: Type of URLSession to use (default: .default)
@@ -329,7 +373,6 @@ public struct NetworkClientConfiguration: Sendable {
         rootQueue: DispatchQueue = NetworkClientConfigurationDefaults.rootQueue,
         requestQueue: DispatchQueue = NetworkClientConfigurationDefaults.requestQueue,
         serializationQueue: DispatchQueue = NetworkClientConfigurationDefaults.serializationQueue,
-        tokenStorage: TokenStorage? = nil,
         logLevel: ASCLogLevel = .none,
         connectivityCheckEnabled: Bool = true,
         decoder: JSONDecoder = NetworkClientConfigurationDefaults.decoder,
@@ -355,7 +398,6 @@ public struct NetworkClientConfiguration: Sendable {
         self.defaultCachePolicy = defaultCachePolicy
         self.defaultHeaders = defaultHeaders
         self.interceptors = interceptors
-        self.tokenStorage = tokenStorage
         self.logLevel = logLevel
         self.decoder = decoder
         self.encoder = encoder
@@ -363,11 +405,6 @@ public struct NetworkClientConfiguration: Sendable {
         self.networkConstraints = networkConstraints
         self.validation = validation
         self.defaultPriority = defaultPriority
-
-        if let tokenStorage {
-            let authInterceptor = AuthInterceptor(storage: tokenStorage)
-            self.interceptors.append(authInterceptor)
-        }
 
         // Automatically add ASCLogger if logging is enabled
         if logLevel != .none {

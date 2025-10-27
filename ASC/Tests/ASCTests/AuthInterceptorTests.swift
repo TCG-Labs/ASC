@@ -6,17 +6,49 @@ import Foundation
 @testable import ASC
 
 struct AuthInterceptorTests {
-    // MARK: - Tests
+    // MARK: - Test Helpers
 
-    @Test("Token type enum raw values")
-    func testTokenTypeRawValues() {
-        #expect(TokenType.bearer.rawValue == "Bearer")
-        #expect(TokenType.basic.rawValue == "Basic")
-        #expect(TokenType.custom("MyAuth").rawValue == "MyAuth")
+    final class MockTokenStorage: TokenStorage, @unchecked Sendable {
+        var accessToken: String?
+        var refreshToken: String?
+        var authToken: AuthToken = .bearer(token: "")
+
+        var refreshRequest: (any NetworkRequest)? {
+            nil
+        }
+
+        func flush() {
+            accessToken = nil
+            refreshToken = nil
+        }
     }
 
-    @Test("Token storage clear tokens")
-    func testClearTokens() {
+    // MARK: - Tests
+
+    @Test("AuthToken header generation")
+    func testAuthTokenHeaderGeneration() {
+        // Test Bearer token
+        let bearer = AuthToken.bearer(token: "test-bearer-token")
+        let bearerHeader = bearer.header
+        #expect(bearerHeader.name == "Authorization")
+        #expect(bearerHeader.value == "Bearer test-bearer-token")
+        
+        // Test Basic authentication
+        let basic = AuthToken.basic(username: "testuser", password: "testpass")
+        let basicHeader = basic.header
+        #expect(basicHeader.name == "Authorization")
+        let expectedBasic = "Basic \(Data("testuser:testpass".utf8).base64EncodedString())"
+        #expect(basicHeader.value == expectedBasic)
+        
+        // Test Custom token
+        let custom = AuthToken.custom(token: "custom-token")
+        let customHeader = custom.header
+        #expect(customHeader.name == "Authorization")
+        #expect(customHeader.value == "custom-token")
+    }
+
+    @Test("Token storage flush")
+    func testFlush() {
         let storage = MockTokenStorage()
         storage.accessToken = "test-token"
         storage.refreshToken = "refresh-token"
@@ -24,7 +56,7 @@ struct AuthInterceptorTests {
         #expect(storage.accessToken != nil)
         #expect(storage.refreshToken != nil)
 
-        storage.clearTokens()
+        storage.flush()
 
         #expect(storage.accessToken == nil)
         #expect(storage.refreshToken == nil)
@@ -36,7 +68,7 @@ struct AuthInterceptorTests {
             var accessToken: String?
             var refreshToken: String?
 
-            func clearTokens() {
+            func flush() {
                 accessToken = nil
                 refreshToken = nil
             }
@@ -47,7 +79,7 @@ struct AuthInterceptorTests {
 
         // Test default implementations
         #expect(storage.refreshToken == nil)
-        #expect(storage.tokenType == .bearer)
+        #expect(storage.authToken == nil)
         #expect(storage.refreshRequest == nil)
 
         // Test default executeRefreshToken does nothing

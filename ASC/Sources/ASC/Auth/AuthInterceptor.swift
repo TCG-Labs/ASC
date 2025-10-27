@@ -36,7 +36,6 @@ public final class AuthInterceptor: RequestInterceptor, @unchecked Sendable {
     ///
     /// - Parameters:
     ///   - storage: Token storage
-    ///   - tokenType: Token type (default: .bearer)
     public init(storage: any TokenStorage) {
         self.storage = storage
     }
@@ -57,13 +56,12 @@ public final class AuthInterceptor: RequestInterceptor, @unchecked Sendable {
         var urlRequest = urlRequest
         urlRequest.headers.remove(name: HTTPHeader.authenticationRequired.name)
 
-        guard let accessToken = storage.accessToken else {
+        guard let authHeader = storage.authToken?.header else {
             completion(.failure(ASCError.invalidToken))
             return
         }
 
-        let authValue = "\(storage.tokenType.rawValue) \(accessToken)"
-        urlRequest.headers.add(name: "Authorization", value: authValue)
+        urlRequest.headers.add(authHeader)
 
         completion(.success(urlRequest))
     }
