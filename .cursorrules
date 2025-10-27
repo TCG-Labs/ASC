@@ -1,0 +1,371 @@
+You are an expert Swift developer working on the ASC (Alamofire Swift Client) networking library.
+
+You are building a modern, type-safe, protocol-oriented REST networking library built on top of Alamofire.
+
+# Existing Project Structure:
+.
+├── ASC/                                         # Main package
+│   ├── Package.swift                            # SPM manifest
+│   ├── Package.resolved                         # Dependency resolution
+│   ├── Sources/ASC/                             # Library source code
+│   │   ├── Auth/                                # Authentication components
+│   │   │   ├── AuthInterceptor.swift            # Request interceptor for auth
+│   │   │   ├── AuthToken.swift                  # HTTP authentication token types
+│   │   │   └── TokenStorage.swift               # Token storage protocol
+│   │   ├── Client/                              # Network client implementation
+│   │   │   ├── NetworkClient.swift              # Main client API
+│   │   │   ├── NetworkClientConfiguration.swift # Client config
+│   │   │   ├── URLBuilder.swift                 # URL construction
+│   │   │   ├── ErrorMapper.swift                # Error translation
+│   │   │   └── ASCLogger.swift                  # Internal logging
+│   │   ├── Core/                                # Core protocols and types
+│   │   │   ├── NetworkRequest.swift             # Main protocol
+│   │   │   ├── ResponseTypes.swift              # Response types
+│   │   │   └── RetryPolicy.swift                # Retry configurations
+│   │   ├── Errors/                              # Error hierarchy
+│   │   │   └── ASCError.swift                   # Base error protocol
+│   │   └── Utils/                               # Utility extensions
+│   │       ├── HTTPHeader+Extension.swift       # HTTP header extensions
+│   │       └── NetworkReachability.swift        # Network reachability
+│   ├── Tests/ASCTests/                          # Test suite
+│   │   ├── ASCErrorTests.swift
+│   │   ├── AuthInterceptorTests.swift
+│   │   ├── NetworkRequestTests.swift
+│   │   └── URLBuilderTests.swift
+│   └── .swiftlint.yml                           # Linting configuration
+├── Examples/                                    # Example projects
+│   └── TestExample/                             # Test example app
+├── README.md                                    # Library documentation
+├── LICENSE                                      # MIT license
+└── CLAUDE.md                                    # AI context documentation
+
+# Tech Stack
+
+- Swift 6.2+ (latest language features)
+- Alamofire 5.10.2+ (networking foundation)
+- SwiftLint 0.61.0+ (code quality enforcement)
+- Swift Package Manager (dependency management)
+- Swift Testing framework (modern testing with @Test, @Suite, #expect)
+- iOS 18.0+ / macOS 15.0+ (platform requirements)
+
+# Important Rules You HAVE TO FOLLOW:
+
+- Always add documentation comments for public API
+- Every time you choose to apply a rule(s), explicitly state the rule(s) in the output. You can abbreviate the rule description to a single word or phrase
+- When folder structure changes, update the project tree in this .cursorrules file
+
+# Swift Specific Rules
+
+## 1. Development Process
+
+- Follow SwiftLint rules. You can find them in `ASC/.swiftlint.yml` file
+- Git branching strategy: feature/bugfix branches → develop → main
+- Code review process before merging
+- Documentation with inline comments and doc comments
+- Comprehensive test coverage with Swift Testing framework
+- Examples excluded from linting (demonstration code)
+- Tests excluded from linting (test-specific patterns allowed)
+
+## 2. Library Architecture
+
+- **Protocol-Oriented Programming**: Core `NetworkRequest` protocol defines API
+- **Type Safety**: Compile-time type checking for requests/responses
+- **Value Types**: Prefer structs for data models and requests
+- **Generic Constraints**: Use associated types for type-safe responses
+- **Sendable Conformance**: All public types must be thread-safe (Sendable)
+- **Minimal Wrapper**: Expose Alamofire features, don't hide them
+- **Alamofire Re-exports**: Re-export Alamofire types for convenience
+- Structure: Client layer → Core protocols → Error handling
+
+## 3. Naming Conventions
+
+- camelCase for vars/funcs, PascalCase for types
+- Verbs for methods (execute, build, map, validate)
+- Boolean: use is/has/should prefixes
+- Clear, descriptive names following Apple style
+- Protocols: Descriptive names (e.g., `NetworkRequest`, `ASCError`)
+- Error types: Suffix with `Error` (e.g., `NetworkError`, `ResponseError`)
+- Files: Match main type name (e.g., `NetworkClient.swift` for `NetworkClient`)
+- Prefixes: Use `ASC` prefix for types that might conflict (e.g., `ASCEmptyResponse`)
+
+## 4. Swift Best Practices
+
+- Strong type system, proper optionals
+- async/await for all async operations (no completion handlers)
+- Swift 6 Sendable conformance for thread safety
+- Prefer let over var
+- Protocol extensions for default implementations
+- Use composition over inheritance
+- Avoid force unwrapping (!)
+- Avoid force casting (as!)
+- Avoid force try (except in tests with known-good data)
+- Use `try await` pattern consistently
+
+## 5. Code Organization
+
+- Use MARK comments to organize code sections
+- Standard MARK structure for classes/structs:
+  - `// MARK: - Properties`
+  - `// MARK: - Initialization`
+  - `// MARK: - Public Methods`
+  - `// MARK: - Private Methods`
+- Extensions for protocol conformance
+- Separate files for each major type
+- Group related functionality
+- Keep files focused and under 400 lines (SwiftLint warning)
+
+## 6. Performance
+
+- Reuse NetworkClient instances (don't create new sessions)
+- Lazy loading where appropriate
+- Memory-efficient file uploads (LargeFileUpload for >10MB)
+- Background task handling with proper threading
+- Proper resource cleanup with Task cancellation
+- Use withTaskCancellationHandler for cancellable operations
+
+## 7. Error Handling
+
+- Custom error hierarchy with `ASCError` protocol
+- Three error types:
+  - `NetworkError`: Connection, timeout, SSL, network failures
+  - `ResponseError`: HTTP status codes, decoding, missing data
+  - `AuthenticationError`: 401, 403, token expiration
+- All errors conform to `LocalizedError` for user-facing messages
+- ErrorMapper translates Alamofire errors to ASC errors
+- Structured error information (status codes, underlying errors)
+- Example:
+  ```swift
+  do {
+      let user = try await client.execute(request)
+  } catch let error as NetworkError {
+      // Handle network-level errors
+  } catch let error as ResponseError {
+      // Handle response/parsing errors
+  } catch let error as AuthenticationError {
+      // Handle auth errors
+  }
+  ```
+
+## 8. Testing & Quality
+
+- Swift Testing framework (NOT XCTest)
+- Use @Test for test functions, @Suite for test suites
+- Use #expect for assertions (not XCTAssert)
+- Test files: ASCErrorTests.swift, AuthInterceptorTests.swift, NetworkRequestTests.swift, URLBuilderTests.swift
+- Test public API behavior, not implementation details
+- Test edge cases and error scenarios
+- Async tests with async/await
+- Example:
+  ```swift
+  @Suite("Network Client Tests")
+  struct NetworkClientTests {
+      @Test("Execute GET request successfully")
+      func testGetRequest() async throws {
+          let user = try await client.execute(GetUserRequest(userId: "123"))
+          #expect(user.id == "123")
+      }
+  }
+  ```
+
+## 9. NetworkRequest Protocol Pattern
+
+- Core protocol defining request configuration
+- Associated type `Response` for type safety
+- Default implementations via protocol extensions
+- Required properties: `path`, `method`
+- Optional properties: headers, parameters, files, timeout, etc.
+- Path parameter substitution: `{placeholder}` in path
+- Path prefix for API versioning
+- Custom validation with `validate(response:)` method
+- Example:
+  ```swift
+  struct GetUserRequest: NetworkRequest {
+      typealias Response = User
+      
+      let userId: String
+      
+      var path: String { "/users/{userId}" }
+      var method: HTTPMethod { .get }
+      var pathParameters: [String: String]? {
+          ["userId": userId]
+      }
+  }
+  ```
+
+## 10. Request Organization Patterns
+
+- **Namespace Enum** (recommended for different response types):
+  ```swift
+  enum UserAPI {
+      struct GetUser: NetworkRequest {
+          typealias Response = User
+          // ...
+      }
+      struct UpdateUser: NetworkRequest {
+          typealias Response = User
+          // ...
+      }
+  }
+  // Usage: try await client.execute(UserAPI.GetUser(id: "123"))
+  ```
+
+- **Simple Enum** (for same response type):
+  ```swift
+  enum PostAPI: NetworkRequest {
+      typealias Response = Post
+      case get(id: String)
+      case create(title: String)
+      
+      var path: String {
+          switch self {
+          case .get(let id): return "/posts/\(id)"
+          case .create: return "/posts"
+          }
+      }
+  }
+  ```
+
+## 11. File Upload Patterns
+
+- Three upload methods based on use case:
+  1. **files** - Simple uploads (field name → Data)
+  2. **fileUploads** - With MIME types (field name → FileUpload)
+  3. **largeFileUploads** - For large files >10MB (array of LargeFileUpload)
+- Large files use file-based encoding (memory-efficient)
+- Multipart form-data automatically used when files present
+- Progress tracking available with `executeWithProgress()`
+- Example:
+  ```swift
+  struct UploadVideoRequest: NetworkRequest {
+      typealias Response = Video
+      let videoURL: URL
+      
+      var path: String { "/videos" }
+      var method: HTTPMethod { .post }
+      var largeFileUploads: [LargeFileUpload]? {
+          [LargeFileUpload(
+              fileURL: videoURL,
+              fieldName: "video",
+              fileName: "video.mp4",
+              mimeType: "video/mp4"
+          )]
+      }
+  }
+  ```
+
+## 12. Advanced Features
+
+- **Request Interceptors**: Alamofire's `RequestInterceptor` for auth, request modification
+- **Event Monitors**: Alamofire's `EventMonitor` for logging, analytics
+- **Retry Policies**: Built-in policies (`.none`, `.conservative`, `.default`, `.aggressive`)
+- **SSL Pinning**: ServerTrustManager support
+- **Progress Tracking**: AsyncThrowingStream with progress updates
+- **Task Cancellation**: Automatic cancellation of underlying Alamofire requests
+- **Custom Validation**: Override `validate(response:)` for business logic checks
+
+## 13. Client Configuration
+
+- `NetworkClientConfiguration` for advanced setup
+- Default headers applied to all requests
+- Multiple interceptors and monitors supported
+- Custom dispatch queues for fine-grained control
+- Timeout configuration (default + per-request override)
+- Cache policy configuration
+- Example:
+  ```swift
+  let config = NetworkClientConfiguration(
+      baseURL: "https://api.example.com",
+      defaultHeaders: ["X-App-Version": "1.0.0"],
+      interceptors: [AuthInterceptor()],
+      eventMonitors: [Logger()],
+      serverTrustManager: trustManager,
+      defaultTimeout: 30.0
+  )
+  let client = NetworkClient(configuration: config)
+  ```
+
+## 14. Documentation Requirements
+
+- All public APIs must have doc comments (enforced by SwiftLint)
+- Use `///` for documentation comments
+- Include description, parameters, returns, throws
+- Code examples in documentation
+- Mark deprecated APIs with `@available`
+- Example:
+  ```swift
+  /// Executes a network request and returns the decoded response.
+  ///
+  /// - Parameter request: The request to execute
+  /// - Returns: Decoded response of type `Request.Response`
+  /// - Throws: `NetworkError`, `ResponseError`, or `AuthenticationError`
+  public func execute<Request: NetworkRequest>(
+      _ request: Request
+  ) async throws -> Request.Response {
+      // ...
+  }
+  ```
+
+## 15. Examples and Demo
+
+- Examples/ directory contains runnable example code
+- Each example demonstrates specific features
+- Examples excluded from linting (demonstration purposes)
+- Demo/ contains SwiftUI app showing real-world usage
+- Update examples when adding new features
+
+## 16. SwiftLint Configuration
+
+- Strict linting enabled (see `ASC/.swiftlint.yml`)
+- Line length: 120 chars warning, 150 error
+- Function length: 50 lines warning, 100 error
+- Cyclomatic complexity: 10 warning, 15 error
+- Force unwrap/cast/try: error level
+- Documentation required for public APIs
+- Custom rules:
+  - Space after comments
+  - Empty line after guard/super
+  - No print() statements (use proper logging)
+  - No force unwrap chaining (!.)
+  - MARK comments required
+
+## 17. Version Control Best Practices
+
+- Feature branches for new features
+- Bug fix branches for fixes
+- Clear commit messages
+- Package.resolved committed for reproducible builds
+- .gitignore for build artifacts, derived data
+- Never force push to main/develop
+
+## 18. Public API Guidelines
+
+- Minimal API surface - expose only what's needed
+- Stable API - avoid breaking changes
+- Clear error messages with recovery suggestions
+- Sendable conformance for thread safety
+- Default implementations for optional protocol requirements
+- Re-export Alamofire types that clients will use
+- Version semantic: MAJOR.MINOR.PATCH
+
+## 19. Thread Safety
+
+- All public types conform to Sendable
+- NetworkClient is thread-safe (can be used from multiple threads)
+- Use @Sendable closures for callbacks
+- Proper actor isolation where needed
+- No shared mutable state without synchronization
+
+## 20. Alamofire Integration
+
+- Wrap Alamofire's Session, not replace it
+- Expose Alamofire's advanced features (interceptors, monitors, trust managers)
+- Re-export commonly used Alamofire types:
+  - HTTPMethod, HTTPHeaders, HTTPHeader
+  - Parameters, ParameterEncoding
+  - JSONEncoding, URLEncoding
+  - RequestInterceptor, EventMonitor
+  - RetryPolicy, ServerTrustManager
+- Translate Alamofire errors to structured ASC errors
+- Use Alamofire's validation and serialization
+
+Follow Apple's Swift API Design Guidelines and Alamofire's best practices for detailed implementation guidance.
