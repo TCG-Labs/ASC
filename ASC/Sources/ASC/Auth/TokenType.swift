@@ -48,8 +48,12 @@ public enum TokenType: Sendable, Equatable {
     }
 }
 
-/// HTTP header keys used by ASC.
-public enum HeaderKeys {
-    /// Authorization header marker for requests that require authentication.
-    public static let authorization: HTTPHeader = .init(name: "X-ASC-Auth-Required", value: "true")
+public extension HTTPHeader {
+    /// Authentication required marker header.
+    ///
+    /// This header marks requests that require authentication.
+    /// When present, `AuthInterceptor` will inject the access token.
+    static var authenticationRequired: Self {
+        .init(name: "X-ASC-Auth-Required", value: "true")
+    }
 }

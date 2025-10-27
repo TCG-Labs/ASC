@@ -120,17 +120,9 @@ public final class NetworkClient: Sendable {
 
     // MARK: - Private Methods
 
-    /// Checks if a request contains files and should use multipart encoding.
+    /// Executes a network request.
     ///
-    /// - Parameter request: The network request to check
-    /// - Returns: True if request contains any files, false otherwise
-    private func isMultipartRequest<Request: NetworkRequest>(_ request: Request) -> Bool {
-        request.files?.isEmpty == false
-    }
-
-    /// Executes a network request, handling both multipart and standard requests.
-    ///
-    /// Centralized request execution that routes to appropriate handler based on request type.
+    /// Centralized request execution that handles both response types.
     /// - Parameters:
     ///   - request: The network request to execute
     ///   - responseType: Expected response type, or nil for empty response
@@ -140,14 +132,6 @@ public final class NetworkClient: Sendable {
         _ request: Request,
         responseType: Response.Type?
     ) async throws -> Response? where Request.Response == Response {
-        if isMultipartRequest(request) {
-            return try await performMultipartRequest(
-                request,
-                responseType: responseType,
-                retryPolicy: request.retryPolicy
-            )
-        }
-
         let urlRequest = try buildURLRequest(from: request)
 
         if let responseType = responseType {
@@ -182,11 +166,67 @@ public final class NetworkClient: Sendable {
             urlRequest.setValue(header.value, forHTTPHeaderField: header.name)
         }
 
-        if request.files == nil, let parameters = request.parameters {
-            urlRequest = try request.parameterEncoding.encode(urlRequest, with: parameters)
+        // Encode parameters if present
+        if let parameters = request.parameters {
+            try encodeParameters(
+                parameters,
+                into: &urlRequest,
+                method: request.method,
+                customEncoder: request.parameterEncoder
+            )
         }
 
         return urlRequest
+    }
+
+    /// Encodes parameters into URLRequest using custom or automatic encoder.
+    ///
+    /// Uses modern Alamofire ParameterEncoder API which works with Encodable directly.
+    ///
+    /// **Automatic encoding (when customEncoder is nil):**
+    /// - GET/HEAD/DELETE: URL-encoded as query string (URLEncodedFormParameterEncoder)
+    /// - POST/PUT/PATCH/other: JSON-encoded in request body (JSONParameterEncoder)
+    ///
+    /// **Custom encoding:**
+    /// If customEncoder is provided, it takes precedence over automatic selection.
+    ///
+    /// - Parameters:
+    ///   - parameters: Encodable parameters to encode
+    ///   - urlRequest: URLRequest to modify (inout)
+    ///   - method: HTTP method (determines encoding strategy when customEncoder is nil)
+    ///   - customEncoder: Optional custom encoder from NetworkRequest
+    /// - Throws: ASCError if encoding fails
+    private func encodeParameters<Params: Encodable & Sendable>(
+        _ parameters: Params,
+        into urlRequest: inout URLRequest,
+        method: HTTPMethod,
+        customEncoder: ParameterEncoder?
+    ) throws {
+        // Use custom encoder if provided, otherwise choose based on HTTP method
+        let encoder: ParameterEncoder
+
+        if let customEncoder = customEncoder {
+            // Custom encoder takes precedence
+            encoder = customEncoder
+        } else {
+            // Automatic selection based on HTTP method
+            switch method {
+            case .get, .head, .delete:
+                // For GET/HEAD/DELETE - query string (URL encoding)
+                encoder = URLEncodedFormParameterEncoder.default
+
+            default:
+                // For POST/PUT/PATCH - JSON in body
+                encoder = JSONParameterEncoder.default
+            }
+        }
+
+        // Encode Encodable → URLRequest directly (no Dictionary conversion!)
+        do {
+            urlRequest = try encoder.encode(parameters, into: urlRequest)
+        } catch {
+            throw ASCError.invalidFormat("Failed to encode parameters: \(error.localizedDescription)")
+        }
     }
 
     /// Performs the actual network request using Alamofire.
@@ -268,112 +308,6 @@ public final class NetworkClient: Sendable {
         }
     }
 
-    /// Performs a multipart file upload request.
-    ///
-    /// Simple multipart upload using Alamofire directly.
-    ///
-    /// Supports Task cancellation - when the Swift Task is cancelled,
-    /// the underlying Alamofire upload request is automatically cancelled.
-    ///
-    /// Calls request.validate() on successful response.
-    private func performMultipartRequest<Request: NetworkRequest, Response: Decodable & Sendable>(
-        _ request: Request,
-        responseType: Response.Type?,
-        retryPolicy: Alamofire.RetryPolicy?
-    ) async throws -> Response? where Request.Response == Response {
-        try Task.checkCancellation()
-        try checkConnectivity()
-
-        let url = try urlBuilder.buildURL(
-            from: request,
-            baseURL: configuration.baseURL
-        )
-        let headers = buildHeaders(for: request)
-
-        // Use request's retry policy, fallback to configuration default
-        let effectiveRetryPolicy = retryPolicy ?? configuration.defaultRetryPolicy
-
-        // Build multipart upload using Alamofire directly
-        let upload = session.upload(
-            multipartFormData: { formData in
-                self.appendFiles(from: request, to: formData)
-                self.appendParameters(from: request, to: formData)
-            },
-            to: url,
-            method: request.method,
-            headers: headers,
-            interceptor: effectiveRetryPolicy
-        )
-
-        // Set request priority
-        upload.task?.priority = configuration.defaultPriority
-
-        // Apply automatic validation if enabled
-        let validatedUpload = configuration.automaticValidation
-            ? upload.validate(statusCode: configuration.acceptableStatusCodes)
-            : upload
-
-        if let responseType = responseType {
-            let uploadRequest = validatedUpload.serializingDecodable(
-                responseType,
-                decoder: configuration.decoder
-            )
-
-            return try await withTaskCancellationHandler {
-                let response = await uploadRequest.response
-                let value = try handleResponse(response)
-
-                try request.validate(response: value)
-
-                return value
-            } onCancel: {
-                upload.cancel()
-            }
-        } else {
-            let uploadRequest = validatedUpload.serializingData()
-
-            try await withTaskCancellationHandler {
-                let response = await uploadRequest.response
-                try validateResponse(response)
-            } onCancel: {
-                upload.cancel()
-            }
-            return nil
-        }
-    }
-
-    // MARK: - Multipart Helpers
-
-    /// Appends files to multipart form data.
-    private func appendFiles<Request: NetworkRequest>(
-        from request: Request,
-        to formData: MultipartFormData
-    ) {
-        guard let files = request.files else { return }
-
-        for (fieldName, data) in files {
-            formData.append(
-                data,
-                withName: fieldName,
-                fileName: "file",
-                mimeType: "application/octet-stream"
-            )
-        }
-    }
-
-    /// Appends parameters to multipart form data.
-    private func appendParameters<Request: NetworkRequest>(
-        from request: Request,
-        to formData: MultipartFormData
-    ) {
-        guard let parameters = request.parameters else { return }
-
-        for (key, value) in parameters {
-            let data = Data("\(value)".utf8)
-            formData.append(data, withName: key)
-        }
-    }
-
     // MARK: - Response Handling
 
     /// Validates response and extracts value.
@@ -426,7 +360,7 @@ public final class NetworkClient: Sendable {
         var headers = configuration.defaultHeaders
 
         if request.isAuthorized {
-            headers.add(HeaderKeys.authorization)
+            headers.add(.authenticationRequired)
         }
 
         if let requestHeaders = request.headers {

@@ -17,18 +17,6 @@ public typealias HTTPHeaders = Alamofire.HTTPHeaders
 /// HTTP header.
 public typealias HTTPHeader = Alamofire.HTTPHeader
 
-/// Request parameters dictionary.
-public typealias Parameters = Alamofire.Parameters
-
-/// Parameter encoding protocol.
-public typealias ParameterEncoding = Alamofire.ParameterEncoding
-
-/// JSON parameter encoding.
-public typealias JSONEncoding = Alamofire.JSONEncoding
-
-/// URL parameter encoding.
-public typealias URLEncoding = Alamofire.URLEncoding
-
 /// Retry policy for requests.
 public typealias RetryPolicy = Alamofire.RetryPolicy
 
@@ -50,6 +38,9 @@ public typealias CachedResponseHandler = Alamofire.CachedResponseHandler
 /// Interceptor combining adapters and retriers.
 public typealias Interceptor = Alamofire.Interceptor
 
+/// Parameter encoder for encoding Encodable parameters.
+public typealias ParameterEncoder = Alamofire.ParameterEncoder
+
 /// Protocol defining a network request configuration.
 ///
 /// Implement this protocol to create type-safe network requests.
@@ -60,6 +51,7 @@ public typealias Interceptor = Alamofire.Interceptor
 /// ```swift
 /// struct GetUserRequest: NetworkRequest {
 ///     typealias Response = User
+///     typealias Parameters = EmptyParameters
 ///
 ///     let userId: String
 ///
@@ -70,6 +62,23 @@ public typealias Interceptor = Alamofire.Interceptor
 public protocol NetworkRequest: Sendable {
     /// The expected response type conforming to Decodable.
     associatedtype Response: Decodable & Sendable
+
+    /// The parameters type conforming to Encodable.
+    ///
+    /// Use `EmptyParameters` for requests without parameters (GET, DELETE, etc.).
+    /// For requests with parameters, define a custom Encodable struct.
+    ///
+    /// Example:
+    /// ```swift
+    /// struct CreateUserRequest: NetworkRequest {
+    ///     struct UserData: Encodable, Sendable {
+    ///         let email: String
+    ///         let name: String
+    ///     }
+    ///     typealias Parameters = UserData
+    /// }
+    /// ```
+    associatedtype Parameters: Encodable & Sendable
 
     /// The base URL for the request.
     ///
@@ -91,17 +100,64 @@ public protocol NetworkRequest: Sendable {
     /// Request-specific headers take precedence over defaults.
     var headers: HTTPHeaders? { get }
 
-    /// Request parameters.
+    /// Request parameters (type-safe Encodable).
     ///
-    /// Parameters to be encoded in the request.
-    /// The encoding location and format depends on `parameterEncoding`.
+    /// Parameters are automatically encoded based on HTTP method:
+    /// - GET/HEAD/DELETE: URL-encoded as query string
+    /// - POST/PUT/PATCH: JSON-encoded in request body
+    ///
+    /// Example:
+    /// ```swift
+    /// struct SearchRequest: NetworkRequest {
+    ///     struct Query: Encodable, Sendable {
+    ///         let q: String
+    ///         let limit: Int
+    ///     }
+    ///     typealias Parameters = Query
+    ///
+    ///     var parameters: Query? {
+    ///         Query(q: "swift", limit: 10)
+    ///     }
+    /// }
+    /// ```
     var parameters: Parameters? { get }
 
-    /// Parameter encoding strategy.
+    /// Custom parameter encoder for this request.
     ///
-    /// Determines how parameters should be encoded.
-    /// Default is JSON encoding.
-    var parameterEncoding: any ParameterEncoding { get }
+    /// If specified, this encoder will be used instead of the automatic encoder selection.
+    /// This allows fine-grained control over parameter encoding when needed.
+    ///
+    /// Common use cases:
+    /// - Custom array encoding (brackets, no brackets, indexed)
+    /// - Custom boolean encoding (0/1 vs true/false)
+    /// - Custom date formatting in query strings
+    /// - Custom nested object encoding
+    ///
+    /// Example:
+    /// ```swift
+    /// struct CreateUserRequest: NetworkRequest {
+    ///     struct UserData: Encodable, Sendable {
+    ///         let name: String
+    ///         let email: String
+    ///     }
+    ///     typealias Parameters = UserData
+    ///
+    ///     var path: String { "/users" }
+    ///     var method: HTTPMethod { .post }
+    ///
+    ///     var parameters: UserData? {
+    ///         UserData(name: "John", email: "john@example.com")
+    ///     }
+    ///
+    ///     // Custom encoder - use URL encoding in POST body instead of JSON
+    ///     var parameterEncoder: ParameterEncoder? {
+    ///         URLEncodedFormParameterEncoder.default
+    ///     }
+    /// }
+    /// // POST body will be: name=John&email=john@example.com (URL-encoded)
+    /// // Instead of default: {"name":"John","email":"john@example.com"} (JSON)
+    /// ```
+    var parameterEncoder: ParameterEncoder? { get }
 
     /// Request timeout interval in seconds.
     ///
@@ -114,12 +170,6 @@ public protocol NetworkRequest: Sendable {
     var cachePolicy: URLRequest.CachePolicy? { get }
 
     var isAuthorized: Bool { get }
-
-    /// Files to upload in a multipart request.
-    ///
-    /// Dictionary mapping field names to file data.
-    /// When specified, the request automatically becomes a multipart/form-data request.
-    var files: [String: Data]? { get }
 
     /// Validates the response after successful decoding.
     ///
@@ -166,17 +216,14 @@ public extension NetworkRequest {
     /// Default parameters are nil
     var parameters: Parameters? { nil }
 
-    /// Default encoding is JSON
-    var parameterEncoding: any ParameterEncoding { JSONEncoding.default }
+    /// Default parameter encoder is nil (automatic selection based on HTTP method)
+    var parameterEncoder: ParameterEncoder? { nil }
 
     /// Default timeout is nil (use client's default)
     var timeout: TimeInterval? { nil }
 
     /// Default cache policy is nil (use client's default)
     var cachePolicy: URLRequest.CachePolicy? { nil }
-
-    /// Default files are nil
-    var files: [String: Data]? { nil }
 
     /// Default authorization is false
     var isAuthorized: Bool { false }
@@ -187,4 +234,14 @@ public extension NetworkRequest {
     func validate(response: Response) throws {
         // No validation by default
     }
+}
+
+// MARK: - EmptyParameters Extension
+
+/// Extension for requests without parameters.
+///
+/// Provides default nil implementation for parameters property when using EmptyParameters.
+public extension NetworkRequest where Parameters == EmptyParameters {
+    /// Default implementation returns nil for empty parameters.
+    var parameters: EmptyParameters? { nil }
 }

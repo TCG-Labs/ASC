@@ -10,6 +10,7 @@ struct NetworkRequestTests {
 
     struct MinimalRequest: NetworkRequest {
         typealias Response = EmptyResponse
+        typealias Parameters = EmptyParameters
 
         var path: String { "/test" }
         var method: HTTPMethod { .get }
@@ -18,28 +19,28 @@ struct NetworkRequestTests {
     struct FullyConfiguredRequest: NetworkRequest {
         typealias Response = EmptyResponse
 
+        struct Params: Encodable, Sendable {
+            let key: String
+        }
+        typealias Parameters = Params
+
         var baseURL: String? { "https://custom.api.com" }
         var path: String { "/users" }
         var method: HTTPMethod { .post }
         var headers: HTTPHeaders? {
             [HTTPHeader(name: "X-Custom", value: "test")]
         }
-        var parameters: Parameters? {
-            ["key": "value"]
-        }
-        var parameterEncoding: any ParameterEncoding {
-            URLEncoding.default
+        var parameters: Params? {
+            Params(key: "value")
         }
         var timeout: TimeInterval? { 60.0 }
         var cachePolicy: URLRequest.CachePolicy? { .reloadIgnoringLocalCacheData }
-        var files: [String: Data]? {
-            ["file": Data("content".utf8)]
-        }
         var retryPolicy: RetryPolicy? { .default }
     }
 
     struct RequestWithValidation: NetworkRequest {
         typealias Response = TestResponse
+        typealias Parameters = EmptyParameters
 
         struct TestResponse: Codable, Sendable {
             let success: Bool
@@ -76,12 +77,6 @@ struct NetworkRequestTests {
         #expect(request.parameters == nil)
     }
 
-    @Test("NetworkRequest default encoding is JSON")
-    func testDefaultEncoding() {
-        let request = MinimalRequest()
-        #expect(request.parameterEncoding is JSONEncoding)
-    }
-
     @Test("NetworkRequest default timeout is nil")
     func testDefaultTimeout() {
         let request = MinimalRequest()
@@ -92,12 +87,6 @@ struct NetworkRequestTests {
     func testDefaultCachePolicy() {
         let request = MinimalRequest()
         #expect(request.cachePolicy == nil)
-    }
-
-    @Test("NetworkRequest default files are nil")
-    func testDefaultFiles() {
-        let request = MinimalRequest()
-        #expect(request.files == nil)
     }
 
     @Test("NetworkRequest default retry policy is nil")
@@ -132,11 +121,43 @@ struct NetworkRequestTests {
         #expect(request.method == .post)
         #expect(request.headers != nil)
         #expect(request.parameters != nil)
-        #expect(request.parameterEncoding is URLEncoding)
         #expect(request.timeout == 60.0)
         #expect(request.cachePolicy == .reloadIgnoringLocalCacheData)
-        #expect(request.files != nil)
         #expect(request.retryPolicy != nil)
+    }
+
+    @Test("NetworkRequest default parameter encoder is nil")
+    func testDefaultParameterEncoder() {
+        let request = MinimalRequest()
+        #expect(request.parameterEncoder == nil)
+    }
+
+    @Test("NetworkRequest can specify custom parameter encoder")
+    func testCustomParameterEncoder() {
+        struct CustomEncoderRequest: NetworkRequest {
+            typealias Response = EmptyResponse
+
+            struct Query: Encodable, Sendable {
+                let tags: [String]
+            }
+            typealias Parameters = Query
+
+            var path: String { "/search" }
+            var method: HTTPMethod { .get }
+
+            var parameters: Query? {
+                Query(tags: ["swift", "ios"])
+            }
+
+            var parameterEncoder: ParameterEncoder? {
+                // Use custom encoder (e.g., JSONParameterEncoder for GET request)
+                // Normally GET uses URLEncodedFormParameterEncoder, but we can override
+                JSONParameterEncoder.default
+            }
+        }
+
+        let request = CustomEncoderRequest()
+        #expect(request.parameterEncoder != nil)
     }
 
     @Test("Request validation throws error when fails")

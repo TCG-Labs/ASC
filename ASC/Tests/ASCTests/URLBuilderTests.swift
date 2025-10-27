@@ -10,6 +10,7 @@ struct URLBuilderTests {
 
     struct TestRequest: NetworkRequest {
         typealias Response = EmptyResponse
+        typealias Parameters = EmptyParameters
 
         var baseURL: String?
         var path: String

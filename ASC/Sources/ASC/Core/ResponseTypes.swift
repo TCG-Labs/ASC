@@ -293,3 +293,25 @@ public extension HTTPURLResponse {
         HTTPResponseType(statusCode: statusCode)
     }
 }
+
+// MARK: - Empty Parameters
+
+/// Empty parameters for requests without parameters.
+///
+/// Use this type for GET, DELETE, or other requests that don't send parameters.
+///
+/// Example:
+/// ```swift
+/// struct GetUserRequest: NetworkRequest {
+///     typealias Response = User
+///     typealias Parameters = EmptyParameters
+///
+///     let userId: String
+///
+///     var path: String { "/users/\(userId)" }
+///     var method: HTTPMethod { .get }
+/// }
+/// ```
+public struct EmptyParameters: Encodable, Sendable {
+    public init() {}
+}

@@ -76,7 +76,6 @@ Defines all network request parameters:
 - Headers, query parameters, body
 - Response type (Codable)
 - Retry policy, timeout configuration
-- **File uploads** via simple multipart/form-data
 
 **Organization Pattern**: Use **Namespace Enum + Nested Structs**:
 ```swift
@@ -132,13 +131,7 @@ Unified `ASCError` enum with three categories:
 - **Authentication Errors**: Token expired, unauthorized
 - All errors provide errorDescription, recoverySuggestion, and failureReason
 
-**4. File Uploads**
-Simple multipart/form-data support via `files` property:
-- Dictionary mapping field names to Data
-- Automatic multipart encoding via Alamofire
-- Default MIME type: application/octet-stream
-
-**5. Network Connectivity Monitoring**
+**4. Network Connectivity Monitoring**
 Automatic connectivity checking before requests:
 - Real-time monitoring via Apple's Network.framework
 - Configurable via `connectivityCheckEnabled` (default: true)
@@ -146,7 +139,7 @@ Automatic connectivity checking before requests:
 - Supports reactive monitoring via AsyncStream
 - Connection type detection (Wi-Fi, cellular, wired, other)
 
-**6. RetryPolicy**
+**5. RetryPolicy**
 Convenient factory methods for Alamofire.RetryPolicy:
 - `.none` → No retry
 - `.default` → 3 retries with exponential backoff
@@ -365,26 +358,6 @@ Task {
         }
     }
 }
-```
-
-### File Upload
-
-```swift
-import ASC
-
-enum UserAPI {
-    struct UploadAvatar: NetworkRequest {
-        typealias Response = User
-        let userId: String
-        let imageData: Data
-
-        var path: String { "/users/\(userId)/avatar" }
-        var method: HTTPMethod { .post }
-        var files: [String: Data]? { ["avatar": imageData] }
-    }
-}
-
-let user = try await client.execute(UserAPI.UploadAvatar(userId: "123", imageData: avatarData))
 ```
 
 ### RetryPolicy Configuration
