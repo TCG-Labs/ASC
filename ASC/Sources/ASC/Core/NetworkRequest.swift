@@ -68,63 +68,13 @@ public protocol NetworkRequest: Sendable {
     /// If not specified, the client's default cache policy will be used.
     var cachePolicy: URLRequest.CachePolicy? { get }
 
-    /// Path parameters for template substitution.
-    ///
-    /// Used to substitute placeholders in the path.
-    /// Example: path = "/users/{userId}" with pathParameters = ["userId": "123"]
-    /// results in "/users/123"
-    var pathParameters: [String: String]? { get }
-
-    /// Common path prefix to be prepended to the path.
-    ///
-    /// Useful for API versioning or common prefixes.
-    /// Example: pathPrefix = "/api/v1" with path = "/users"
-    /// results in "/api/v1/users"
-    var pathPrefix: String? { get }
-
     var isAuthorized: Bool { get }
 
     /// Files to upload in a multipart request.
     ///
     /// Dictionary mapping field names to file data.
     /// When specified, the request automatically becomes a multipart/form-data request.
-    ///
-    /// **Note:** For small files only (< 10MB). For larger files, use `largeFileUploads`.
     var files: [String: Data]? { get }
-
-    /// Files with custom metadata (filename, MIME type).
-    ///
-    /// Use this when you need fine-grained control over file uploads,
-    /// including custom MIME types and filenames.
-    ///
-    /// Example:
-    /// ```swift
-    /// var fileUploads: [String: FileUpload]? {
-    ///     ["photo": .jpeg(data: imageData, fileName: "profile.jpg")]
-    /// }
-    /// ```
-    ///
-    /// **Note:** For small files only (< 10MB). For larger files, use `largeFileUploads`.
-    var fileUploads: [String: FileUpload]? { get }
-
-    /// Large files for file-based encoding.
-    ///
-    /// Use this for large files (> 10MB) to avoid loading all data into memory.
-    /// Files will be streamed from disk during upload, which is memory-efficient
-    /// for videos and other large files.
-    ///
-    /// Example:
-    /// ```swift
-    /// var largeFileUploads: [LargeFileUpload]? {
-    ///     [LargeFileUpload(
-    ///         fileURL: videoURL,
-    ///         fieldName: "video",
-    ///         fileName: "my-video.mp4",
-    ///         mimeType: "video/mp4"
-    ///     )]
-    /// }
-    /// ```
-    var largeFileUploads: [LargeFileUpload]? { get }
 
     /// Validates the response after successful decoding.
     ///
@@ -180,21 +130,8 @@ public extension NetworkRequest {
     /// Default cache policy is nil (use client's default)
     var cachePolicy: URLRequest.CachePolicy? { nil }
 
-    /// Default path parameters are nil
-    var pathParameters: [String: String]? { nil }
-
-    /// Default path prefix is nil
-    var pathPrefix: String? { nil }
-    
-
     /// Default files are nil
     var files: [String: Data]? { nil }
-
-    /// Default file uploads are nil
-    var fileUploads: [String: FileUpload]? { nil }
-
-    /// Default large file uploads are nil
-    var largeFileUploads: [LargeFileUpload]? { nil }
 
     /// Default implementation performs no validation.
     ///

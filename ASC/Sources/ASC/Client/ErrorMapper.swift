@@ -50,13 +50,13 @@ internal struct ErrorMapper {
             return mapSerializationError(reason, data: data)
         }
 
-        return NetworkError.networkFailure(error)
+        return ASCError.networkFailure(error)
     }
 
     // MARK: - Private Methods
 
-    /// Maps URLError to NetworkError.
-    private func mapURLError(_ error: URLError) -> NetworkError {
+    /// Maps URLError to ASCError.
+    private func mapURLError(_ error: URLError) -> ASCError {
         switch error.code {
         case .notConnectedToInternet, .networkConnectionLost:
             return .noConnection
@@ -78,13 +78,13 @@ internal struct ErrorMapper {
         }
     }
 
-    /// Maps validation failure to ResponseError.
+    /// Maps validation failure to ASCError.
     private func mapValidationError(
         _ reason: AFError.ResponseValidationFailureReason,
         data: Data?
-    ) -> ResponseError {
+    ) -> ASCError {
         guard case .unacceptableStatusCode(let code) = reason else {
-            return ResponseError.validationFailed("Response validation failed")
+            return ASCError.validationFailed("Response validation failed")
         }
 
         let errorMessage = extractErrorMessage(from: data)
@@ -92,19 +92,19 @@ internal struct ErrorMapper {
 
         switch responseType {
         case .success:
-            return ResponseError.invalidStatusCode(code, data)
+            return ASCError.invalidStatusCode(code, data)
 
         case let .clientError(statusCode, message):
             if statusCode == HTTPStatus.unauthorized {
-                return ResponseError.clientError(statusCode, message ?? "Unauthorized")
+                return ASCError.clientError(statusCode, message ?? "Unauthorized")
             }
-            return ResponseError.clientError(statusCode, message)
+            return ASCError.clientError(statusCode, message)
 
         case let .serverError(statusCode, message):
-            return ResponseError.serverError(statusCode, message ?? "Server error")
+            return ASCError.serverError(statusCode, message ?? "Server error")
 
         case .informational, .redirection, .undefined:
-            return ResponseError.invalidStatusCode(code, data)
+            return ASCError.invalidStatusCode(code, data)
         }
     }
 
@@ -181,19 +181,19 @@ internal struct ErrorMapper {
         return nil
     }
 
-    /// Maps serialization failure to ResponseError.
+    /// Maps serialization failure to ASCError.
     private func mapSerializationError(
         _ reason: AFError.ResponseSerializationFailureReason,
         data: Data?
-    ) -> ResponseError {
+    ) -> ASCError {
         if case .decodingFailed(let error) = reason, let data = data {
-            return ResponseError.decodingFailed(error, data)
+            return ASCError.decodingFailed(error, data)
         }
 
         if case .inputDataNilOrZeroLength = reason {
-            return ResponseError.missingData
+            return ASCError.missingData
         }
 
-        return ResponseError.invalidFormat("Response serialization failed")
+        return ASCError.invalidFormat("Response serialization failed")
     }
 }

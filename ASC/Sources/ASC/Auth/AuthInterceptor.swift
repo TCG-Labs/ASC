@@ -59,7 +59,7 @@ public final class AuthInterceptor: RequestInterceptor, @unchecked Sendable {
         urlRequest.headers.remove(name: HeaderKeys.authorization.name)
 
         guard let accessToken = storage.accessToken else {
-            completion(.failure(AuthenticationError.invalidToken))
+            completion(.failure(ASCError.invalidToken))
             return
         }
 

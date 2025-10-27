@@ -196,12 +196,6 @@ public struct NetworkClientConfiguration: Sendable {
     /// Dispatch queue for serialization operations.
     public let serializationQueue: DispatchQueue
 
-    /// Threshold for using file-based multipart encoding (in bytes).
-    ///
-    /// Files larger than this threshold will use file-based encoding to avoid memory issues.
-    /// Default is 10MB (10,000,000 bytes).
-    public let multipartFileSizeThreshold: Int
-
     public let tokenStorage: TokenStorage?
 
     /// Log level for built-in logger.
@@ -241,20 +235,6 @@ public struct NetworkClientConfiguration: Sendable {
     /// Controls URLSession network access policies (cellular, expensive, constrained).
     /// Default allows all network types.
     public let networkConstraints: NetworkConstraints
-
-    /// Query parameters added to ALL requests.
-    ///
-    /// Useful for api_key, client_id, version, etc.
-    /// Request-specific parameters take precedence.
-    /// Default is nil.
-    public let defaultQueryParameters: [String: String]?
-
-    /// Path prefix added to all requests.
-    ///
-    /// Useful for API versioning (e.g., "/api/v1").
-    /// Combined before request's pathPrefix.
-    /// Default is nil.
-    public let defaultPathPrefix: String?
 
     /// HTTP response validation options.
     ///
@@ -328,15 +308,12 @@ public struct NetworkClientConfiguration: Sendable {
     ///   - rootQueue: Root dispatch queue (default: from NetworkClientConfigurationDefaults)
     ///   - requestQueue: Request dispatch queue (default: from NetworkClientConfigurationDefaults)
     ///   - serializationQueue: Serialization dispatch queue (default: from NetworkClientConfigurationDefaults)
-    ///   - multipartFileSizeThreshold: Threshold for file-based encoding (default: 10MB)
     ///   - logLevel: Log level for built-in logger (default: .none)
     ///   - connectivityCheckEnabled: Enable automatic connectivity checking (default: true)
     ///   - decoder: Custom JSON decoder (default: from NetworkClientConfigurationDefaults)
     ///   - encoder: Custom JSON encoder (default: from NetworkClientConfigurationDefaults)
     ///   - defaultRetryPolicy: Default retry policy for all requests (default: nil)
     ///   - networkConstraints: Network access constraints (default: .default)
-    ///   - defaultQueryParameters: Query parameters added to all requests (default: nil)
-    ///   - defaultPathPrefix: Path prefix added to all requests (default: nil)
     ///   - validation: HTTP response validation options (default: .default)
     ///   - defaultPriority: Default priority for all requests (default: 0.5)
     public init(
@@ -353,7 +330,6 @@ public struct NetworkClientConfiguration: Sendable {
         rootQueue: DispatchQueue = NetworkClientConfigurationDefaults.rootQueue,
         requestQueue: DispatchQueue = NetworkClientConfigurationDefaults.requestQueue,
         serializationQueue: DispatchQueue = NetworkClientConfigurationDefaults.serializationQueue,
-        multipartFileSizeThreshold: Int = ASCConstants.FileUpload.defaultSizeThreshold,
         tokenStorage: TokenStorage? = nil,
         logLevel: ASCLogLevel = .none,
         connectivityCheckEnabled: Bool = true,
@@ -361,8 +337,6 @@ public struct NetworkClientConfiguration: Sendable {
         encoder: JSONEncoder = NetworkClientConfigurationDefaults.encoder,
         defaultRetryPolicy: Alamofire.RetryPolicy? = nil,
         networkConstraints: NetworkConstraints = .default,
-        defaultQueryParameters: [String: String]? = nil,
-        defaultPathPrefix: String? = nil,
         validation: ValidationOptions = .default,
         defaultPriority: Float = 0.5
     ) {
@@ -388,8 +362,6 @@ public struct NetworkClientConfiguration: Sendable {
         self.encoder = encoder
         self.defaultRetryPolicy = defaultRetryPolicy
         self.networkConstraints = networkConstraints
-        self.defaultQueryParameters = defaultQueryParameters
-        self.defaultPathPrefix = defaultPathPrefix
         self.validation = validation
         self.defaultPriority = defaultPriority
 
@@ -413,7 +385,6 @@ public struct NetworkClientConfiguration: Sendable {
         self.rootQueue = rootQueue
         self.requestQueue = requestQueue
         self.serializationQueue = serializationQueue
-        self.multipartFileSizeThreshold = multipartFileSizeThreshold
         self.connectivityCheckEnabled = connectivityCheckEnabled
     }
 
