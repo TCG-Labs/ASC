@@ -3,7 +3,52 @@
 
 // Core protocol defining network request configuration.
 
+@_exported import Alamofire
 import Foundation
+
+// MARK: - Type Aliases
+
+/// HTTP method for requests.
+public typealias HTTPMethod = Alamofire.HTTPMethod
+
+/// HTTP headers collection.
+public typealias HTTPHeaders = Alamofire.HTTPHeaders
+
+/// HTTP header.
+public typealias HTTPHeader = Alamofire.HTTPHeader
+
+/// Request parameters dictionary.
+public typealias Parameters = Alamofire.Parameters
+
+/// Parameter encoding protocol.
+public typealias ParameterEncoding = Alamofire.ParameterEncoding
+
+/// JSON parameter encoding.
+public typealias JSONEncoding = Alamofire.JSONEncoding
+
+/// URL parameter encoding.
+public typealias URLEncoding = Alamofire.URLEncoding
+
+/// Retry policy for requests.
+public typealias RetryPolicy = Alamofire.RetryPolicy
+
+/// Request interceptor for adapting and retrying requests.
+public typealias RequestInterceptor = Alamofire.RequestInterceptor
+
+/// Event monitor for observing request lifecycle.
+public typealias EventMonitor = Alamofire.EventMonitor
+
+/// Server trust manager for SSL/TLS validation.
+public typealias ServerTrustManager = Alamofire.ServerTrustManager
+
+/// Redirect handler for custom redirect logic.
+public typealias RedirectHandler = Alamofire.RedirectHandler
+
+/// Cached response handler for custom caching behavior.
+public typealias CachedResponseHandler = Alamofire.CachedResponseHandler
+
+/// Interceptor combining adapters and retriers.
+public typealias Interceptor = Alamofire.Interceptor
 
 /// Protocol defining a network request configuration.
 ///
@@ -68,61 +113,13 @@ public protocol NetworkRequest: Sendable {
     /// If not specified, the client's default cache policy will be used.
     var cachePolicy: URLRequest.CachePolicy? { get }
 
-    /// Path parameters for template substitution.
-    ///
-    /// Used to substitute placeholders in the path.
-    /// Example: path = "/users/{userId}" with pathParameters = ["userId": "123"]
-    /// results in "/users/123"
-    var pathParameters: [String: String]? { get }
-
-    /// Common path prefix to be prepended to the path.
-    ///
-    /// Useful for API versioning or common prefixes.
-    /// Example: pathPrefix = "/api/v1" with path = "/users"
-    /// results in "/api/v1/users"
-    var pathPrefix: String? { get }
+    var isAuthorized: Bool { get }
 
     /// Files to upload in a multipart request.
     ///
     /// Dictionary mapping field names to file data.
     /// When specified, the request automatically becomes a multipart/form-data request.
-    ///
-    /// **Note:** For small files only (< 10MB). For larger files, use `largeFileUploads`.
     var files: [String: Data]? { get }
-
-    /// Files with custom metadata (filename, MIME type).
-    ///
-    /// Use this when you need fine-grained control over file uploads,
-    /// including custom MIME types and filenames.
-    ///
-    /// Example:
-    /// ```swift
-    /// var fileUploads: [String: FileUpload]? {
-    ///     ["photo": .jpeg(data: imageData, fileName: "profile.jpg")]
-    /// }
-    /// ```
-    ///
-    /// **Note:** For small files only (< 10MB). For larger files, use `largeFileUploads`.
-    var fileUploads: [String: FileUpload]? { get }
-
-    /// Large files for file-based encoding.
-    ///
-    /// Use this for large files (> 10MB) to avoid loading all data into memory.
-    /// Files will be streamed from disk during upload, which is memory-efficient
-    /// for videos and other large files.
-    ///
-    /// Example:
-    /// ```swift
-    /// var largeFileUploads: [LargeFileUpload]? {
-    ///     [LargeFileUpload(
-    ///         fileURL: videoURL,
-    ///         fieldName: "video",
-    ///         fileName: "my-video.mp4",
-    ///         mimeType: "video/mp4"
-    ///     )]
-    /// }
-    /// ```
-    var largeFileUploads: [LargeFileUpload]? { get }
 
     /// Validates the response after successful decoding.
     ///
@@ -178,20 +175,11 @@ public extension NetworkRequest {
     /// Default cache policy is nil (use client's default)
     var cachePolicy: URLRequest.CachePolicy? { nil }
 
-    /// Default path parameters are nil
-    var pathParameters: [String: String]? { nil }
-
-    /// Default path prefix is nil
-    var pathPrefix: String? { nil }
-
     /// Default files are nil
     var files: [String: Data]? { nil }
 
-    /// Default file uploads are nil
-    var fileUploads: [String: FileUpload]? { nil }
-
-    /// Default large file uploads are nil
-    var largeFileUploads: [LargeFileUpload]? { nil }
+    /// Default authorization is false
+    var isAuthorized: Bool { false }
 
     /// Default implementation performs no validation.
     ///
