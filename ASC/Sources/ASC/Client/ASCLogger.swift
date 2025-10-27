@@ -1,11 +1,9 @@
 // ASCLogger.swift
 // ASC - Alamofire Swift Client
 
-// Built-in debug logger using OSLog.
-
-import Alamofire
 import Foundation
 import os.log
+import Synchronization
 
 /// Log level for ASC logger.
 public enum ASCLogLevel: Int, Sendable {
@@ -30,6 +28,12 @@ public enum ASCLogLevel: Int, Sendable {
 /// Logs HTTP requests and responses with configurable log levels.
 /// Uses unified logging system (os.log) for better performance and privacy.
 ///
+/// Features enhanced visual structure with:
+/// - Request numbering for tracking
+/// - Visual separators between requests
+/// - Grouped information blocks
+/// - Improved JSON formatting
+///
 /// Example:
 /// ```swift
 /// let config = NetworkClientConfiguration(
@@ -41,16 +45,11 @@ public enum ASCLogLevel: Int, Sendable {
 public final class ASCLogger: EventMonitor, Sendable {
     // MARK: - Properties
 
-    /// Shared dispatch queue for all logger instances.
     private static let sharedQueue = DispatchQueue(label: "com.asc.logger", qos: .utility)
-
-    /// The log level for this logger.
+    private let requestCounter = Mutex<Int>(0)
     private let logLevel: ASCLogLevel
-
-    /// OSLog logger instance.
     private let logger: Logger
 
-    /// Dispatch queue for EventMonitor callbacks.
     public var queue: DispatchQueue {
         Self.sharedQueue
     }
@@ -74,28 +73,34 @@ public final class ASCLogger: EventMonitor, Sendable {
 
     // MARK: - EventMonitor
 
-    /// Called when a request is about to start.
     public func requestDidResume(_ request: Request) {
         guard logLevel.rawValue >= ASCLogLevel.info.rawValue else { return }
+        guard let urlRequest = request.request else { return }
 
-        if let urlRequest = request.request {
-            let method = urlRequest.httpMethod ?? "GET"
-            let url = urlRequest.url?.absoluteString ?? "unknown"
-            let methodEmoji = methodEmoji(for: method)
-
-            logger.info("\(methodEmoji) \(method) \(url)")
-
-            if logLevel.rawValue >= ASCLogLevel.debug.rawValue {
-                logHeaders(urlRequest.allHTTPHeaderFields)
-            }
-
-            if logLevel.rawValue >= ASCLogLevel.verbose.rawValue {
-                logBody(urlRequest.httpBody)
-            }
+        let requestNumber = requestCounter.withLock { counter in
+            counter += 1
+            return counter
         }
+
+        let method = urlRequest.httpMethod ?? "GET"
+        let url = urlRequest.url?.absoluteString ?? "unknown"
+        let methodEmoji = methodEmoji(for: method)
+
+        logger.info("┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+        logger.info("┃ 📡 REQUEST #\(requestNumber)")
+        logger.info("┃ \(methodEmoji) \(method) \(url)")
+
+        if logLevel.rawValue >= ASCLogLevel.debug.rawValue {
+            logHeaders(urlRequest.allHTTPHeaderFields, prefix: "┃")
+        }
+
+        if logLevel.rawValue >= ASCLogLevel.verbose.rawValue {
+            logBody(urlRequest.httpBody, prefix: "┃")
+        }
+
+        logger.info("┗━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
     }
 
-    /// Called when a request finishes successfully.
     public func request<Value>(
         _ request: DataRequest,
         didParseResponse response: DataResponse<Value, AFError>
@@ -106,18 +111,25 @@ public final class ASCLogger: EventMonitor, Sendable {
             let statusCode = httpResponse.statusCode
             let url = httpResponse.url?.absoluteString ?? "unknown"
             let duration = response.metrics?.taskInterval.duration ?? 0
+            let dataSize = response.data?.count ?? 0
 
             let statusEmoji = statusEmoji(for: statusCode)
             let durationEmoji = durationEmoji(for: duration)
-            logger.info("← \(statusEmoji) \(statusCode) \(url) \(durationEmoji) \(String(format: "%.2f", duration))s")
+
+            logger.info("┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+            logger.info("┃ 📥 RESPONSE")
+            logger.info("┃ \(statusEmoji) \(statusCode) \(url)")
+            logger.info("┃ \(durationEmoji) Duration: \(String(format: "%.3f", duration))s • Size: \(self.formatBytes(dataSize))")
 
             if logLevel.rawValue >= ASCLogLevel.debug.rawValue {
-                logHeaders(httpResponse.allHeaderFields as? [String: String])
+                logHeaders(httpResponse.allHeaderFields as? [String: String], prefix: "┃")
             }
 
             if logLevel.rawValue >= ASCLogLevel.verbose.rawValue {
-                logResponseBody(response.data)
+                logResponseBody(response.data, prefix: "┃")
             }
+
+            logger.info("┗━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
         }
 
         if let error = response.error {
@@ -125,7 +137,6 @@ public final class ASCLogger: EventMonitor, Sendable {
         }
     }
 
-    /// Called when a request fails.
     public func request(
         _ request: Request,
         didCompleteTask task: URLSessionTask,
@@ -138,59 +149,94 @@ public final class ASCLogger: EventMonitor, Sendable {
 
     // MARK: - Private Methods
 
-    /// Logs HTTP headers.
-    private func logHeaders(_ headers: [String: String]?) {
+    private func logHeaders(_ headers: [String: String]?, prefix: String = "") {
         guard let headers = headers, !headers.isEmpty else { return }
 
-        logger.debug("  📋 Headers:")
+        logger.debug("\(prefix) ┃")
+        logger.debug("\(prefix) ┣━━ 📋 Headers (\(headers.count))")
         for (key, value) in headers.sorted(by: { $0.key < $1.key }) {
             let sanitizedValue = shouldRedact(headerName: key) ? "🔒 <redacted>" : value
-            logger.debug("    \(key): \(sanitizedValue)")
+            logger.debug("\(prefix) ┃   • \(key): \(sanitizedValue)")
         }
     }
 
-    /// Logs request body.
-    private func logBody(_ body: Data?) {
+    private func logBody(_ body: Data?, prefix: String = "") {
         guard let body = body else { return }
 
-        if let jsonString = prettyPrintJSON(body) {
-            logger.debug("  📦 Body (JSON):\n\(jsonString)")
+        logger.debug("\(prefix) ┃")
+        logger.debug("\(prefix) ┣━━ 📦 Request Body (\(self.formatBytes(body.count)))")
+
+        if let jsonString = prettyPrintJSON(body, maxLines: 20) {
+            for line in jsonString.split(separator: "\n") {
+                logger.debug("\(prefix) ┃   \(line)")
+            }
         } else if let string = String(data: body, encoding: .utf8) {
-            logger.debug("  📝 Body (Text): \(string)")
+            let preview = string.prefix(500)
+            logger.debug("\(prefix) ┃   📝 Text: \(preview)\(string.count > 500 ? "..." : "")")
         } else {
-            logger.debug("  💾 Body (Binary): \(body.count) bytes")
+            logger.debug("\(prefix) ┃   💾 Binary: \(body.count) bytes")
         }
     }
 
-    /// Logs response body.
-    private func logResponseBody(_ data: Data?) {
+    private func logResponseBody(_ data: Data?, prefix: String = "") {
         guard let data = data else { return }
 
-        if let jsonString = prettyPrintJSON(data) {
-            logger.debug("  📄 Response (JSON):\n\(jsonString)")
+        logger.debug("\(prefix) ┃")
+        logger.debug("\(prefix) ┣━━ 📄 Response Body (\(self.formatBytes(data.count)))")
+
+        if let jsonString = prettyPrintJSON(data, maxLines: 50) {
+            for line in jsonString.split(separator: "\n") {
+                logger.debug("\(prefix) ┃   \(line)")
+            }
         } else if let string = String(data: data, encoding: .utf8) {
-            logger.debug("  📃 Response (Text): \(string)")
+            let preview = string.prefix(500)
+            logger.debug("\(prefix) ┃   📃 Text: \(preview)\(string.count > 500 ? "..." : "")")
         } else {
-            logger.debug("  💿 Response (Binary): \(data.count) bytes")
+            logger.debug("\(prefix) ┃   💿 Binary: \(data.count) bytes")
         }
     }
 
-    /// Logs an error.
     private func logError(_ error: AFError, for request: Request) {
         guard logLevel.rawValue >= ASCLogLevel.error.rawValue else { return }
 
         let url = request.request?.url?.absoluteString ?? "unknown"
         let errorEmoji = errorEmoji(for: error)
-        logger.error("\(errorEmoji) Error for \(url): \(error.localizedDescription)")
+
+        logger.error("┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+        logger.error("┃ ❌ ERROR")
+        logger.error("┃ \(errorEmoji) \(error.localizedDescription)")
+        logger.error("┃ URL: \(url)")
 
         if logLevel.rawValue >= ASCLogLevel.debug.rawValue {
             if let underlyingError = error.underlyingError {
-                logger.error("  ⚙️ Underlying error: \(underlyingError.localizedDescription)")
+                logger.error("┃")
+                logger.error("┣━━ ⚙️ Underlying Error")
+                logger.error("┃   \(underlyingError.localizedDescription)")
             }
+        }
+
+        logger.error("┗━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+    }
+
+    private func formatBytes(_ bytes: Int) -> String {
+        guard bytes > 0 else { return "0 B" }
+
+        let units = ["B", "KB", "MB", "GB"]
+        var value = Double(bytes)
+        var unitIndex = 0
+
+        while value >= 1024 && unitIndex < units.count - 1 {
+            value /= 1024
+            unitIndex += 1
+        }
+
+        if unitIndex == 0 {
+            return "\(bytes) B"
+        } else {
+            return String(format: "%.2f %@", value, units[unitIndex])
         }
     }
 
-    /// Returns emoji for HTTP method.
     private func methodEmoji(for method: String) -> String {
         switch method.uppercased() {
         case "GET": return "📥"
@@ -204,7 +250,6 @@ public final class ASCLogger: EventMonitor, Sendable {
         }
     }
 
-    /// Returns emoji for HTTP status code.
     private func statusEmoji(for statusCode: Int) -> String {
         switch statusCode {
         case 200: return "✅"
@@ -234,7 +279,6 @@ public final class ASCLogger: EventMonitor, Sendable {
         }
     }
 
-    /// Returns emoji for request duration.
     private func durationEmoji(for duration: TimeInterval) -> String {
         switch duration {
         case 0..<0.1: return "⚡"
@@ -245,7 +289,6 @@ public final class ASCLogger: EventMonitor, Sendable {
         }
     }
 
-    /// Returns emoji for error type.
     private func errorEmoji(for error: AFError) -> String {
         if let urlError = error.underlyingError as? URLError {
             switch urlError.code {
@@ -265,7 +308,6 @@ public final class ASCLogger: EventMonitor, Sendable {
         return "❌"
     }
 
-    /// Checks if a header should be redacted for privacy.
     private func shouldRedact(headerName: String) -> Bool {
         let redactedHeaders = [
             "authorization",
@@ -279,15 +321,9 @@ public final class ASCLogger: EventMonitor, Sendable {
         return redactedHeaders.contains(headerName.lowercased())
     }
 
-    /// Pretty prints JSON data.
-    ///
-    /// Skips pretty printing for large payloads to avoid performance issues.
-    /// - Parameter data: JSON data to format
-    /// - Returns: Pretty-printed JSON string, or size info for large payloads
-    private func prettyPrintJSON(_ data: Data) -> String? {
-        // Skip pretty printing for large payloads (100KB limit)
+    private func prettyPrintJSON(_ data: Data, maxLines: Int? = nil) -> String? {
         guard data.count < 100_000 else {
-            return "JSON too large (\(data.count) bytes)"
+            return "JSON too large (\(self.formatBytes(data.count)))"
         }
 
         guard let json = try? JSONSerialization.jsonObject(with: data),
@@ -297,6 +333,15 @@ public final class ASCLogger: EventMonitor, Sendable {
               ),
               let string = String(data: prettyData, encoding: .utf8) else {
             return nil
+        }
+
+        if let maxLines = maxLines {
+            let lines = string.split(separator: "\n", omittingEmptySubsequences: false)
+            if lines.count > maxLines {
+                let preview = lines.prefix(maxLines).joined(separator: "\n")
+                let remaining = lines.count - maxLines
+                return preview + "\n... (\(remaining) more lines)"
+            }
         }
 
         return string

@@ -28,9 +28,15 @@ public protocol TokenStorage: Sendable {
 }
 
 public extension TokenStorage {
+    /// Default refresh token is nil.
     var refreshToken: String? { nil }
+
+    /// Default token type is Bearer.
     var tokenType: TokenType { .bearer }
+
+    /// Default refresh request is nil.
     var refreshRequest: (any NetworkRequest)? { nil }
 
+    /// Default implementation does nothing.
     func executeRefreshToken(with client: NetworkClient) async throws { }
 }

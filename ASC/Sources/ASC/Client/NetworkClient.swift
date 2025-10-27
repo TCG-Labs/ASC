@@ -3,7 +3,6 @@
 
 // Main network client for executing requests with advanced Alamofire features.
 
-import Alamofire
 import Foundation
 
 /// Main network client for executing requests.
@@ -297,21 +296,8 @@ public final class NetworkClient: Sendable {
         // Build multipart upload using Alamofire directly
         let upload = session.upload(
             multipartFormData: { formData in
-                // Add files
-                if let files = request.files {
-                    for (fieldName, data) in files {
-                        formData.append(data, withName: fieldName, fileName: "file", mimeType: "application/octet-stream")
-                    }
-                }
-
-                // Add parameters if any
-                if let parameters = request.parameters {
-                    for (key, value) in parameters {
-                        if let data = "\(value)".data(using: .utf8) {
-                            formData.append(data, withName: key)
-                        }
-                    }
-                }
+                self.appendFiles(from: request, to: formData)
+                self.appendParameters(from: request, to: formData)
             },
             to: url,
             method: request.method,
@@ -353,6 +339,38 @@ public final class NetworkClient: Sendable {
                 upload.cancel()
             }
             return nil
+        }
+    }
+
+    // MARK: - Multipart Helpers
+
+    /// Appends files to multipart form data.
+    private func appendFiles<Request: NetworkRequest>(
+        from request: Request,
+        to formData: MultipartFormData
+    ) {
+        guard let files = request.files else { return }
+
+        for (fieldName, data) in files {
+            formData.append(
+                data,
+                withName: fieldName,
+                fileName: "file",
+                mimeType: "application/octet-stream"
+            )
+        }
+    }
+
+    /// Appends parameters to multipart form data.
+    private func appendParameters<Request: NetworkRequest>(
+        from request: Request,
+        to formData: MultipartFormData
+    ) {
+        guard let parameters = request.parameters else { return }
+
+        for (key, value) in parameters {
+            let data = Data("\(value)".utf8)
+            formData.append(data, withName: key)
         }
     }
 

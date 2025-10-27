@@ -3,7 +3,6 @@
 
 // Convenient extensions for Alamofire's RetryPolicy.
 
-import Alamofire
 import Foundation
 
 /// Extension providing convenient preset retry policies.

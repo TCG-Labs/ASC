@@ -17,6 +17,7 @@ struct ContentView: View {
 
     private let networkClient: NetworkClient = .init(
         configuration: .init(
+            baseURL: "https://jsonplaceholder.typicode.com",
             logLevel: .verbose,
             connectivityCheckEnabled: true
         )

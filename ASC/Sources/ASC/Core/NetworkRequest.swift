@@ -3,7 +3,52 @@
 
 // Core protocol defining network request configuration.
 
+@_exported import Alamofire
 import Foundation
+
+// MARK: - Type Aliases
+
+/// HTTP method for requests.
+public typealias HTTPMethod = Alamofire.HTTPMethod
+
+/// HTTP headers collection.
+public typealias HTTPHeaders = Alamofire.HTTPHeaders
+
+/// HTTP header.
+public typealias HTTPHeader = Alamofire.HTTPHeader
+
+/// Request parameters dictionary.
+public typealias Parameters = Alamofire.Parameters
+
+/// Parameter encoding protocol.
+public typealias ParameterEncoding = Alamofire.ParameterEncoding
+
+/// JSON parameter encoding.
+public typealias JSONEncoding = Alamofire.JSONEncoding
+
+/// URL parameter encoding.
+public typealias URLEncoding = Alamofire.URLEncoding
+
+/// Retry policy for requests.
+public typealias RetryPolicy = Alamofire.RetryPolicy
+
+/// Request interceptor for adapting and retrying requests.
+public typealias RequestInterceptor = Alamofire.RequestInterceptor
+
+/// Event monitor for observing request lifecycle.
+public typealias EventMonitor = Alamofire.EventMonitor
+
+/// Server trust manager for SSL/TLS validation.
+public typealias ServerTrustManager = Alamofire.ServerTrustManager
+
+/// Redirect handler for custom redirect logic.
+public typealias RedirectHandler = Alamofire.RedirectHandler
+
+/// Cached response handler for custom caching behavior.
+public typealias CachedResponseHandler = Alamofire.CachedResponseHandler
+
+/// Interceptor combining adapters and retriers.
+public typealias Interceptor = Alamofire.Interceptor
 
 /// Protocol defining a network request configuration.
 ///
@@ -132,6 +177,9 @@ public extension NetworkRequest {
 
     /// Default files are nil
     var files: [String: Data]? { nil }
+
+    /// Default authorization is false
+    var isAuthorized: Bool { false }
 
     /// Default implementation performs no validation.
     ///

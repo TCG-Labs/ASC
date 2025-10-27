@@ -36,15 +36,23 @@ swiftlint --fix
 ## Architecture
 
 ### Package Structure
-- **Sources/ASC/**: Main library (15 files, 2,250 lines)
-  - **Client/**: NetworkClient and components (5 files, 1,027 lines)
-    - `NetworkClient.swift` - Main client (309 lines)
-    - `MultipartRequestBuilder.swift` - File uploads (288 lines)
-    - `ErrorMapper.swift` - Error mapping (164 lines)
-    - `URLBuilder.swift` - URL construction (145 lines)
-    - `NetworkClientConfiguration.swift` - Configuration (121 lines)
-  - **Core/**: Protocols and types (5 files, 560 lines)
-  - **Errors/**: Error types (4 files, 405 lines)
+- **Sources/ASC/**: Main library (13 files, ~1,990 lines)
+  - **Auth/**: Authentication (3 files, 236 lines)
+    - `AuthInterceptor.swift` - Token refresh (98 lines)
+    - `TokenStorage.swift` - Token storage protocol (43 lines)
+    - `TokenType.swift` - Token types (56 lines)
+  - **Client/**: NetworkClient and components (5 files, ~1,180 lines)
+    - `NetworkClient.swift` - Main client (455 lines)
+    - `NetworkClientConfiguration.swift` - Configuration (463 lines)
+    - `ErrorMapper.swift` - Error mapping (157 lines)
+    - `ASCLogger.swift` - Debug logging (92 lines)
+    - `URLBuilder.swift` - URL construction (69 lines)
+  - **Core/**: Protocols and types (3 files, ~305 lines)
+    - `NetworkRequest.swift` - Request protocol + Alamofire re-export (187 lines)
+    - `ResponseTypes.swift` - HTTP types (67 lines)
+    - `RetryPolicy.swift` - Retry helpers (51 lines)
+  - **Errors/**: Error types (1 file, 271 lines)
+    - `ASCError.swift` - Unified error handling (271 lines)
   - **Utils/**: Utility classes (1 file, 216 lines)
     - `NetworkReachability.swift` - Connectivity monitoring (216 lines)
 - **Tests/ASCTests/**: Test suite (135 tests, 3,527 lines)
@@ -68,9 +76,7 @@ Defines all network request parameters:
 - Headers, query parameters, body
 - Response type (Codable)
 - Retry policy, timeout configuration
-- **Path parameters** for template substitution (`{userId}` → `123`)
-- **Path prefix** for API versioning (`/api/v1`)
-- **File uploads** via multipart/form-data
+- **File uploads** via simple multipart/form-data
 
 **Organization Pattern**: Use **Namespace Enum + Nested Structs**:
 ```swift
@@ -84,29 +90,28 @@ enum UserAPI {
 #### NetworkClient Components
 
 1. **URLBuilder** - URL Construction
-   - Combines base URL with path and prefix
-   - Substitutes path parameters
+   - Combines base URL with path
    - Validates and builds final URLs
 
-2. **MultipartRequestBuilder** - File Uploads
-   - Constructs multipart/form-data requests
-   - Handles files with custom MIME types
-   - Automatic encoding selection (memory vs file-based)
-
-3. **ErrorMapper** - Error Translation
+2. **ErrorMapper** - Error Translation
    - Maps Alamofire errors to ASC error types
    - Provides recovery suggestions
 
-4. **NetworkClientConfiguration** - Configuration
+3. **NetworkClientConfiguration** - Configuration
    - Centralizes client settings
    - Manages interceptors, monitors, trust managers
    - Connectivity checking configuration
 
-5. **NetworkReachability** - Connectivity Monitoring
+4. **NetworkReachability** - Connectivity Monitoring
    - Real-time network status monitoring via NWPathMonitor
    - Detects Wi-Fi, cellular, wired, and other connection types
    - Provides both sync (currentStatus) and async (statusStream) APIs
    - Automatic monitoring lifecycle (start/stop)
+
+5. **ASCLogger** - Debug Logging
+   - OSLog-based logging with emoji-enhanced output
+   - 5 log levels with privacy-aware redaction
+   - Visual indicators for methods, status codes, performance
 
 ### Core Features
 
@@ -121,23 +126,24 @@ enum UserAPI {
 - Multiple authentication schemes
 
 **3. Error Handling**
-- `NetworkError`: Connection, timeout, SSL problems
-- `ResponseError`: HTTP status, parsing failures
-- `AuthenticationError`: Token expired, unauthorized
-- All errors provide errorDescription, recoverySuggestion
+Unified `ASCError` enum with three categories:
+- **Network Errors**: Connection, timeout, SSL problems
+- **Response Errors**: HTTP status, parsing failures
+- **Authentication Errors**: Token expired, unauthorized
+- All errors provide errorDescription, recoverySuggestion, and failureReason
 
 **4. File Uploads**
-Three-tier multipart/form-data support:
-- `files`: Simple uploads (< 10MB, default MIME)
-- `fileUploads`: Custom MIME types (< 10MB)
-- `largeFileUploads`: File-based encoding (> 10MB, memory-efficient)
+Simple multipart/form-data support via `files` property:
+- Dictionary mapping field names to Data
+- Automatic multipart encoding via Alamofire
+- Default MIME type: application/octet-stream
 
 **5. Network Connectivity Monitoring**
 Automatic connectivity checking before requests:
 - Real-time monitoring via Apple's Network.framework
 - Configurable via `connectivityCheckEnabled` (default: true)
-- Throws `NetworkError.noConnection` immediately when offline
-- Supports reactive monitoring via Combine and AsyncStream
+- Throws `ASCError.noConnection` immediately when offline
+- Supports reactive monitoring via AsyncStream
 - Connection type detection (Wi-Fi, cellular, wired, other)
 
 **6. RetryPolicy**
@@ -148,12 +154,10 @@ Convenient factory methods for Alamofire.RetryPolicy:
 - `.conservative` → 2 retries
 - Can be set globally via `defaultRetryPolicy` in configuration
 
-**8. Advanced Configuration Options**
+**6. Advanced Configuration Options**
 - **JSON Coding**: Custom JSONDecoder/JSONEncoder with configurable strategies
 - **Session Types**: Default, ephemeral (private), or background sessions
 - **Network Constraints**: Control cellular, expensive, and constrained network access
-- **Default Query Parameters**: Automatically added to all requests (API keys, etc.)
-- **Default Path Prefix**: Global API versioning without per-request configuration
 - **Automatic Validation**: HTTP status code validation with custom acceptable ranges
 - **Request Priority**: Set default priority for all network requests
 - **Preset Configurations**: `.development`, `.production`, `.testing` for quick setup
@@ -171,24 +175,44 @@ ASCLogger with emoji-enhanced visual output:
 - Privacy-aware: 🔒 auto-redacts sensitive headers
 - See `LOGGER_EMOJIS.md` for complete emoji guide
 
-## Architecture Decision: Type Re-exports
+## Architecture Decision: @_exported import Alamofire
 
-Instead of duplicating Alamofire types, ASC **re-exports them directly**:
+ASC uses `@_exported import Alamofire` to **re-export all Alamofire types**:
+- ✅ **No need to import Alamofire** - all types available when you `import ASC`
 - ✅ Uses battle-tested implementations from Alamofire
 - ✅ Zero conversion overhead
 - ✅ Automatic updates when Alamofire improves
-- ✅ Focuses on unique value: protocol-based API, error handling
+- ✅ Minimal imports inside library - only NetworkRequest.swift imports Alamofire
 
-### Re-exported Types
-- **HTTP**: `HTTPHeaders`, `HTTPHeader`, `HTTPMethod`
-- **Parameters**: `Parameters`, `ParameterEncoding`, `JSONEncoding`, `URLEncoding`
-- **Advanced**: `RequestInterceptor`, `EventMonitor`, `RetryPolicy`, `ServerTrustManager`
+### How It Works
+- **NetworkRequest.swift** uses `@_exported import Alamofire`
+- All other library files don't need to import Alamofire
+- When users `import ASC`, they get all Alamofire types automatically
+
+### Available Types (via re-export)
+All Alamofire types are available including:
+- `HTTPMethod`, `HTTPHeaders`, `HTTPHeader`
+- `Parameters`, `ParameterEncoding`, `JSONEncoding`, `URLEncoding`
+- `RequestInterceptor`, `EventMonitor`, `RetryPolicy`
+- `ServerTrustManager`, `RedirectHandler`, `CachedResponseHandler`
+- `Session`, `DataRequest`, `UploadRequest`, and all other Alamofire types
+
+### Public Typealiases
+For commonly used types, ASC also defines typealiases in **NetworkRequest.swift** for better discoverability:
+- `HTTPMethod`, `HTTPHeaders`, `HTTPHeader`
+- `Parameters`, `ParameterEncoding`, `JSONEncoding`, `URLEncoding`
+- `RetryPolicy`, `RequestInterceptor`, `EventMonitor`
+- `ServerTrustManager`, `RedirectHandler`, `CachedResponseHandler`, `Interceptor`
 
 ## Usage Examples
+
+**Note**: Only `import ASC` is needed - all Alamofire types are automatically available via `@_exported import`.
 
 ### Basic Usage
 
 ```swift
+import ASC
+
 let client = NetworkClient(baseURL: "https://api.example.com")
 
 enum UserAPI {
@@ -208,6 +232,8 @@ let user = try await client.execute(UserAPI.GetUser(userId: "123"))
 ASC provides three preset configurations optimized for different environments:
 
 ```swift
+import ASC
+
 // 1. Development - verbose logging, relaxed timeouts
 let client = NetworkClient(configuration: .development(baseURL: "https://dev-api.example.com"))
 // Features: verbose logging, 120s timeout, no retries
@@ -232,6 +258,8 @@ let client = NetworkClient(configuration: .default(
 ### Advanced Configuration
 
 ```swift
+import ASC
+
 // Custom JSON decoder/encoder (or use defaults)
 let decoder = JSONDecoder()
 decoder.dateDecodingStrategy = .secondsSince1970
@@ -279,8 +307,6 @@ let config = NetworkClientConfiguration(
     encoder: encoder,  // or use NetworkClientConfigurationDefaults.encoder
     defaultRetryPolicy: .conservative,
     networkConstraints: networkConstraints,
-    defaultQueryParameters: ["api_key": "your-key", "client_id": "ios"],
-    defaultPathPrefix: "/api/v1",
     validation: validation,
     defaultPriority: 0.7  // Higher priority for important requests
 )
@@ -293,14 +319,14 @@ let client = NetworkClient(configuration: config)
 2. **JSON Coding**: Custom decoder/encoder or use `NetworkClientConfigurationDefaults` (ISO8601 + snake_case)
 3. **Default Retry Policy**: Applied to all requests unless overridden
 4. **NetworkConstraints**: Grouped network access settings with presets (`.default`, `.restrictive`)
-5. **Default Query Parameters**: Auto-added to all requests (e.g., API keys)
-6. **Default Path Prefix**: API versioning without modifying each request
-7. **ValidationOptions**: Grouped validation settings with presets (`.default`, `.disabled`)
-8. **Request Priority**: Set default priority for all requests (0.0-1.0)
+5. **ValidationOptions**: Grouped validation settings with presets (`.default`, `.disabled`)
+6. **Request Priority**: Set default priority for all requests (0.0-1.0)
 
 ### Network Connectivity Monitoring
 
 ```swift
+import ASC
+
 // Option 1: Automatic connectivity checking (enabled by default)
 let config = NetworkClientConfiguration(
     baseURL: "https://api.example.com",
@@ -311,7 +337,7 @@ let client = NetworkClient(configuration: config)
 // Requests automatically fail fast when offline
 do {
     let user = try await client.execute(UserAPI.GetUser(userId: "123"))
-} catch NetworkError.noConnection {
+} catch ASCError.noConnection {
     debugPrint("No internet connection available")
 }
 
@@ -341,46 +367,31 @@ Task {
 }
 ```
 
-### Path Parameters & Prefix
-
-```swift
-enum UserAPIv1 {
-    struct GetUser: NetworkRequest {
-        typealias Response = User
-        let userId: String
-        var pathPrefix: String? { "/api/v1" }
-        var path: String { "/users/{userId}" }
-        var method: HTTPMethod { .get }
-        var pathParameters: [String: String]? { ["userId": userId] }
-    }
-}
-
-// Actual URL: https://api.example.com/api/v1/users/123
-let user = try await client.execute(UserAPIv1.GetUser(userId: "123"))
-```
-
 ### File Upload
 
 ```swift
+import ASC
+
 enum UserAPI {
     struct UploadAvatar: NetworkRequest {
         typealias Response = User
         let userId: String
         let imageData: Data
 
-        var path: String { "/users/{userId}/avatar" }
+        var path: String { "/users/\(userId)/avatar" }
         var method: HTTPMethod { .post }
-        var pathParameters: [String: String]? { ["userId": userId] }
-        var fileUploads: [String: FileUpload]? {
-            ["avatar": .jpeg(data: imageData, fileName: "avatar.jpg")]
-        }
+        var files: [String: Data]? { ["avatar": imageData] }
     }
 }
+
+let user = try await client.execute(UserAPI.UploadAvatar(userId: "123", imageData: avatarData))
 ```
 
 ### RetryPolicy Configuration
 
 ```swift
+import ASC
+
 enum DataAPI {
     struct GetCriticalData: NetworkRequest {
         typealias Response = Data
@@ -394,6 +405,8 @@ enum DataAPI {
 ### Optional BaseURL
 
 ```swift
+import ASC
+
 // Client without base URL
 let client = NetworkClient()
 
@@ -432,16 +445,20 @@ let user = try await client.execute(CustomRequest())
 ## Code Quality Metrics
 
 **Library Code:**
-- 2,034 lines across 14 files
+- ~1,990 lines across 13 files
 - Zero code duplication
 - All public APIs documented
 - Full Swift 6 concurrency support
 
 **Test Suite:**
-- 135 comprehensive tests, 100% pass rate
-- 3,527 lines of test code
-- Test infrastructure: 676 lines (helpers), 266 lines (mocks)
-- Average test length: 15 lines
+- 61 comprehensive tests, 100% pass rate
+- 671 lines of test code
+- Test framework: Swift Testing (not XCTest)
+- Test breakdown:
+  - ASCErrorTests: 27 tests (error handling)
+  - NetworkRequestTests: 21 tests (protocol defaults)
+  - URLBuilderTests: 10 tests (URL construction)
+  - AuthInterceptorTests: 3 tests (token storage)
 
 **Code Quality:**
 - 0 SwiftLint warnings/errors
@@ -456,5 +473,5 @@ GitHub Actions configured for Claude Code:
 
 ---
 
-**Last Updated**: October 20, 2025
+**Last Updated**: October 27, 2025
 **Maintained by**: ASC Development Team

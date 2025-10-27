@@ -11,7 +11,7 @@ import Alamofire
 
 // MARK: - User Model
 
-struct User: Codable, Identifiable, Sendable {
+nonisolated struct User: Codable, Identifiable, Sendable {
     let id: Int
     let name: String
     let email: String
@@ -22,7 +22,6 @@ struct User: Codable, Identifiable, Sendable {
 struct GetUsersRequest: NetworkRequest {
     typealias Response = [User]
 
-    var baseURL: String? { "https://jsonplaceholder.typicode.com" }
     var path: String { "/users" }
     var method: HTTPMethod { .get }
 }

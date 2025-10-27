@@ -3,7 +3,6 @@
 
 // Configuration for NetworkClient.
 
-import Alamofire
 import Foundation
 
 // MARK: - Supporting Types
