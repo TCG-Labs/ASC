@@ -158,9 +158,14 @@ public final class ASCLogger: EventMonitor, Sendable {
         didCompleteTask task: URLSessionTask,
         with error: AFError?
     ) {
-        guard let error = error else { return }
+        // Log error if present
+        if let error = error {
+            logError(error, for: request)
+        }
 
-        logError(error, for: request)
+        // Always cleanup request number when task completes
+        // This ensures no memory leak even if didParseResponse is never called
+        _ = requestNumbers.withLock { $0.removeValue(forKey: request.id) }
     }
 
     // MARK: - Private Methods
@@ -239,9 +244,6 @@ public final class ASCLogger: EventMonitor, Sendable {
         lines.append("└─────────────────────────────────────────────────────────────────")
 
         logger.error("\(lines.joined(separator: "\n"))")
-
-        // Cleanup: remove request number after logging error
-        _ = requestNumbers.withLock { $0.removeValue(forKey: request.id) }
     }
 
     private func formatBytes(_ bytes: Int) -> String {
