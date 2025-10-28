@@ -169,7 +169,20 @@ public protocol NetworkRequest: Sendable {
     /// If not specified, the client's default cache policy will be used.
     var cachePolicy: URLRequest.CachePolicy? { get }
 
-    var isAuthorized: Bool { get }
+    /// Enables automatic authorization header injection.
+    ///
+    /// When set to `true`, the request interceptor will add an `Authorization` header
+    /// based on the token storage configuration. Default is `false`.
+    ///
+    /// Example:
+    /// ```swift
+    /// struct GetProfileRequest: NetworkRequest {
+    ///     typealias Response = UserProfile
+    ///
+    ///     var enableAuthorization: Bool { true }  // Adds Authorization header
+    /// }
+    /// ```
+    var enableAuthorization: Bool { get }
 
     /// Validates the response after successful decoding.
     ///
@@ -225,8 +238,8 @@ public extension NetworkRequest {
     /// Default cache policy is nil (use client's default)
     var cachePolicy: URLRequest.CachePolicy? { nil }
 
-    /// Default authorization is false
-    var isAuthorized: Bool { false }
+    /// Default authorization is disabled
+    var enableAuthorization: Bool { false }
 
     /// Default implementation performs no validation.
     ///

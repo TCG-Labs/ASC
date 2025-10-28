@@ -104,10 +104,10 @@ struct NetworkRequestTests {
         try request.validate(response: response)
     }
 
-    @Test("NetworkRequest default isAuthorized is false")
-    func testDefaultIsAuthorized() {
+    @Test("NetworkRequest default enableAuthorization is false")
+    func testDefaultEnableAuthorization() {
         let request = MinimalRequest()
-        #expect(request.isAuthorized == false)
+        #expect(request.enableAuthorization == false)
     }
 
     // MARK: - Custom Implementation Tests
