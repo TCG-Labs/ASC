@@ -15,7 +15,7 @@ Provides a convenient wrapper over Alamofire for:
 ### Current Status
 - **Version**: 1.0 (feature/verson-1.0 branch)
 - **Status**: Production-ready
-- **Test Coverage**: 135 tests, 100% pass rate
+- **Test Coverage**: 112 tests, 100% pass rate
 - **Code Quality**: 0 SwiftLint warnings/errors
 
 ## Development Commands
@@ -55,9 +55,11 @@ swiftlint --fix
     - `ASCError.swift` - Unified error handling (271 lines)
   - **Utils/**: Utility classes (1 file, 216 lines)
     - `NetworkReachability.swift` - Connectivity monitoring (216 lines)
-- **Tests/ASCTests/**: Test suite (135 tests, 3,527 lines)
-  - **Helpers/**: Test infrastructure (676 lines)
-  - **Mocks/**: Mock implementations (266 lines)
+- **Tests/ASCTests/**: Test suite (112 tests, 6 suites)
+  - Core tests: ASCErrorTests (27), NetworkRequestTests (21), URLBuilderTests (10)
+  - Component tests: ErrorMapperTests (28), NetworkClientTests (17), AuthInterceptorTests (9)
+  - **Helpers/**: Test utilities (TestHelpers.swift)
+  - **Mocks/**: Mock implementations (MockURLProtocol, MockNetworkRequest, MockTokenStorage)
 
 ### Dependencies
 - **Alamofire** (5.10.2+): Core networking library
@@ -65,6 +67,18 @@ swiftlint --fix
 
 ### Testing Framework
 Uses Swift Testing framework (not XCTest). Tests use `@Test` attribute and `#expect` for assertions.
+
+**Mock Infrastructure:**
+- **MockURLProtocol**: Thread-safe HTTP response mocking using `Mutex<T>` for Swift 6 concurrency
+- **MockNetworkRequest**: Reusable request types (GET, POST, authenticated, empty, validated, custom encoded)
+- **MockTokenStorage**: Thread-safe token storage for authentication testing
+- **TestHelpers**: Factory methods for creating test data, responses, and errors
+
+**Test Patterns:**
+- `.serialized` trait for tests requiring sequential execution (prevents race conditions)
+- `defer { MockURLProtocol.reset() }` pattern for guaranteed cleanup
+- `withCheckedThrowingContinuation` for async adapter testing
+- `await #expect(throws: ASCError.self)` for error validation
 
 ## Library Architecture
 
@@ -424,19 +438,30 @@ let user = try await client.execute(CustomRequest())
 - Full Swift 6 concurrency support
 
 **Test Suite:**
-- 61 comprehensive tests, 100% pass rate
-- 671 lines of test code
+- 112 comprehensive tests across 6 suites, 100% pass rate
 - Test framework: Swift Testing (not XCTest)
+- Thread-safe mock infrastructure with `Mutex<T>`
 - Test breakdown:
-  - ASCErrorTests: 27 tests (error handling)
-  - NetworkRequestTests: 21 tests (protocol defaults)
-  - URLBuilderTests: 10 tests (URL construction)
-  - AuthInterceptorTests: 3 tests (token storage)
+  - **Core Tests** (58 tests):
+    - ASCErrorTests: 27 tests (error enum, descriptions, recovery suggestions)
+    - NetworkRequestTests: 21 tests (protocol defaults, encoding, validation)
+    - URLBuilderTests: 10 tests (URL construction, validation)
+  - **Component Tests** (54 tests):
+    - ErrorMapperTests: 28 tests (AFError/URLError mapping, error messages)
+    - NetworkClientTests: 17 tests (initialization, request execution, retry, validation)
+    - AuthInterceptorTests: 9 tests (token types, header injection, error handling)
+
+**Code Coverage (Priority 1 Components):**
+- ErrorMapper: 89.09% (was 1.82%)
+- NetworkClient: 68.35% (was 6.33%)
+- AuthInterceptor: 100% (was 0%)
 
 **Code Quality:**
 - 0 SwiftLint warnings/errors
 - Protocol-oriented design throughout
 - Type-safe with comprehensive generics
+- All tests are honest (no tautological assertions)
+- Consistent test patterns (defer cleanup, inline creation, minimal comments)
 
 ## GitHub Integration
 
@@ -446,5 +471,5 @@ GitHub Actions configured for Claude Code:
 
 ---
 
-**Last Updated**: October 27, 2025
+**Last Updated**: October 28, 2025
 **Maintained by**: ASC Development Team

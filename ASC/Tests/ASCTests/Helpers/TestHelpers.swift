@@ -1,0 +1,108 @@
+// TestHelpers.swift
+// ASC - Alamofire Swift Client
+
+// Test helpers and utilities for ASC tests.
+
+import Foundation
+@testable import ASC
+
+/// Test helpers for creating mock data and responses.
+enum TestHelpers {
+    // MARK: - Mock Response Creation
+
+    /// Creates a mock HTTPURLResponse.
+    ///
+    /// - Parameters:
+    ///   - statusCode: HTTP status code (default: 200)
+    ///   - headers: HTTP headers (default: nil)
+    ///   - url: URL for the response (default: example.com)
+    /// - Returns: HTTPURLResponse instance
+    static func createMockResponse(
+        statusCode: Int = 200,
+        headers: [String: String]? = nil,
+        url: URL = URL(string: "https://api.example.com/test")!
+    ) -> HTTPURLResponse {
+        HTTPURLResponse(
+            url: url,
+            statusCode: statusCode,
+            httpVersion: "HTTP/1.1",
+            headerFields: headers
+        )!
+    }
+
+    // MARK: - Mock Data Creation
+
+    /// Creates mock JSON data from a dictionary.
+    ///
+    /// - Parameter json: Dictionary to encode as JSON
+    /// - Returns: JSON data
+    static func createJSONData(_ json: [String: Any]) -> Data {
+        try! JSONSerialization.data(withJSONObject: json)
+    }
+
+    /// Creates mock JSON data from a string.
+    ///
+    /// - Parameter jsonString: JSON string
+    /// - Returns: JSON data
+    static func createJSONData(from jsonString: String) -> Data {
+        jsonString.data(using: .utf8)!
+    }
+
+    // MARK: - Mock Error Creation
+
+    /// Creates a mock URLError.
+    ///
+    /// - Parameters:
+    ///   - code: URLError code
+    ///   - url: URL for the error (default: example.com)
+    /// - Returns: URLError instance
+    static func createURLError(
+        _ code: URLError.Code,
+        url: URL = URL(string: "https://api.example.com/test")!
+    ) -> URLError {
+        URLError(code, userInfo: [NSURLErrorFailingURLStringErrorKey: url.absoluteString])
+    }
+
+    /// Creates a mock AFError with underlying URLError.
+    ///
+    /// - Parameter urlError: URLError to wrap
+    /// - Returns: AFError instance
+    static func createAFErrorWithURLError(_ urlError: URLError) -> AFError {
+        .sessionTaskFailed(error: urlError)
+    }
+
+    /// Creates a mock AFError for validation failure.
+    ///
+    /// - Parameter statusCode: HTTP status code
+    /// - Returns: AFError instance
+    static func createValidationError(statusCode: Int) -> AFError {
+        .responseValidationFailed(reason: .unacceptableStatusCode(code: statusCode))
+    }
+
+    /// Creates a mock AFError for decoding failure.
+    ///
+    /// - Parameter error: Underlying decoding error
+    /// - Returns: AFError instance
+    static func createDecodingError(_ error: Error) -> AFError {
+        .responseSerializationFailed(reason: .decodingFailed(error: error))
+    }
+
+    // MARK: - Mock Codable Types
+
+    /// Simple mock Codable type for testing.
+    struct MockCodable: Codable, Equatable {
+        let id: Int
+        let name: String
+    }
+
+    /// Creates mock Codable instance.
+    static func createMockCodable() -> MockCodable {
+        MockCodable(id: 1, name: "Test")
+    }
+
+    /// Creates mock Codable JSON data.
+    static func createMockCodableData() -> Data {
+        let mockObject = createMockCodable()
+        return try! JSONEncoder().encode(mockObject)
+    }
+}
