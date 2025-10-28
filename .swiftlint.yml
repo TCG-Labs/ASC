@@ -284,13 +284,6 @@ custom_rules:
     message: 'Avoid !. in call chains. Use optional chaining'
     severity: error
 
-  # Prohibit empty comments
-  no_empty_comments:
-    name: 'No Empty Comments'
-    regex: '^\s*//\s*$'
-    message: 'Remove empty comments'
-    severity: warning
-
 # ============================================================================
 # REPORTER
 # ============================================================================

@@ -9,13 +9,7 @@ import Foundation
 ///
 /// Implement this protocol to provide custom token storage (Keychain, UserDefaults, etc.).
 public protocol TokenStorage: Sendable {
-    /// Current access token
-    var accessToken: String? { get set }
-
-    /// Current refresh token
-    var refreshToken: String? { get set }
-
-    var tokenType: TokenType { get }
+    var authToken: AuthToken? { get }
 
     /// Network request for refreshing tokens
     var refreshRequest: (any NetworkRequest)? { get }
@@ -23,16 +17,13 @@ public protocol TokenStorage: Sendable {
     /// Executes token refresh using the provided client
     func executeRefreshToken(with client: NetworkClient) async throws
 
-    /// Clears all stored tokens
-    func clearTokens()
+    /// Flushes the storage state (clears all stored tokens)
+    func flush()
 }
 
 public extension TokenStorage {
-    /// Default refresh token is nil.
-    var refreshToken: String? { nil }
-
-    /// Default token type is Bearer.
-    var tokenType: TokenType { .bearer }
+    /// Default auth token is nil.
+    var authToken: AuthToken? { nil }
 
     /// Default refresh request is nil.
     var refreshRequest: (any NetworkRequest)? { nil }

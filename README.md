@@ -115,6 +115,62 @@ let results = try await client.execute(
 )
 ```
 
+## 🔍 Logging
+
+ASC includes built-in logging using Apple's unified logging system (os.log).
+
+### Log Levels
+
+Configure logging when creating a NetworkClient:
+
+```swift
+let config = NetworkClientConfiguration(
+    baseURL: "https://api.example.com",
+    logLevel: .verbose  // Choose your log level
+)
+let client = NetworkClient(configuration: config)
+```
+
+**Available levels:**
+
+- `.none` - No logging (default)
+- `.error` - Errors only
+- `.info` - Requests and responses (URLs, status codes, timing)
+- `.debug` - Info + HTTP headers
+- `.verbose` - Debug + request/response bodies (JSON pretty-printed)
+
+### Example Output
+
+With `.verbose` logging enabled, you'll see in Xcode Console:
+
+```
+→ 📤 POST https://api.example.com/v1/auth/login
+  📋 Headers:
+    Content-Type: application/json
+  📦 Body (JSON):
+{
+  "email" : "user@example.com",
+  "password" : "🔒 <redacted>"
+}
+← ✅ 200 https://api.example.com/v1/auth/login ⚡ 0.23s
+  📄 Response (JSON):
+{
+  "accessToken" : "eyJhbG...",
+  "refreshToken" : "eyJhbG..."
+}
+```
+
+**Features:**
+- 🎨 Emoji indicators for methods, status codes, and timing
+- 🔒 Automatic redaction of sensitive headers (Authorization, API keys, cookies)
+- 📊 Request duration with performance emojis (⚡ fast, 🐢 slow)
+- 🎯 Pretty-printed JSON for easy reading
+
+### Viewing Logs in Xcode
+
+- Logs appear in real-time with emoji prefixes
+- Filter by subsystem: `com.asc.networking`
+
 ## 📚 Examples
 
 All runnable examples are located in the [`Examples/`](ASC/Examples/) directory.
@@ -274,20 +330,94 @@ let user = try await client.execute(
 
 ### Request Interceptor (Authentication)
 
+ASC provides built-in authentication support through two key components:
+
+- **`TokenStorage`** - Protocol for storing and managing authentication tokens (bearer, basic, custom)
+- **`AuthInterceptor`** - Request interceptor that automatically adds `Authorization` headers to requests
+
+When a request is marked with `enableAuthorization = true`, the interceptor retrieves the token from storage and adds the appropriate authentication header before sending the request.
+
+**Usage:**
+
+1. Implement the `TokenStorage` protocol to define how tokens are stored
+2. Create an `AuthInterceptor` instance with your token storage
+3. Add the interceptor to `NetworkClientConfiguration`
+4. Mark requests that need authentication with `enableAuthorization = true`
+
+#### Bearer Token Authentication (API Keys, OAuth)
+
+Most common for REST APIs and OAuth 2.0:
+
+```swift
+import ASC
+
+// 1. Implement TokenStorage protocol
+final class BearerTokenStorage: TokenStorage {
+    private var token: String?
+    
+    var authToken: AuthToken? {
+        guard let token = token else { return nil }
+        return .bearer(token: token)
+    }
+    
+    init(token: String) {
+        self.token = token
+    }
+    
+    func updateToken(_ newToken: String) {
+        self.token = newToken
+    }
+    
+    func flush() {
+        token = nil
+    }
+}
+
+// 2. Configure client with AuthInterceptor
+let storage = BearerTokenStorage(token: "your-api-key")
+let authInterceptor = AuthInterceptor(storage: storage)
+
+let config = NetworkClientConfiguration(
+    baseURL: "https://api.example.com",
+    interceptors: [authInterceptor]
+)
+let client = NetworkClient(configuration: config)
+
+// 3. Mark requests that need authentication
+struct GetProfileRequest: NetworkRequest {
+    typealias Response = UserProfile
+    
+    var path: String { "/me" }
+    var method: HTTPMethod { .get }
+    var enableAuthorization: Bool { true }  // Adds Authorization header
+}
+
+let profile = try await client.execute(GetProfileRequest())
+// Request includes: Authorization: Bearer your-api-key
+```
+
+For advanced scenarios (custom retry logic, token refresh), implement Alamofire's `RequestInterceptor` directly:
+
 ```swift
 import Alamofire
 
-final class AuthInterceptor: RequestInterceptor {
+final class CustomAuthInterceptor: RequestInterceptor {
+    private var token: String
+    
+    init(token: String) {
+        self.token = token
+    }
+    
     func adapt(
         _ urlRequest: URLRequest,
         for session: Session,
         completion: @escaping (Result<URLRequest, Error>) -> Void
     ) {
         var urlRequest = urlRequest
-        urlRequest.headers.add(.authorization(bearerToken: getToken()))
+        urlRequest.headers.add(.authorization(bearerToken: token))
         completion(.success(urlRequest))
     }
-
+    
     func retry(
         _ request: Request,
         for session: Session,
@@ -296,21 +426,25 @@ final class AuthInterceptor: RequestInterceptor {
     ) {
         if let response = request.task?.response as? HTTPURLResponse,
            response.statusCode == 401 {
-            refreshToken { success in
-                completion(success ? .retry : .doNotRetry)
+            // Refresh token and retry
+            Task {
+                do {
+                    self.token = try await refreshToken()
+                    completion(.retry)
+                } catch {
+                    completion(.doNotRetry)
+                }
             }
         } else {
             completion(.doNotRetry)
         }
     }
+    
+    private func refreshToken() async throws -> String {
+        // Implement token refresh logic
+        return "new-token"
+    }
 }
-
-// Configure client with interceptor
-let config = NetworkClientConfiguration(
-    baseURL: "https://api.example.com",
-    interceptors: [AuthInterceptor()]
-)
-let client = NetworkClient(configuration: config)
 ```
 
 ### Event Monitoring (Logging)
