@@ -1,5 +1,5 @@
 // MockTokenStorage.swift
-// ASC - Alamofire Swift Client
+// ASC - Alamofire Swift Client Tests
 
 // Mock token storage for testing authentication.
 
@@ -7,39 +7,30 @@ import Foundation
 import Synchronization
 @testable import ASC
 
-/// Mock token storage for testing
+/// Mock token storage for testing authentication.
+///
+/// Provides thread-safe storage for testing `TokenStorage` protocol implementations.
 final class MockTokenStorage: TokenStorage, @unchecked Sendable {
-    private let _accessToken: Mutex<String?>
-    private let _refreshToken: Mutex<String?>
-    private let _tokenType: Mutex<TokenType>
+    private let _authToken: Mutex<AuthToken?>
 
-    var accessToken: String? {
-        get { _accessToken.withLock { $0 } }
-        set { _accessToken.withLock { $0 = newValue } }
+    var authToken: AuthToken? {
+        get { _authToken.withLock { $0 } }
+        set { _authToken.withLock { $0 = newValue } }
     }
 
-    var refreshToken: String? {
-        get { _refreshToken.withLock { $0 } }
-        set { _refreshToken.withLock { $0 = newValue } }
+    var refreshRequest: (any NetworkRequest)? {
+        nil
     }
 
-    var tokenType: TokenType {
-        get { _tokenType.withLock { $0 } }
-        set { _tokenType.withLock { $0 = newValue } }
+    init(authToken: AuthToken? = nil) {
+        self._authToken = Mutex(authToken)
     }
 
-    init(
-        accessToken: String? = nil,
-        refreshToken: String? = nil,
-        tokenType: TokenType = .bearer
-    ) {
-        self._accessToken = Mutex(accessToken)
-        self._refreshToken = Mutex(refreshToken)
-        self._tokenType = Mutex(tokenType)
+    func executeRefreshToken(with client: NetworkClient) async throws {
+        // Mock implementation - does nothing
     }
 
-    func clearTokens() {
-        _accessToken.withLock { $0 = nil }
-        _refreshToken.withLock { $0 = nil }
+    func flush() {
+        _authToken.withLock { $0 = nil }
     }
 }
