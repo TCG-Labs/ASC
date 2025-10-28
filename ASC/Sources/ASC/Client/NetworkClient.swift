@@ -30,8 +30,8 @@ public final class NetworkClient: Sendable {
     /// Alamofire session used for networking.
     private let session: Session
 
-    /// URL builder for constructing request URLs.
-    private let urlBuilder: URLBuilder
+    /// Request builder for constructing URLRequests.
+    private let requestBuilder: RequestBuilder
 
     /// Error mapper for translating Alamofire errors.
     private let errorMapper: ErrorMapper
@@ -46,8 +46,15 @@ public final class NetworkClient: Sendable {
     /// - Parameter configuration: Client configuration
     public init(configuration: NetworkClientConfiguration) {
         self.configuration = configuration
-        self.urlBuilder = URLBuilder()
         self.errorMapper = ErrorMapper(defaultTimeout: configuration.defaultTimeout)
+
+        self.requestBuilder = RequestBuilder(
+            baseURL: configuration.baseURL,
+            defaultHeaders: configuration.defaultHeaders,
+            defaultTimeout: configuration.defaultTimeout,
+            defaultCachePolicy: configuration.defaultCachePolicy,
+            defaultDecoder: configuration.decoder
+        )
 
         if configuration.connectivityCheckEnabled {
             let reachability = NetworkReachability()
@@ -132,7 +139,7 @@ public final class NetworkClient: Sendable {
         _ request: Request,
         responseType: Response.Type?
     ) async throws -> Response? where Request.Response == Response {
-        let urlRequest = try buildURLRequest(from: request)
+        let urlRequest = try requestBuilder.buildURLRequest(from: request)
 
         if let responseType = responseType {
             return try await performRequest(
@@ -144,88 +151,6 @@ public final class NetworkClient: Sendable {
         } else {
             try await performEmptyRequest(urlRequest, retryPolicy: request.retryPolicy)
             return nil
-        }
-    }
-
-    /// Builds a URLRequest from a NetworkRequest.
-    private func buildURLRequest<Request: NetworkRequest>(
-        from request: Request
-    ) throws -> URLRequest {
-        let url = try urlBuilder.buildURL(
-            from: request,
-            baseURL: configuration.baseURL
-        )
-
-        var urlRequest = URLRequest(url: url)
-        urlRequest.httpMethod = request.method.rawValue
-        urlRequest.timeoutInterval = request.timeout ?? configuration.defaultTimeout
-        urlRequest.cachePolicy = request.cachePolicy ?? configuration.defaultCachePolicy
-
-        let headers = buildHeaders(for: request)
-        for header in headers {
-            urlRequest.setValue(header.value, forHTTPHeaderField: header.name)
-        }
-
-        // Encode parameters if present
-        if let parameters = request.parameters {
-            try encodeParameters(
-                parameters,
-                into: &urlRequest,
-                method: request.method,
-                customEncoder: request.parameterEncoder
-            )
-        }
-
-        return urlRequest
-    }
-
-    /// Encodes parameters into URLRequest using custom or automatic encoder.
-    ///
-    /// Uses modern Alamofire ParameterEncoder API which works with Encodable directly.
-    ///
-    /// **Automatic encoding (when customEncoder is nil):**
-    /// - GET/HEAD/DELETE: URL-encoded as query string (URLEncodedFormParameterEncoder)
-    /// - POST/PUT/PATCH/other: JSON-encoded in request body (JSONParameterEncoder)
-    ///
-    /// **Custom encoding:**
-    /// If customEncoder is provided, it takes precedence over automatic selection.
-    ///
-    /// - Parameters:
-    ///   - parameters: Encodable parameters to encode
-    ///   - urlRequest: URLRequest to modify (inout)
-    ///   - method: HTTP method (determines encoding strategy when customEncoder is nil)
-    ///   - customEncoder: Optional custom encoder from NetworkRequest
-    /// - Throws: ASCError if encoding fails
-    private func encodeParameters<Params: Encodable & Sendable>(
-        _ parameters: Params,
-        into urlRequest: inout URLRequest,
-        method: HTTPMethod,
-        customEncoder: ParameterEncoder?
-    ) throws {
-        // Use custom encoder if provided, otherwise choose based on HTTP method
-        let encoder: ParameterEncoder
-
-        if let customEncoder = customEncoder {
-            // Custom encoder takes precedence
-            encoder = customEncoder
-        } else {
-            // Automatic selection based on HTTP method
-            switch method {
-            case .get, .head, .delete:
-                // For GET/HEAD/DELETE - query string (URL encoding)
-                encoder = URLEncodedFormParameterEncoder.default
-
-            default:
-                // For POST/PUT/PATCH - JSON in body
-                encoder = JSONParameterEncoder.default
-            }
-        }
-
-        // Encode Encodable → URLRequest directly (no Dictionary conversion!)
-        do {
-            urlRequest = try encoder.encode(parameters, into: urlRequest)
-        } catch {
-            throw ASCError.invalidFormat("Failed to encode parameters: \(error.localizedDescription)")
         }
     }
 
@@ -351,25 +276,6 @@ public final class NetworkClient: Sendable {
         if case .unreachable = reachability.currentStatus {
             throw ASCError.noConnection
         }
-    }
-
-    // MARK: - Header Building
-
-    /// Builds HTTP headers for a request.
-    private func buildHeaders<Request: NetworkRequest>(for request: Request) -> HTTPHeaders {
-        var headers = configuration.defaultHeaders
-
-        if request.isAuthorized {
-            headers.add(.authenticationRequired)
-        }
-
-        if let requestHeaders = request.headers {
-            for header in requestHeaders {
-                headers.add(header)
-            }
-        }
-
-        return headers
     }
 }
 
