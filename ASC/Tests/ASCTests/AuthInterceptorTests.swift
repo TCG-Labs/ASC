@@ -6,23 +6,6 @@ import Foundation
 @testable import ASC
 
 struct AuthInterceptorTests {
-    // MARK: - Test Helpers
-
-    final class MockTokenStorage: TokenStorage, @unchecked Sendable {
-        var accessToken: String?
-        var refreshToken: String?
-        var tokenType: TokenType = .bearer
-
-        var refreshRequest: (any NetworkRequest)? {
-            nil
-        }
-
-        func clearTokens() {
-            accessToken = nil
-            refreshToken = nil
-        }
-    }
-
     // MARK: - Tests
 
     @Test("Token type enum raw values")

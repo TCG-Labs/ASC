@@ -8,6 +8,16 @@ import Foundation
 
 /// Test helpers for creating mock data and responses.
 enum TestHelpers {
+    // MARK: - Constants
+
+    /// Default test URL used across test helpers.
+    private static let testURL: URL = {
+        guard let url = URL(string: "https://api.example.com/test") else {
+            fatalError("Failed to create test URL: invalid URL string")
+        }
+        return url
+    }()
+
     // MARK: - Mock Response Creation
 
     /// Creates a mock HTTPURLResponse.
@@ -20,14 +30,17 @@ enum TestHelpers {
     static func createMockResponse(
         statusCode: Int = 200,
         headers: [String: String]? = nil,
-        url: URL = URL(string: "https://api.example.com/test")!
+        url: URL = testURL
     ) -> HTTPURLResponse {
-        HTTPURLResponse(
+        guard let response = HTTPURLResponse(
             url: url,
             statusCode: statusCode,
             httpVersion: "HTTP/1.1",
             headerFields: headers
-        )!
+        ) else {
+            fatalError("Failed to create HTTPURLResponse: invalid parameters")
+        }
+        return response
     }
 
     // MARK: - Mock Data Creation
@@ -37,7 +50,11 @@ enum TestHelpers {
     /// - Parameter json: Dictionary to encode as JSON
     /// - Returns: JSON data
     static func createJSONData(_ json: [String: Any]) -> Data {
-        try! JSONSerialization.data(withJSONObject: json)
+        do {
+            return try JSONSerialization.data(withJSONObject: json)
+        } catch {
+            fatalError("Failed to serialize JSON data: \(error)")
+        }
     }
 
     /// Creates mock JSON data from a string.
@@ -45,7 +62,10 @@ enum TestHelpers {
     /// - Parameter jsonString: JSON string
     /// - Returns: JSON data
     static func createJSONData(from jsonString: String) -> Data {
-        jsonString.data(using: .utf8)!
+        guard let data = jsonString.data(using: .utf8) else {
+            fatalError("Failed to convert JSON string to data: invalid UTF-8 encoding")
+        }
+        return data
     }
 
     // MARK: - Mock Error Creation
@@ -58,7 +78,7 @@ enum TestHelpers {
     /// - Returns: URLError instance
     static func createURLError(
         _ code: URLError.Code,
-        url: URL = URL(string: "https://api.example.com/test")!
+        url: URL = testURL
     ) -> URLError {
         URLError(code, userInfo: [NSURLErrorFailingURLStringErrorKey: url.absoluteString])
     }
@@ -103,6 +123,10 @@ enum TestHelpers {
     /// Creates mock Codable JSON data.
     static func createMockCodableData() -> Data {
         let mockObject = createMockCodable()
-        return try! JSONEncoder().encode(mockObject)
+        do {
+            return try JSONEncoder().encode(mockObject)
+        } catch {
+            fatalError("Failed to encode mock object: \(error)")
+        }
     }
 }
