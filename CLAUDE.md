@@ -13,9 +13,9 @@ Provides a convenient wrapper over Alamofire for:
 - **Modern Swift patterns** - Protocol-oriented, async/await, Codable support
 
 ### Current Status
-- **Version**: 1.0 (feature/verson-1.0 branch)
+- **Version**: 1.0
 - **Status**: Production-ready
-- **Test Coverage**: 135 tests, 100% pass rate
+- **Test Coverage**: 112 tests in 6 suites, 100% pass rate
 - **Code Quality**: 0 SwiftLint warnings/errors
 
 ## Development Commands
@@ -36,16 +36,16 @@ swiftlint --fix
 ## Architecture
 
 ### Package Structure
-- **Sources/ASC/**: Main library (13 files, ~1,990 lines)
+- **Sources/ASC/**: Main library (13 files, ~2,915 lines)
   - **Auth/**: Authentication (3 files, 236 lines)
     - `AuthInterceptor.swift` - Token refresh (98 lines)
     - `TokenStorage.swift` - Token storage protocol (43 lines)
     - `TokenType.swift` - Token types (56 lines)
-  - **Client/**: NetworkClient and components (5 files, ~1,180 lines)
+  - **Client/**: NetworkClient and components (5 files, ~1,557 lines)
     - `NetworkClient.swift` - Main client (455 lines)
     - `NetworkClientConfiguration.swift` - Configuration (463 lines)
     - `ErrorMapper.swift` - Error mapping (157 lines)
-    - `ASCLogger.swift` - Debug logging (92 lines)
+    - `ASCLogger.swift` - Debug logging with request correlation (377 lines)
     - `URLBuilder.swift` - URL construction (69 lines)
   - **Core/**: Protocols and types (3 files, ~305 lines)
     - `NetworkRequest.swift` - Request protocol + Alamofire re-export (187 lines)
@@ -55,9 +55,11 @@ swiftlint --fix
     - `ASCError.swift` - Unified error handling (271 lines)
   - **Utils/**: Utility classes (1 file, 216 lines)
     - `NetworkReachability.swift` - Connectivity monitoring (216 lines)
-- **Tests/ASCTests/**: Test suite (135 tests, 3,527 lines)
-  - **Helpers/**: Test infrastructure (676 lines)
-  - **Mocks/**: Mock implementations (266 lines)
+- **Tests/ASCTests/**: Test suite (112 tests, 6 suites)
+  - Core tests: ASCErrorTests (27), NetworkRequestTests (21), URLBuilderTests (10)
+  - Component tests: ErrorMapperTests (28), NetworkClientTests (17), AuthInterceptorTests (9)
+  - **Helpers/**: Test utilities (TestHelpers.swift)
+  - **Mocks/**: Mock implementations (MockURLProtocol, MockNetworkRequest, MockTokenStorage)
 
 ### Dependencies
 - **Alamofire** (5.10.2+): Core networking library
@@ -65,6 +67,18 @@ swiftlint --fix
 
 ### Testing Framework
 Uses Swift Testing framework (not XCTest). Tests use `@Test` attribute and `#expect` for assertions.
+
+**Mock Infrastructure:**
+- **MockURLProtocol**: Thread-safe HTTP response mocking using `Mutex<T>` for Swift 6 concurrency
+- **MockNetworkRequest**: Reusable request types (GET, POST, authenticated, empty, validated, custom encoded)
+- **MockTokenStorage**: Thread-safe token storage for authentication testing
+- **TestHelpers**: Factory methods for creating test data, responses, and errors
+
+**Test Patterns:**
+- `.serialized` trait for tests requiring sequential execution (prevents race conditions)
+- `defer { MockURLProtocol.reset() }` pattern for guaranteed cleanup
+- `withCheckedThrowingContinuation` for async adapter testing
+- `await #expect(throws: ASCError.self)` for error validation
 
 ## Library Architecture
 
@@ -111,6 +125,9 @@ enum UserAPI {
    - OSLog-based logging with emoji-enhanced output
    - 5 log levels with privacy-aware redaction
    - Visual indicators for methods, status codes, performance
+   - Request correlation tracking with numbered requests (#1, #2, etc)
+   - Thread-safe request tracking using Mutex
+   - Automatic memory management (prevents leaks in long-running apps)
 
 ### Core Features
 
@@ -159,6 +176,9 @@ Convenient factory methods for Alamofire.RetryPolicy:
 ASCLogger with emoji-enhanced visual output:
 - OSLog integration for performance and privacy
 - 5 log levels: none, error, info, debug, verbose
+- **Request correlation tracking**: Numbered requests (#1, #2) for easy debugging
+- **Thread-safe**: Uses Mutex for concurrent request tracking
+- **Memory efficient**: Automatic cleanup prevents leaks in long-running apps
 - Rich emoji visualization for better readability:
   - HTTP methods: 📥 GET, 📤 POST, 🔄 PUT, ✏️ PATCH, 🗑️ DELETE
   - Status codes: ✅ 200, 🎉 201, 🔐 401, 🔍 404, 💥 500
@@ -418,25 +438,36 @@ let user = try await client.execute(CustomRequest())
 ## Code Quality Metrics
 
 **Library Code:**
-- ~1,990 lines across 13 files
+- ~2,915 lines across 13 files
 - Zero code duplication
 - All public APIs documented
 - Full Swift 6 concurrency support
 
 **Test Suite:**
-- 61 comprehensive tests, 100% pass rate
-- 671 lines of test code
+- 112 comprehensive tests across 6 suites, 100% pass rate
 - Test framework: Swift Testing (not XCTest)
+- Thread-safe mock infrastructure with `Mutex<T>`
 - Test breakdown:
-  - ASCErrorTests: 27 tests (error handling)
-  - NetworkRequestTests: 21 tests (protocol defaults)
-  - URLBuilderTests: 10 tests (URL construction)
-  - AuthInterceptorTests: 3 tests (token storage)
+  - **Core Tests** (58 tests):
+    - ASCErrorTests: 27 tests (error enum, descriptions, recovery suggestions)
+    - NetworkRequestTests: 21 tests (protocol defaults, encoding, validation)
+    - URLBuilderTests: 10 tests (URL construction, validation)
+  - **Component Tests** (54 tests):
+    - ErrorMapperTests: 28 tests (AFError/URLError mapping, error messages)
+    - NetworkClientTests: 17 tests (initialization, request execution, retry, validation)
+    - AuthInterceptorTests: 9 tests (token types, header injection, error handling)
+
+**Code Coverage (Priority 1 Components):**
+- ErrorMapper: 89.09% (was 1.82%)
+- NetworkClient: 68.35% (was 6.33%)
+- AuthInterceptor: 100% (was 0%)
 
 **Code Quality:**
 - 0 SwiftLint warnings/errors
 - Protocol-oriented design throughout
 - Type-safe with comprehensive generics
+- All tests are honest (no tautological assertions)
+- Consistent test patterns (defer cleanup, inline creation, minimal comments)
 
 ## GitHub Integration
 
@@ -446,5 +477,5 @@ GitHub Actions configured for Claude Code:
 
 ---
 
-**Last Updated**: October 27, 2025
+**Last Updated**: October 28, 2025
 **Maintained by**: ASC Development Team
