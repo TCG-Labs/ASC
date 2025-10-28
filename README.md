@@ -115,6 +115,62 @@ let results = try await client.execute(
 )
 ```
 
+## 🔍 Logging
+
+ASC includes built-in logging using Apple's unified logging system (os.log).
+
+### Log Levels
+
+Configure logging when creating a NetworkClient:
+
+```swift
+let config = NetworkClientConfiguration(
+    baseURL: "https://api.example.com",
+    logLevel: .verbose  // Choose your log level
+)
+let client = NetworkClient(configuration: config)
+```
+
+**Available levels:**
+
+- `.none` - No logging (default)
+- `.error` - Errors only
+- `.info` - Requests and responses (URLs, status codes, timing)
+- `.debug` - Info + HTTP headers
+- `.verbose` - Debug + request/response bodies (JSON pretty-printed)
+
+### Example Output
+
+With `.verbose` logging enabled, you'll see in Xcode Console:
+
+```
+→ 📤 POST https://api.example.com/v1/auth/login
+  📋 Headers:
+    Content-Type: application/json
+  📦 Body (JSON):
+{
+  "email" : "user@example.com",
+  "password" : "🔒 <redacted>"
+}
+← ✅ 200 https://api.example.com/v1/auth/login ⚡ 0.23s
+  📄 Response (JSON):
+{
+  "accessToken" : "eyJhbG...",
+  "refreshToken" : "eyJhbG..."
+}
+```
+
+**Features:**
+- 🎨 Emoji indicators for methods, status codes, and timing
+- 🔒 Automatic redaction of sensitive headers (Authorization, API keys, cookies)
+- 📊 Request duration with performance emojis (⚡ fast, 🐢 slow)
+- 🎯 Pretty-printed JSON for easy reading
+
+### Viewing Logs in Xcode
+
+- Logs appear in real-time with emoji prefixes
+- Filter by subsystem: `com.asc.networking`
+
 ## 📚 Examples
 
 All runnable examples are located in the [`Examples/`](ASC/Examples/) directory.
