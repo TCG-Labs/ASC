@@ -13,9 +13,9 @@ Provides a convenient wrapper over Alamofire for:
 - **Modern Swift patterns** - Protocol-oriented, async/await, Codable support
 
 ### Current Status
-- **Version**: 1.0 (feature/verson-1.0 branch)
+- **Version**: 1.0
 - **Status**: Production-ready
-- **Test Coverage**: 112 tests, 100% pass rate
+- **Test Coverage**: 112 tests in 6 suites, 100% pass rate
 - **Code Quality**: 0 SwiftLint warnings/errors
 
 ## Development Commands
@@ -36,16 +36,16 @@ swiftlint --fix
 ## Architecture
 
 ### Package Structure
-- **Sources/ASC/**: Main library (13 files, ~1,990 lines)
+- **Sources/ASC/**: Main library (13 files, ~2,915 lines)
   - **Auth/**: Authentication (3 files, 236 lines)
     - `AuthInterceptor.swift` - Token refresh (98 lines)
     - `TokenStorage.swift` - Token storage protocol (43 lines)
     - `TokenType.swift` - Token types (56 lines)
-  - **Client/**: NetworkClient and components (5 files, ~1,180 lines)
+  - **Client/**: NetworkClient and components (5 files, ~1,557 lines)
     - `NetworkClient.swift` - Main client (455 lines)
     - `NetworkClientConfiguration.swift` - Configuration (463 lines)
     - `ErrorMapper.swift` - Error mapping (157 lines)
-    - `ASCLogger.swift` - Debug logging (92 lines)
+    - `ASCLogger.swift` - Debug logging with request correlation (377 lines)
     - `URLBuilder.swift` - URL construction (69 lines)
   - **Core/**: Protocols and types (3 files, ~305 lines)
     - `NetworkRequest.swift` - Request protocol + Alamofire re-export (187 lines)
@@ -125,6 +125,9 @@ enum UserAPI {
    - OSLog-based logging with emoji-enhanced output
    - 5 log levels with privacy-aware redaction
    - Visual indicators for methods, status codes, performance
+   - Request correlation tracking with numbered requests (#1, #2, etc)
+   - Thread-safe request tracking using Mutex
+   - Automatic memory management (prevents leaks in long-running apps)
 
 ### Core Features
 
@@ -173,6 +176,9 @@ Convenient factory methods for Alamofire.RetryPolicy:
 ASCLogger with emoji-enhanced visual output:
 - OSLog integration for performance and privacy
 - 5 log levels: none, error, info, debug, verbose
+- **Request correlation tracking**: Numbered requests (#1, #2) for easy debugging
+- **Thread-safe**: Uses Mutex for concurrent request tracking
+- **Memory efficient**: Automatic cleanup prevents leaks in long-running apps
 - Rich emoji visualization for better readability:
   - HTTP methods: 📥 GET, 📤 POST, 🔄 PUT, ✏️ PATCH, 🗑️ DELETE
   - Status codes: ✅ 200, 🎉 201, 🔐 401, 🔍 404, 💥 500
@@ -432,7 +438,7 @@ let user = try await client.execute(CustomRequest())
 ## Code Quality Metrics
 
 **Library Code:**
-- ~1,990 lines across 13 files
+- ~2,915 lines across 13 files
 - Zero code duplication
 - All public APIs documented
 - Full Swift 6 concurrency support
