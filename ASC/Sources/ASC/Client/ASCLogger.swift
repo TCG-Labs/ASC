@@ -47,6 +47,7 @@ public final class ASCLogger: EventMonitor, Sendable {
 
     private static let sharedQueue = DispatchQueue(label: "com.asc.logger", qos: .utility)
     private let requestCounter = Mutex<Int>(0)
+    private let requestNumbers = Mutex<[UUID: Int]>([:])
     private let logLevel: ASCLogLevel
     private let logger: Logger
 
@@ -82,23 +83,28 @@ public final class ASCLogger: EventMonitor, Sendable {
             return counter
         }
 
+        // Store request number for later correlation
+        requestNumbers.withLock { $0[request.id] = requestNumber }
+
         let method = urlRequest.httpMethod ?? "GET"
         let url = urlRequest.url?.absoluteString ?? "unknown"
         let methodEmoji = methodEmoji(for: method)
 
-        logger.info("┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
-        logger.info("┃ 📡 REQUEST #\(requestNumber)")
-        logger.info("┃ \(methodEmoji) \(method) \(url)")
+        var lines: [String] = []
+        lines.append("┌─ 📡 #\(requestNumber) ▶️ \(methodEmoji) \(method)")
+        lines.append("│  \(url)")
 
         if logLevel.rawValue >= ASCLogLevel.debug.rawValue {
-            logHeaders(urlRequest.allHTTPHeaderFields, prefix: "┃")
+            lines.append(contentsOf: buildHeadersLines(urlRequest.allHTTPHeaderFields, prefix: "│"))
         }
 
         if logLevel.rawValue >= ASCLogLevel.verbose.rawValue {
-            logBody(urlRequest.httpBody, prefix: "┃")
+            lines.append(contentsOf: buildBodyLines(urlRequest.httpBody, prefix: "│"))
         }
 
-        logger.info("┗━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+        lines.append("└─────────────────────────────────────────────────────────────────")
+
+        logger.info("\(lines.joined(separator: "\n"))")
     }
 
     public func request<Value>(
@@ -107,34 +113,44 @@ public final class ASCLogger: EventMonitor, Sendable {
     ) {
         guard logLevel.rawValue >= ASCLogLevel.info.rawValue else { return }
 
+        // Get request number for correlation
+        let requestNumber = requestNumbers.withLock { $0[request.id] }
+
         if let httpResponse = response.response {
             let statusCode = httpResponse.statusCode
-            let url = httpResponse.url?.absoluteString ?? "unknown"
             let duration = response.metrics?.taskInterval.duration ?? 0
             let dataSize = response.data?.count ?? 0
 
             let statusEmoji = statusEmoji(for: statusCode)
             let durationEmoji = durationEmoji(for: duration)
 
-            logger.info("┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
-            logger.info("┃ 📥 RESPONSE")
-            logger.info("┃ \(statusEmoji) \(statusCode) \(url)")
-            logger.info("┃ \(durationEmoji) Duration: \(String(format: "%.3f", duration))s • Size: \(self.formatBytes(dataSize))")
+            // Format request number
+            let requestTag = requestNumber.map { "#\($0)" } ?? "#?"
+
+            var lines: [String] = []
+            lines.append("┌─ 📡 \(requestTag) ◀️ \(statusEmoji) \(statusCode)")
+            lines.append("│  \(durationEmoji) \(String(format: "%.3f", duration))s • 📦 \(self.formatBytes(dataSize))")
 
             if logLevel.rawValue >= ASCLogLevel.debug.rawValue {
-                logHeaders(httpResponse.allHeaderFields as? [String: String], prefix: "┃")
+                let headers = httpResponse.allHeaderFields as? [String: String]
+                lines.append(contentsOf: buildHeadersLines(headers, prefix: "│"))
             }
 
             if logLevel.rawValue >= ASCLogLevel.verbose.rawValue {
-                logResponseBody(response.data, prefix: "┃")
+                lines.append(contentsOf: buildResponseBodyLines(response.data, prefix: "│"))
             }
 
-            logger.info("┗━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+            lines.append("└─────────────────────────────────────────────────────────────────")
+
+            logger.info("\(lines.joined(separator: "\n"))")
         }
 
         if let error = response.error {
             logError(error, for: request)
         }
+
+        // Cleanup: remove request number after logging response
+        _ = requestNumbers.withLock { $0.removeValue(forKey: request.id) }
     }
 
     public func request(
@@ -142,80 +158,92 @@ public final class ASCLogger: EventMonitor, Sendable {
         didCompleteTask task: URLSessionTask,
         with error: AFError?
     ) {
-        guard let error = error else { return }
+        // Log error if present
+        if let error = error {
+            logError(error, for: request)
+        }
 
-        logError(error, for: request)
+        // Always cleanup request number when task completes
+        // This ensures no memory leak even if didParseResponse is never called
+        _ = requestNumbers.withLock { $0.removeValue(forKey: request.id) }
     }
 
     // MARK: - Private Methods
 
-    private func logHeaders(_ headers: [String: String]?, prefix: String = "") {
-        guard let headers = headers, !headers.isEmpty else { return }
+    private func buildHeadersLines(_ headers: [String: String]?, prefix: String = "") -> [String] {
+        guard let headers = headers, !headers.isEmpty else { return [] }
 
-        logger.debug("\(prefix) ┃")
-        logger.debug("\(prefix) ┣━━ 📋 Headers (\(headers.count))")
+        var lines: [String] = []
+        lines.append("\(prefix)  📋 Headers (\(headers.count))")
         for (key, value) in headers.sorted(by: { $0.key < $1.key }) {
             let sanitizedValue = shouldRedact(headerName: key) ? "🔒 <redacted>" : value
-            logger.debug("\(prefix) ┃   • \(key): \(sanitizedValue)")
+            lines.append("\(prefix)     • \(key): \(sanitizedValue)")
         }
+        return lines
     }
 
-    private func logBody(_ body: Data?, prefix: String = "") {
-        guard let body = body else { return }
+    private func buildBodyLines(_ body: Data?, prefix: String = "") -> [String] {
+        guard let body = body else { return [] }
 
-        logger.debug("\(prefix) ┃")
-        logger.debug("\(prefix) ┣━━ 📦 Request Body (\(self.formatBytes(body.count)))")
+        var lines: [String] = []
+        lines.append("\(prefix)  📦 Request Body (\(self.formatBytes(body.count)))")
 
-        if let jsonString = prettyPrintJSON(body, maxLines: 20) {
+        if let jsonString = prettyPrintJSON(body, maxLines: 30) {
             for line in jsonString.split(separator: "\n") {
-                logger.debug("\(prefix) ┃   \(line)")
+                lines.append("\(prefix)     \(line)")
             }
         } else if let string = String(data: body, encoding: .utf8) {
             let preview = string.prefix(500)
-            logger.debug("\(prefix) ┃   📝 Text: \(preview)\(string.count > 500 ? "..." : "")")
+            lines.append("\(prefix)     📝 Text: \(preview)\(string.count > 500 ? "..." : "")")
         } else {
-            logger.debug("\(prefix) ┃   💾 Binary: \(body.count) bytes")
+            lines.append("\(prefix)     💾 Binary: \(body.count) bytes")
         }
+        return lines
     }
 
-    private func logResponseBody(_ data: Data?, prefix: String = "") {
-        guard let data = data else { return }
+    private func buildResponseBodyLines(_ data: Data?, prefix: String = "") -> [String] {
+        guard let data = data else { return [] }
 
-        logger.debug("\(prefix) ┃")
-        logger.debug("\(prefix) ┣━━ 📄 Response Body (\(self.formatBytes(data.count)))")
+        var lines: [String] = []
+        lines.append("\(prefix)  📄 Response Body (\(self.formatBytes(data.count)))")
 
         if let jsonString = prettyPrintJSON(data, maxLines: 50) {
             for line in jsonString.split(separator: "\n") {
-                logger.debug("\(prefix) ┃   \(line)")
+                lines.append("\(prefix)     \(line)")
             }
         } else if let string = String(data: data, encoding: .utf8) {
             let preview = string.prefix(500)
-            logger.debug("\(prefix) ┃   📃 Text: \(preview)\(string.count > 500 ? "..." : "")")
+            lines.append("\(prefix)     📝 Text: \(preview)\(string.count > 500 ? "..." : "")")
         } else {
-            logger.debug("\(prefix) ┃   💿 Binary: \(data.count) bytes")
+            lines.append("\(prefix)     💾 Binary: \(data.count) bytes")
         }
+        return lines
     }
 
     private func logError(_ error: AFError, for request: Request) {
         guard logLevel.rawValue >= ASCLogLevel.error.rawValue else { return }
 
+        // Get request number for correlation
+        let requestNumber = requestNumbers.withLock { $0[request.id] }
+        let requestTag = requestNumber.map { "#\($0)" } ?? "#?"
+
         let url = request.request?.url?.absoluteString ?? "unknown"
         let errorEmoji = errorEmoji(for: error)
 
-        logger.error("┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
-        logger.error("┃ ❌ ERROR")
-        logger.error("┃ \(errorEmoji) \(error.localizedDescription)")
-        logger.error("┃ URL: \(url)")
+        var lines: [String] = []
+        lines.append("┌─ 📡 \(requestTag) ✗ ERROR")
+        lines.append("│  \(errorEmoji) \(error.localizedDescription)")
+        lines.append("│  URL: \(url)")
 
         if logLevel.rawValue >= ASCLogLevel.debug.rawValue {
             if let underlyingError = error.underlyingError {
-                logger.error("┃")
-                logger.error("┣━━ ⚙️ Underlying Error")
-                logger.error("┃   \(underlyingError.localizedDescription)")
+                lines.append("│  ⚙️ Underlying: \(underlyingError.localizedDescription)")
             }
         }
 
-        logger.error("┗━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+        lines.append("└─────────────────────────────────────────────────────────────────")
+
+        logger.error("\(lines.joined(separator: "\n"))")
     }
 
     private func formatBytes(_ bytes: Int) -> String {
