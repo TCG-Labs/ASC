@@ -16,7 +16,6 @@ let package = Package(
         ),
     ],
     dependencies: [
-        .package(url: "https://github.com/realm/SwiftLint", from: "0.61.0"),
         .package(url: "https://github.com/Alamofire/Alamofire", from: "5.10.2"),
     ],
     targets: [
@@ -24,9 +23,6 @@ let package = Package(
             name: "ASC",
             dependencies: [
                 "Alamofire",
-            ],
-            plugins: [
-                .plugin(name: "SwiftLintBuildToolPlugin", package: "SwiftLint"),
             ]
         ),
         .testTarget(

@@ -28,6 +28,7 @@
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXFileReference section */
+		45A338F42EB3870C00F10F79 /* ASC */ = {isa = PBXFileReference; lastKnownFileType = wrapper; name = ASC; path = ../..; sourceTree = "<group>"; };
 		B40DB5452EAD65700052EF4D /* TestExample.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = TestExample.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		B40DB5522EAD65720052EF4D /* TestExampleTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = TestExampleTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		B40DB55C2EAD65720052EF4D /* TestExampleUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = TestExampleUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -71,12 +72,21 @@
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
+		45A338F12EB386AA00F10F79 /* Frameworks */ = {
+			isa = PBXGroup;
+			children = (
+				45A338F42EB3870C00F10F79 /* ASC */,
+			);
+			name = Frameworks;
+			sourceTree = "<group>";
+		};
 		B40DB53C2EAD65700052EF4D = {
 			isa = PBXGroup;
 			children = (
 				B40DB5472EAD65700052EF4D /* TestExample */,
 				B40DB5552EAD65720052EF4D /* TestExampleTests */,
 				B40DB55F2EAD65720052EF4D /* TestExampleUITests */,
+				45A338F12EB386AA00F10F79 /* Frameworks */,
 				B40DB5462EAD65700052EF4D /* Products */,
 			);
 			sourceTree = "<group>";
@@ -190,7 +200,6 @@
 			mainGroup = B40DB53C2EAD65700052EF4D;
 			minimizedProjectReferenceProxies = 1;
 			packageReferences = (
-				B40DB56F2EAD65A10052EF4D /* XCLocalSwiftPackageReference "../../ASC" */,
 			);
 			preferredProjectObjectVersion = 90;
 			productRefGroup = B40DB5462EAD65700052EF4D /* Products */;
@@ -551,13 +560,6 @@
 			defaultConfigurationName = Release;
 		};
 /* End XCConfigurationList section */
-
-/* Begin XCLocalSwiftPackageReference section */
-		B40DB56F2EAD65A10052EF4D /* XCLocalSwiftPackageReference "../../ASC" */ = {
-			isa = XCLocalSwiftPackageReference;
-			relativePath = ../../ASC;
-		};
-/* End XCLocalSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
 		B40DB5702EAD65A10052EF4D /* ASC */ = {

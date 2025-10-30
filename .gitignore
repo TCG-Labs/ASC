@@ -142,6 +142,8 @@ fastlane/test_output
 fastlane/xcov_output
 fastlane/archive
 fastlane/README.md
+scripts/swiftlint
+scripts/swiftlint.*
 
 # ===========================
 # Backup & Temporary Files
