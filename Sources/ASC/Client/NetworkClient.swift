@@ -190,17 +190,7 @@ public final class NetworkClient: Sendable {
         try Task.checkCancellation()
         try checkConnectivity()
 
-        // Use request's retry policy, fallback to configuration default
-        let effectiveRetryPolicy = retryPolicy ?? configuration.defaultRetryPolicy
-
-        var interceptors: [any RequestInterceptor] = []
-        if let effectiveRetryPolicy {
-            interceptors.append(effectiveRetryPolicy)
-        }
-        if let authInterceptor = configuration.authInterceptor {
-            interceptors.append(authInterceptor)
-        }
-        let interceptor: Interceptor = .init(interceptors: interceptors)
+        let interceptor = buildRequestInterceptor(retryPolicy: retryPolicy)
         let dataRequest = session.request(urlRequest, interceptor: interceptor)
 
         // Set request priority
@@ -239,10 +229,8 @@ public final class NetworkClient: Sendable {
         try Task.checkCancellation()
         try checkConnectivity()
 
-        // Use request's retry policy, fallback to configuration default
-        let effectiveRetryPolicy = retryPolicy ?? configuration.defaultRetryPolicy
-
-        let dataRequest = session.request(urlRequest, interceptor: effectiveRetryPolicy)
+        let interceptor = buildRequestInterceptor(retryPolicy: retryPolicy)
+        let dataRequest = session.request(urlRequest, interceptor: interceptor)
 
         // Set request priority
         dataRequest.task?.priority = configuration.defaultPriority
@@ -260,6 +248,19 @@ public final class NetworkClient: Sendable {
         } onCancel: {
             dataRequest.cancel()
         }
+    }
+
+    private func buildRequestInterceptor(retryPolicy: Alamofire.RetryPolicy?) -> Interceptor {
+        let effectiveRetryPolicy = retryPolicy ?? configuration.defaultRetryPolicy
+        var interceptors: [any RequestInterceptor] = []
+        if let effectiveRetryPolicy {
+            interceptors.append(effectiveRetryPolicy)
+        }
+        if let authInterceptor = configuration.authInterceptor {
+            interceptors.append(authInterceptor)
+        }
+        let interceptor: Interceptor = .init(interceptors: interceptors)
+        return interceptor
     }
 
     // MARK: - Response Handling
