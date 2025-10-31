@@ -192,6 +192,8 @@ public struct NetworkClientConfiguration: Sendable {
     /// Default headers added to all requests.
     public var defaultHeaders: HTTPHeaders
 
+    public var authInterceptor: (any RequestInterceptor)?
+
     /// Request interceptors for adapting and retrying requests.
     public var interceptors: [any RequestInterceptor]
 
@@ -386,6 +388,7 @@ public struct NetworkClientConfiguration: Sendable {
         defaultTimeout: TimeInterval = 60,
         defaultCachePolicy: URLRequest.CachePolicy = .useProtocolCachePolicy,
         defaultHeaders: HTTPHeaders = .default,
+        authInterceptor: (any RequestInterceptor)? = nil,
         interceptors: [any RequestInterceptor] = [],
         eventMonitors: [any EventMonitor] = [],
         serverTrustManager: ServerTrustManager? = nil,
@@ -418,6 +421,7 @@ public struct NetworkClientConfiguration: Sendable {
         self.defaultTimeout = defaultTimeout
         self.defaultCachePolicy = defaultCachePolicy
         self.defaultHeaders = defaultHeaders
+        self.authInterceptor = authInterceptor
         self.interceptors = interceptors
         self.logLevel = logLevel
         self.decoder = decoder

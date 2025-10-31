@@ -131,9 +131,9 @@ internal final class RequestBuilder: Sendable {
     ) -> HTTPHeaders {
         var headers = defaultHeaders.copy()
 
-        if request.enableAuthorization {
-            headers.add(.authenticationRequired)
-        }
+//        if request.enableAuthorization {
+//            headers.add(.authenticationRequired)
+//        }
 
         if let requestHeaders = request.headers {
             for header in requestHeaders {

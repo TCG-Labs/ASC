@@ -193,7 +193,15 @@ public final class NetworkClient: Sendable {
         // Use request's retry policy, fallback to configuration default
         let effectiveRetryPolicy = retryPolicy ?? configuration.defaultRetryPolicy
 
-        let dataRequest = session.request(urlRequest, interceptor: effectiveRetryPolicy)
+        var interceptors: [any RequestInterceptor] = []
+        if let effectiveRetryPolicy {
+            interceptors.append(effectiveRetryPolicy)
+        }
+        if let authInterceptor = configuration.authInterceptor {
+            interceptors.append(authInterceptor)
+        }
+        let interceptor: Interceptor = .init(interceptors: interceptors)
+        let dataRequest = session.request(urlRequest, interceptor: interceptor)
 
         // Set request priority
         dataRequest.task?.priority = configuration.defaultPriority
