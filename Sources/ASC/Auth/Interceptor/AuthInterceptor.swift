@@ -69,13 +69,7 @@ public final class AuthInterceptor: RequestInterceptor, @unchecked Sendable {
         for session: Session,
         completion: @escaping (Result<URLRequest, any Error>) -> Void
     ) {
-//        guard urlRequest.headers.contains(.authenticationRequired) else {
-//            completion(.success(urlRequest))
-//            return
-//        }
-
         var urlRequest = urlRequest
-//        urlRequest.headers.remove(name: HTTPHeader.authenticationRequired.name)
 
         guard let authHeader = storage.authToken?.header else {
             completion(.failure(ASCError.invalidToken))
