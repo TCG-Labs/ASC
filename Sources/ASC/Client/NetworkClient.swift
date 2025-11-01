@@ -170,7 +170,11 @@ public final class NetworkClient: Sendable {
                 retryPolicy: request.retryPolicy
             )
         } else {
-            try await performEmptyRequest(urlRequest, retryPolicy: request.retryPolicy)
+            try await performEmptyRequest(
+                request,
+                urlRequest: urlRequest,
+                retryPolicy: request.retryPolicy
+            )
             return nil
         }
     }
@@ -190,7 +194,7 @@ public final class NetworkClient: Sendable {
         try Task.checkCancellation()
         try checkConnectivity()
 
-        let interceptor = buildRequestInterceptor(retryPolicy: retryPolicy)
+        let interceptor = buildRequestInterceptor(request, retryPolicy: retryPolicy)
         let dataRequest = session.request(urlRequest, interceptor: interceptor)
 
         // Set request priority
@@ -222,14 +226,15 @@ public final class NetworkClient: Sendable {
     ///
     /// Supports Task cancellation - when the Swift Task is cancelled,
     /// the underlying Alamofire request is automatically cancelled.
-    private func performEmptyRequest(
-        _ urlRequest: URLRequest,
+    private func performEmptyRequest<Request: NetworkRequest>(
+        _ request: Request,
+        urlRequest: URLRequest,
         retryPolicy: Alamofire.RetryPolicy?
     ) async throws {
         try Task.checkCancellation()
         try checkConnectivity()
 
-        let interceptor = buildRequestInterceptor(retryPolicy: retryPolicy)
+        let interceptor = buildRequestInterceptor(request, retryPolicy: retryPolicy)
         let dataRequest = session.request(urlRequest, interceptor: interceptor)
 
         // Set request priority
@@ -250,15 +255,18 @@ public final class NetworkClient: Sendable {
         }
     }
 
-    private func buildRequestInterceptor(retryPolicy: Alamofire.RetryPolicy?) -> Interceptor {
+    private func buildRequestInterceptor(_ request: any NetworkRequest, retryPolicy: Alamofire.RetryPolicy?) -> Interceptor {
         let effectiveRetryPolicy = retryPolicy ?? configuration.defaultRetryPolicy
+        let authInterceptor = request.enableAuthorization ? configuration.authInterceptor : nil
         var interceptors: [any RequestInterceptor] = []
+
         if let effectiveRetryPolicy {
             interceptors.append(effectiveRetryPolicy)
         }
-        if let authInterceptor = configuration.authInterceptor {
+        if let authInterceptor {
             interceptors.append(authInterceptor)
         }
+
         let interceptor: Interceptor = .init(interceptors: interceptors)
         return interceptor
     }

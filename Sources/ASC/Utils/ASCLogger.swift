@@ -67,10 +67,14 @@ public final class ASCLogger: EventMonitor, Sendable {
     // MARK: - Properties
 
     private static let sharedQueue = DispatchQueue(label: "com.asc.logger", qos: .utility)
-    private let requestCounter = Mutex<Int>(0)
-    private let requestNumbers = Mutex<[UUID: Int]>([:])
     private let logLevel: ASCLogLevel
     private let logger: Logger
+
+    private let dateFormatter: DateFormatter = {
+        let formatter: DateFormatter = .init()
+        formatter.dateFormat = "yyyy-MM-dd HH:mm:ss"
+        return formatter
+    }()
 
     public var queue: DispatchQueue {
         Self.sharedQueue
@@ -95,24 +99,19 @@ public final class ASCLogger: EventMonitor, Sendable {
 
     // MARK: - EventMonitor
 
-    public func requestDidResume(_ request: Request) {
+    public func request(_ request: Request, didResumeTask task: URLSessionTask) {
         guard logLevel.rawValue >= ASCLogLevel.info.rawValue else { return }
         guard let urlRequest = request.request else { return }
-
-        let requestNumber = requestCounter.withLock { counter in
-            counter += 1
-            return counter
-        }
-
-        // Store request number for later correlation
-        requestNumbers.withLock { $0[request.id] = requestNumber }
 
         let method = urlRequest.httpMethod ?? "GET"
         let url = urlRequest.url?.absoluteString ?? "unknown"
         let methodEmoji = methodEmoji(for: method)
 
+        let date: Date = .now
+        let stringDate = dateFormatter.string(from: date)
+
         var lines: [String] = []
-        lines.append("┌─ 📡 #\(requestNumber) ▶️ \(methodEmoji) \(method)")
+        lines.append("┌─ \(stringDate) [ASC] ▶️ \(methodEmoji) \(method)")
         lines.append("│  \(url)")
 
         if logLevel.rawValue >= ASCLogLevel.debug.rawValue {
@@ -134,22 +133,21 @@ public final class ASCLogger: EventMonitor, Sendable {
     ) {
         guard logLevel.rawValue >= ASCLogLevel.info.rawValue else { return }
 
-        // Get request number for correlation
-        let requestNumber = requestNumbers.withLock { $0[request.id] }
-
         if let httpResponse = response.response {
             let statusCode = httpResponse.statusCode
             let duration = response.metrics?.taskInterval.duration ?? 0
-            let dataSize = response.data?.count ?? 0
-
+            let dataSize = calculateResponseSize(from: response)
+            let method = response.request?.httpMethod ?? "GET"
+            let url = response.request?.url?.absoluteString ?? "unknown"
             let statusEmoji = statusEmoji(for: statusCode)
             let durationEmoji = durationEmoji(for: duration)
 
-            // Format request number
-            let requestTag = requestNumber.map { "#\($0)" } ?? "#?"
+            let date: Date = .now
+            let stringDate = dateFormatter.string(from: date)
 
             var lines: [String] = []
-            lines.append("┌─ 📡 \(requestTag) ◀️ \(statusEmoji) \(statusCode)")
+            lines.append("┌─ 📡 \(stringDate) [ASC] ◀️ \(statusEmoji) \(method) (\(statusCode))")
+            lines.append("│  \(url)")
             lines.append("│  \(durationEmoji) \(String(format: "%.3f", duration))s • 📦 \(self.formatBytes(dataSize))")
 
             if logLevel.rawValue >= ASCLogLevel.debug.rawValue {
@@ -169,9 +167,6 @@ public final class ASCLogger: EventMonitor, Sendable {
         if let error = response.error {
             logError(error, for: request)
         }
-
-        // Cleanup: remove request number after logging response
-        _ = requestNumbers.withLock { $0.removeValue(forKey: request.id) }
     }
 
     public func request(
@@ -183,13 +178,41 @@ public final class ASCLogger: EventMonitor, Sendable {
         if let error = error {
             logError(error, for: request)
         }
-
-        // Always cleanup request number when task completes
-        // This ensures no memory leak even if didParseResponse is never called
-        _ = requestNumbers.withLock { $0.removeValue(forKey: request.id) }
     }
 
     // MARK: - Private Methods
+
+    /// Calculates the total response size in bytes from URLSessionTaskMetrics.
+    ///
+    /// Returns nil if size cannot be determined (metrics unavailable).
+    ///
+    /// Calculates total size as sum of:
+    /// - `countOfResponseHeaderBytesReceived` (response headers size)
+    /// - `countOfResponseBodyBytesReceived` (response body size)
+    ///
+    /// Sums across all transaction metrics to handle redirects and retries correctly.
+    ///
+    /// - Parameter response: The DataResponse to calculate size from
+    /// - Returns: Total response size in bytes (headers + body), or nil if unavailable
+    private func calculateResponseSize<Value>(
+        from response: DataResponse<Value, AFError>
+    ) -> Int? {
+        guard let metrics = response.metrics else {
+            return nil
+        }
+
+        var totalBytes: Int64 = 0
+        for transaction in metrics.transactionMetrics {
+            totalBytes += transaction.countOfResponseHeaderBytesReceived
+            totalBytes += transaction.countOfResponseBodyBytesReceived
+        }
+
+        guard totalBytes > 0 else {
+            return nil
+        }
+
+        return Int(totalBytes)
+    }
 
     private func buildHeadersLines(_ headers: [String: String]?, prefix: String = "") -> [String] {
         guard let headers = headers, !headers.isEmpty else { return [] }
@@ -197,8 +220,12 @@ public final class ASCLogger: EventMonitor, Sendable {
         var lines: [String] = []
         lines.append("\(prefix)  📋 Headers (\(headers.count))")
         for (key, value) in headers.sorted(by: { $0.key < $1.key }) {
+            #if DEBUG
+            lines.append("\(prefix)     • \(key): \(value)")
+            #else
             let sanitizedValue = shouldRedact(headerName: key) ? "🔒 <redacted>" : value
             lines.append("\(prefix)     • \(key): \(sanitizedValue)")
+            #endif
         }
         return lines
     }
@@ -228,6 +255,12 @@ public final class ASCLogger: EventMonitor, Sendable {
         var lines: [String] = []
         lines.append("\(prefix)  📄 Response Body (\(self.formatBytes(data.count)))")
 
+        if let jsonString: String = .init(data: data, encoding: .utf8),
+           jsonString == "[]" {
+            lines.append("\(prefix)     \(jsonString)")
+            return lines
+        }
+
         if let jsonString = prettyPrintJSON(data, maxLines: 50) {
             for line in jsonString.split(separator: "\n") {
                 lines.append("\(prefix)     \(line)")
@@ -244,15 +277,14 @@ public final class ASCLogger: EventMonitor, Sendable {
     private func logError(_ error: AFError, for request: Request) {
         guard logLevel.rawValue >= ASCLogLevel.error.rawValue else { return }
 
-        // Get request number for correlation
-        let requestNumber = requestNumbers.withLock { $0[request.id] }
-        let requestTag = requestNumber.map { "#\($0)" } ?? "#?"
-
         let url = request.request?.url?.absoluteString ?? "unknown"
         let errorEmoji = errorEmoji(for: error)
 
+        let date: Date = .now
+        let stringDate = dateFormatter.string(from: date)
+
         var lines: [String] = []
-        lines.append("┌─ 📡 \(requestTag) ✗ ERROR")
+        lines.append("┌─ 📡 \(stringDate) [ASC] ✗ ERROR")
         lines.append("│  \(errorEmoji) \(error.localizedDescription)")
         lines.append("│  URL: \(url)")
 
@@ -267,8 +299,10 @@ public final class ASCLogger: EventMonitor, Sendable {
         logger.error("\(lines.joined(separator: "\n"))")
     }
 
-    private func formatBytes(_ bytes: Int) -> String {
-        guard bytes > 0 else { return "0 B" }
+    private func formatBytes(_ bytes: Int?) -> String {
+        guard let bytes = bytes, bytes > 0 else {
+            return "??? B"
+        }
 
         let units = ["B", "KB", "MB", "GB"]
         var value = Double(bytes)
