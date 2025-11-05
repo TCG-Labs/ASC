@@ -205,8 +205,6 @@ public protocol NetworkRequest: Sendable {
     /// ```
     var enableAuthorization: Bool { get }
 
-    init()
-
     /// Validates the response after successful decoding.
     ///
     /// Override this method to implement custom business logic validation.
