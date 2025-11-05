@@ -81,9 +81,6 @@ public typealias ParameterEncoder = Alamofire.ParameterEncoder
 /// }
 /// ```
 public protocol NetworkRequest: Sendable {
-    /// The expected response type conforming to Decodable.
-    associatedtype Response: Decodable & Sendable
-
     /// The parameters type conforming to Encodable.
     ///
     /// Use `EmptyParameters` for requests without parameters (GET, DELETE, etc.).
@@ -100,6 +97,9 @@ public protocol NetworkRequest: Sendable {
     /// }
     /// ```
     associatedtype Parameters: Encodable & Sendable
+
+    /// The expected response type conforming to Decodable.
+    associatedtype Response: Decodable & Sendable
 
     /// The base URL for the request.
     ///
@@ -204,6 +204,8 @@ public protocol NetworkRequest: Sendable {
     /// }
     /// ```
     var enableAuthorization: Bool { get }
+
+    init()
 
     /// Validates the response after successful decoding.
     ///
