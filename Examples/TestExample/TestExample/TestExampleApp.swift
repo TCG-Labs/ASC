@@ -26,12 +26,60 @@
 //
 
 import SwiftUI
+import ASC
 
 @main
 struct TestExampleApp: App {
+    init() {
+        setupDIContainer()
+    }
+
     var body: some Scene {
         WindowGroup {
             ContentView()
         }
+    }
+
+    // MARK: - Private Methods
+
+    /// Configures the DI container with NetworkClient instances for different environments.
+    private func setupDIContainer() {
+        let container = DIContainer.shared
+
+        // Production environment - minimal logging, optimized for performance
+        container.registerClient(
+            for: .production,
+            configuration: NetworkClientConfiguration(
+                baseURL: "https://jsonplaceholder.typicode.com",
+                defaultTimeout: 30.0,
+                logLevel: .error,
+                connectivityCheckEnabled: true
+            )
+        )
+
+        // Staging environment - info level logging for debugging
+        container.registerClient(
+            for: .staging,
+            configuration: NetworkClientConfiguration(
+                baseURL: "https://jsonplaceholder.typicode.com",
+                defaultTimeout: 30.0,
+                logLevel: .info,
+                connectivityCheckEnabled: true
+            )
+        )
+
+        // Development environment - verbose logging for detailed debugging
+        container.registerClient(
+            for: .development,
+            configuration: NetworkClientConfiguration(
+                baseURL: "https://jsonplaceholder.typicode.com",
+                defaultTimeout: 30.0,
+                logLevel: .verbose,
+                connectivityCheckEnabled: true
+            )
+        )
+
+        // Set default environment
+        container.currentEnvironment = .development
     }
 }

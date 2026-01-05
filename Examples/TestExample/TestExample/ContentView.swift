@@ -31,77 +31,299 @@ import ASC
 // MARK: - Content View
 
 struct ContentView: View {
-    @State private var users: [User] = []
-    @State private var isLoading = false
-    @State private var errorMessage: String?
-
-    private let networkClient: NetworkClient = .init(
-        configuration: .init(
-            baseURL: "https://jsonplaceholder.typicode.com",
-            logLevel: .verbose,
-            connectivityCheckEnabled: true
-        )
-    )
+    @StateObject private var viewModel = UsersViewModel()
+    @State private var selectedEnvironment: Env = DIContainer.shared.currentEnvironment
+    @State private var showingCreateUser = false
 
     var body: some View {
         NavigationStack {
-            VStack {
-                if isLoading {
-                    ProgressView("Загрузка...")
-                        .padding()
-                } else if let error = errorMessage {
-                    Text(error)
-                        .foregroundColor(.red)
-                        .padding()
-                } else if users.isEmpty {
-                    Text("Нажмите кнопку для загрузки пользователей")
-                        .foregroundColor(.gray)
-                        .padding()
+            VStack(spacing: 0) {
+                // Environment selector
+                environmentSelector
+
+                // Main content
+                if viewModel.isLoading {
+                    ProgressView("Loading...")
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                } else if let error = viewModel.errorMessage {
+                    errorView(error)
+                } else if viewModel.users.isEmpty {
+                    emptyStateView
                 } else {
-                    List(users) { user in
-                        VStack(alignment: .leading, spacing: 4) {
-                            Text(user.name)
-                                .font(.headline)
-                            Text(user.email)
-                                .font(.subheadline)
-                                .foregroundColor(.secondary)
-                        }
-                        .padding(.vertical, 4)
+                    usersListView
+                }
+            }
+            .navigationTitle("ASC Demo")
+            .toolbar {
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    Button {
+                        showingCreateUser = true
+                    } label: {
+                        Image(systemName: "plus")
                     }
                 }
-
-                Spacer()
-
-                Button {
-                    fetchUsers()
-                } label: {
-                    Label("Загрузить пользователей", systemImage: "arrow.down.circle.fill")
-                        .frame(maxWidth: .infinity)
-                        .padding()
-                }
-                .buttonStyle(.borderedProminent)
-                .disabled(isLoading)
-                .padding()
             }
-            .navigationTitle("ASC Test")
+            .sheet(isPresented: $showingCreateUser) {
+                CreateUserView(viewModel: viewModel)
+            }
         }
     }
 
-    private func fetchUsers() {
-        Task {
-            isLoading = true
-            errorMessage = nil
+    // MARK: - Environment Selector
 
-            do {
-                users = try await networkClient.execute(GetUsersRequest())
-                debugPrint("✅ Загружено \(users.count) пользователей")
-            } catch {
-                errorMessage = "Ошибка: \(error.localizedDescription)"
-                debugPrint("❌ Ошибка загрузки: \(error)")
+    private var environmentSelector: some View {
+        Picker("Environment", selection: $selectedEnvironment) {
+            ForEach(Env.allCases, id: \.self) { environment in
+                Text(environment.rawValue.capitalized).tag(environment)
+            }
+        }
+        .pickerStyle(.segmented)
+        .padding()
+        .onChange(of: selectedEnvironment) { _, newValue in
+            DIContainer.shared.currentEnvironment = newValue
+            // Recreate ViewModel with new client
+            Task { @MainActor in
+                viewModel.clearSelection()
+                if let client = DIContainer.shared.client(for: newValue) {
+                    // Note: In a real app, you'd want to recreate the ViewModel
+                    // For this demo, we'll just reload users
+                    await viewModel.loadUsers()
+                }
+            }
+        }
+    }
+
+    // MARK: - Error View
+
+    private func errorView(_ error: String) -> some View {
+        VStack(spacing: 16) {
+            Image(systemName: "exclamationmark.triangle")
+                .font(.system(size: 50))
+                .foregroundColor(.red)
+            Text(error)
+                .foregroundColor(.red)
+                .multilineTextAlignment(.center)
+                .padding()
+            Button("Retry") {
+                Task {
+                    await viewModel.loadUsers()
+                }
+            }
+            .buttonStyle(.borderedProminent)
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .padding()
+    }
+
+    // MARK: - Empty State View
+
+    private var emptyStateView: some View {
+        VStack(spacing: 16) {
+            Image(systemName: "person.3")
+                .font(.system(size: 50))
+                .foregroundColor(.gray)
+            Text("No users loaded")
+                .foregroundColor(.gray)
+            Button("Load Users") {
+                Task {
+                    await viewModel.loadUsers()
+                }
+            }
+            .buttonStyle(.borderedProminent)
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
+
+    // MARK: - Users List View
+
+    private var usersListView: some View {
+        List {
+            ForEach(viewModel.users) { user in
+                NavigationLink {
+                    UserDetailView(user: user, viewModel: viewModel)
+                } label: {
+                    UserRowView(user: user)
+                }
+            }
+        }
+        .refreshable {
+            await viewModel.loadUsers()
+        }
+    }
+}
+
+// MARK: - User Row View
+
+private struct UserRowView: View {
+    let user: User
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text(user.name)
+                .font(.headline)
+            Text(user.email)
+                .font(.subheadline)
+                .foregroundColor(.secondary)
+            if let website = user.website {
+                Text(website)
+                    .font(.caption)
+                    .foregroundColor(.blue)
+            }
+        }
+        .padding(.vertical, 4)
+    }
+}
+
+// MARK: - User Detail View
+
+private struct UserDetailView: View {
+    let user: User
+    @ObservedObject var viewModel: UsersViewModel
+
+    var body: some View {
+        List {
+            Section("User Info") {
+                LabeledContent("Name", value: user.name)
+                LabeledContent("Username", value: user.username)
+                LabeledContent("Email", value: user.email)
+                if let phone = user.phone {
+                    LabeledContent("Phone", value: phone)
+                }
+                if let website = user.website {
+                    LabeledContent("Website", value: website)
+                }
             }
 
-            isLoading = false
+            Section("Posts") {
+                if viewModel.userPosts.isEmpty {
+                    Button("Load Posts") {
+                        Task {
+                            await viewModel.loadUserPosts()
+                        }
+                    }
+                } else {
+                    ForEach(viewModel.userPosts) { post in
+                        NavigationLink {
+                            PostDetailView(post: post, viewModel: viewModel)
+                        } label: {
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text(post.title)
+                                    .font(.headline)
+                                Text(post.body)
+                                    .font(.caption)
+                                    .foregroundColor(.secondary)
+                                    .lineLimit(2)
+                            }
+                        }
+                    }
+                }
+            }
         }
+        .navigationTitle(user.name)
+        .navigationBarTitleDisplayMode(.inline)
+        .onAppear {
+            if viewModel.selectedUser?.id != user.id {
+                Task {
+                    await viewModel.loadUser(id: user.id)
+                    await viewModel.loadUserPosts()
+                }
+            }
+        }
+    }
+}
+
+// MARK: - Post Detail View
+
+private struct PostDetailView: View {
+    let post: Post
+    @ObservedObject var viewModel: UsersViewModel
+
+    var body: some View {
+        List {
+            Section("Post") {
+                Text(post.title)
+                    .font(.headline)
+                Text(post.body)
+                    .padding(.top, 4)
+            }
+
+            Section("Comments") {
+                if viewModel.postComments.isEmpty {
+                    Button("Load Comments") {
+                        Task {
+                            await viewModel.loadPostComments(postId: post.id)
+                        }
+                    }
+                } else {
+                    ForEach(viewModel.postComments) { comment in
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text(comment.name)
+                                .font(.headline)
+                            Text(comment.email)
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                            Text(comment.body)
+                                .padding(.top, 4)
+                        }
+                    }
+                }
+            }
+        }
+        .navigationTitle("Post")
+        .navigationBarTitleDisplayMode(.inline)
+        .onAppear {
+            Task {
+                await viewModel.loadPostComments(postId: post.id)
+            }
+        }
+    }
+}
+
+// MARK: - Create User View
+
+private struct CreateUserView: View {
+    @ObservedObject var viewModel: UsersViewModel
+    @Environment(\.dismiss) private var dismiss
+    @State private var name = ""
+    @State private var username = ""
+    @State private var email = ""
+
+    var body: some View {
+        NavigationStack {
+            Form {
+                Section("User Information") {
+                    TextField("Name", text: $name)
+                    TextField("Username", text: $username)
+                    TextField("Email", text: $email)
+                        .keyboardType(.emailAddress)
+                        .autocapitalization(.none)
+                }
+            }
+            .navigationTitle("Create User")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Cancel") {
+                        dismiss()
+                    }
+                }
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Create") {
+                        Task {
+                            await viewModel.createUser(name: name, username: username, email: email)
+                            dismiss()
+                        }
+                    }
+                    .disabled(name.isEmpty || username.isEmpty || email.isEmpty)
+                }
+            }
+        }
+    }
+}
+
+struct NewView: View {
+    var body: some View {
+        Text("hello")
     }
 }
 

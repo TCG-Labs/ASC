@@ -24,43 +24,7 @@
 
 // Core protocol defining network request configuration.
 
-@_exported import Alamofire
 import Foundation
-
-// MARK: - Type Aliases
-
-/// HTTP method for requests.
-public typealias HTTPMethod = Alamofire.HTTPMethod
-
-/// HTTP headers collection.
-public typealias HTTPHeaders = Alamofire.HTTPHeaders
-
-/// HTTP header.
-public typealias HTTPHeader = Alamofire.HTTPHeader
-
-/// Retry policy for requests.
-public typealias RetryPolicy = Alamofire.RetryPolicy
-
-/// Request interceptor for adapting and retrying requests.
-public typealias RequestInterceptor = Alamofire.RequestInterceptor
-
-/// Event monitor for observing request lifecycle.
-public typealias EventMonitor = Alamofire.EventMonitor
-
-/// Server trust manager for SSL/TLS validation.
-public typealias ServerTrustManager = Alamofire.ServerTrustManager
-
-/// Redirect handler for custom redirect logic.
-public typealias RedirectHandler = Alamofire.RedirectHandler
-
-/// Cached response handler for custom caching behavior.
-public typealias CachedResponseHandler = Alamofire.CachedResponseHandler
-
-/// Interceptor combining adapters and retriers.
-public typealias Interceptor = Alamofire.Interceptor
-
-/// Parameter encoder for encoding Encodable parameters.
-public typealias ParameterEncoder = Alamofire.ParameterEncoder
 
 /// Protocol defining a network request configuration.
 ///
@@ -268,6 +232,24 @@ public extension NetworkRequest {
     func validate(response: Response) throws {
         // No validation by default
     }
+}
+
+// MARK: - NetworkRequest+RetryPolicy Extension
+
+/// Extension to add retry policy to NetworkRequest.
+public extension NetworkRequest {
+    /// Retry policy for this request.
+    ///
+    /// Override this to customize retry behavior for specific requests.
+    /// Default is `nil` (no retries) to avoid unexpected behavior in tests.
+    ///
+    /// Example:
+    /// ```swift
+    /// struct MyRequest: NetworkRequest {
+    ///     var retryPolicy: Alamofire.RetryPolicy? { .default }
+    /// }
+    /// ```
+    var retryPolicy: Alamofire.RetryPolicy? { nil }
 }
 
 // MARK: - EmptyParameters Extension

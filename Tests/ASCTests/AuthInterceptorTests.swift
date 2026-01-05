@@ -88,8 +88,7 @@ struct AuthInterceptorTests {
         let storage = MockTokenStorage(authToken: .bearer(token: "test-access-token"))
         let interceptor = AuthInterceptor(storage: storage)
 
-        var urlRequest = URLRequest(url: URL(string: "https://api.example.com/test")!)
-        urlRequest.headers.add(.authenticationRequired)
+        let urlRequest = URLRequest(url: URL(string: "https://api.example.com/test")!)
 
         // When: Interceptor adapts the request
         let adaptedRequest = try await withCheckedThrowingContinuation { continuation in
@@ -102,34 +101,13 @@ struct AuthInterceptorTests {
         #expect(adaptedRequest.headers["Authorization"] == "Bearer test-access-token")
     }
 
-    @Test("AuthInterceptor skips when authentication not required")
-    func testAuthInterceptorSkipsWhenNotRequired() async throws {
-        // Given: Storage with token but request without auth requirement
-        let storage = MockTokenStorage(authToken: .bearer(token: "test-token"))
-        let interceptor = AuthInterceptor(storage: storage)
-
-        let urlRequest = URLRequest(url: URL(string: "https://api.example.com/test")!)
-        // Note: No .authenticationRequired header
-
-        // When: Interceptor adapts the request
-        let adaptedRequest = try await withCheckedThrowingContinuation { continuation in
-            interceptor.adapt(urlRequest, for: Session()) { result in
-                continuation.resume(with: result)
-            }
-        }
-
-        // Then: No Authorization header is added
-        #expect(adaptedRequest.headers["Authorization"] == nil)
-    }
-
     @Test("AuthInterceptor fails when no token available")
     func testAuthInterceptorFailsWhenNoToken() async {
         // Given: Storage without token
         let storage = MockTokenStorage(authToken: nil)
         let interceptor = AuthInterceptor(storage: storage)
 
-        var urlRequest = URLRequest(url: URL(string: "https://api.example.com/test")!)
-        urlRequest.headers.add(.authenticationRequired)
+        let urlRequest = URLRequest(url: URL(string: "https://api.example.com/test")!)
 
         // When/Then: Interceptor throws error
         await #expect(throws: ASCError.self) {
@@ -149,8 +127,7 @@ struct AuthInterceptorTests {
         )
         let interceptor = AuthInterceptor(storage: storage)
 
-        var urlRequest = URLRequest(url: URL(string: "https://api.example.com/test")!)
-        urlRequest.headers.add(.authenticationRequired)
+        let urlRequest = URLRequest(url: URL(string: "https://api.example.com/test")!)
 
         // When: Interceptor adapts the request
         let adaptedRequest = try await withCheckedThrowingContinuation { continuation in
@@ -170,8 +147,7 @@ struct AuthInterceptorTests {
         let storage = MockTokenStorage(authToken: .custom(token: "custom-token-value"))
         let interceptor = AuthInterceptor(storage: storage)
 
-        var urlRequest = URLRequest(url: URL(string: "https://api.example.com/test")!)
-        urlRequest.headers.add(.authenticationRequired)
+        let urlRequest = URLRequest(url: URL(string: "https://api.example.com/test")!)
 
         // When: Interceptor adapts the request
         let adaptedRequest = try await withCheckedThrowingContinuation { continuation in

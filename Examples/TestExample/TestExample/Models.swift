@@ -28,19 +28,115 @@
 import Foundation
 import ASC
 
-// MARK: - User Model
+// MARK: - Models
 
+/// User model from JSONPlaceholder API.
 nonisolated struct User: Codable, Identifiable, Sendable {
     let id: Int
     let name: String
+    let username: String
+    let email: String
+    let phone: String?
+    let website: String?
+}
+
+/// Post model from JSONPlaceholder API.
+nonisolated struct Post: Codable, Identifiable, Sendable {
+    let id: Int
+    let userId: Int
+    let title: String
+    let body: String
+}
+
+/// Comment model from JSONPlaceholder API.
+nonisolated struct Comment: Codable, Identifiable, Sendable {
+    let id: Int
+    let postId: Int
+    let name: String
+    let email: String
+    let body: String
+}
+
+/// User creation request model.
+nonisolated struct CreateUserReq: Codable, Sendable {
+    let name: String
+    let username: String
     let email: String
 }
 
-// MARK: - API Request
+/// User creation response model.
+nonisolated struct CreateUserRes: Codable, Sendable {
+    let id: Int
+    let name: String
+    let username: String
+    let email: String
+}
 
+// MARK: - API Requests
+
+/// Request to get all users.
 struct GetUsersRequest: NetworkRequest {
     typealias Response = [User]
+    typealias Parameters = EmptyParameters
 
     var path: String { "/users" }
+    var method: HTTPMethod { .get }
+}
+
+/// Request to get a specific user by ID.
+struct GetUserRequest: NetworkRequest {
+    typealias Response = User
+    typealias Parameters = EmptyParameters
+
+    let userId: Int
+
+    var path: String { "/users/\(userId)" }
+    var method: HTTPMethod { .get }
+}
+
+/// Request to create a new user.
+struct CreateUserRequest: NetworkRequest {
+    typealias Response = CreateUserRes
+    typealias Parameters = CreateUserReq
+
+    let name: String
+    let username: String
+    let email: String
+
+    var path: String { "/users" }
+    var method: HTTPMethod { .post }
+    var parameters: Parameters? {
+        CreateUserReq(name: name, username: username, email: email)
+    }
+}
+
+/// Request to get posts for a specific user.
+struct GetUserPostsRequest: NetworkRequest {
+    typealias Response = [Post]
+    typealias Parameters = EmptyParameters
+
+    let userId: Int
+
+    var path: String { "/users/\(userId)/posts" }
+    var method: HTTPMethod { .get }
+}
+
+/// Request to get all posts.
+struct GetPostsRequest: NetworkRequest {
+    typealias Response = [Post]
+    typealias Parameters = EmptyParameters
+
+    var path: String { "/posts" }
+    var method: HTTPMethod { .get }
+}
+
+/// Request to get comments for a specific post.
+struct GetPostCommentsRequest: NetworkRequest {
+    typealias Response = [Comment]
+    typealias Parameters = EmptyParameters
+
+    let postId: Int
+
+    var path: String { "/posts/\(postId)/comments" }
     var method: HTTPMethod { .get }
 }

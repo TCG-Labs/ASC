@@ -1,4 +1,4 @@
-// RetryPolicy.swift
+// RetryPolicy+Presets.swift
 // ASC - Alamofire Swift Client
 //
 //  Copyright (c) 2025 TCG Labs
@@ -22,9 +22,11 @@
 //  SOFTWARE.
 //
 
-// Convenient extensions for Alamofire's RetryPolicy.
+// Convenient preset retry policies for Alamofire's RetryPolicy.
 
 import Foundation
+
+// MARK: - RetryPolicy+Presets
 
 /// Extension providing convenient preset retry policies.
 ///
@@ -92,20 +94,4 @@ public extension Alamofire.RetryPolicy {
             exponentialBackoffScale: 0.5
         )
     }
-}
-
-/// Extension to add retry policy to NetworkRequest.
-public extension NetworkRequest {
-    /// Retry policy for this request.
-    ///
-    /// Override this to customize retry behavior for specific requests.
-    /// Default is `nil` (no retries) to avoid unexpected behavior in tests.
-    ///
-    /// Example:
-    /// ```swift
-    /// struct MyRequest: NetworkRequest {
-    ///     var retryPolicy: Alamofire.RetryPolicy? { .default }
-    /// }
-    /// ```
-    var retryPolicy: Alamofire.RetryPolicy? { nil }
 }

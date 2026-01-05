@@ -28,6 +28,7 @@ import Foundation
 
 // MARK: - Supporting Types
 
+// MARK: - NetworkConstraints
 /// Network constraints configuration.
 ///
 /// Controls network access policies for URLSession.
@@ -78,6 +79,7 @@ public struct NetworkConstraints: Sendable {
     }
 }
 
+// MARK: - ValidationOptions
 /// HTTP response validation options.
 ///
 /// Controls automatic validation of HTTP status codes.
@@ -107,6 +109,7 @@ public struct ValidationOptions: Sendable {
     }
 }
 
+// MARK: - NetworkClientConfigurationDefaults
 /// Default values for NetworkClientConfiguration.
 public enum NetworkClientConfigurationDefaults {
     /// Default JSON decoder with ISO8601 dates and snake_case keys.
@@ -141,6 +144,7 @@ public enum NetworkClientConfigurationDefaults {
     )
 }
 
+// MARK: - SessionType
 /// Type of URLSession to use.
 public enum SessionType: Sendable {
     /// Default URLSession with disk-persisted cache
@@ -170,6 +174,7 @@ public enum SessionType: Sendable {
     }
 }
 
+// MARK: - NetworkClientConfiguration
 /// Configuration for NetworkClient.
 ///
 /// Provides fine-grained control over networking behavior using Alamofire's

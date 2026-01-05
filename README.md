@@ -194,7 +194,7 @@ Task { try await quickStart() }
 Complete CRUD operations with real API (JSONPlaceholder).
 
 **What you'll learn:**
-- GET with path parameters (`/posts/{id}`)
+- GET requests
 - POST with body parameters
 - PUT to update resources
 - DELETE with empty response
@@ -250,7 +250,7 @@ Two ways to organize your API requests.
 - **Namespace Enum** (recommended) - For different response types
 - **Simple Enum** - For same response type
 - When to use each pattern
-- Path parameters and URL encoding
+- URL encoding
 
 **Run:**
 ```swift
@@ -258,50 +258,6 @@ Task { try await demonstratePatterns() }
 ```
 
 ## 🎯 Advanced Features
-
-### Path Parameters
-
-Use path templates with automatic substitution:
-
-```swift
-struct GetUserPostRequest: NetworkRequest {
-    typealias Response = Post
-
-    let userId: String
-    let postId: String
-
-    var path: String { "/users/{userId}/posts/{postId}" }
-    var method: HTTPMethod { .get }
-    var pathParameters: [String: String]? {
-        ["userId": userId, "postId": postId]
-    }
-}
-
-// Actual URL: https://api.example.com/users/123/posts/456
-let post = try await client.execute(
-    GetUserPostRequest(userId: "123", postId: "456")
-)
-```
-
-### API Versioning with Path Prefix
-
-```swift
-struct GetUserRequestV1: NetworkRequest {
-    typealias Response = User
-
-    let userId: String
-
-    var pathPrefix: String? { "/api/v1" }
-    var path: String { "/users/{userId}" }
-    var method: HTTPMethod { .get }
-    var pathParameters: [String: String]? {
-        ["userId": userId]
-    }
-}
-
-// Actual URL: https://api.example.com/api/v1/users/123
-let user = try await client.execute(GetUserRequestV1(userId: "123"))
-```
 
 ### File Upload (Multipart Form-Data)
 
@@ -312,11 +268,8 @@ struct UploadAvatarRequest: NetworkRequest {
     let userId: String
     let imageData: Data
 
-    var path: String { "/users/{userId}/avatar" }
+    var path: String { "/users/\(userId)/avatar" }
     var method: HTTPMethod { .post }
-    var pathParameters: [String: String]? {
-        ["userId": userId]
-    }
     var files: [String: Data]? {
         ["avatar": imageData]
     }
@@ -514,16 +467,14 @@ let client = NetworkClient(configuration: config)
 // Use predefined policies
 struct MyRequest: NetworkRequest {
     // ...
-    var retryPolicy: RetryPolicy { .aggressive }  // 5 retries with 2s delay
+    var retryPolicy: Alamofire.RetryPolicy? { .aggressive }  // 5 retries with exponential backoff
 }
 
-// Or create custom policy
-let customPolicy = RetryPolicy(
-    maxRetries: 3,
-    retryDelay: 1.0,
-    exponentialBackoff: true,
-    retryableStatusCodes: [408, 429, 500, 502, 503],
-    retryOnNetworkError: true
+// Or create custom policy using Alamofire's RetryPolicy
+let customPolicy = Alamofire.RetryPolicy(
+    retryLimit: 3,
+    exponentialBackoffBase: 2,
+    exponentialBackoffScale: 0.5
 )
 ```
 

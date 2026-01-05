@@ -5,8 +5,8 @@
 //  Created by Vyacheslav Razumeenko on 31.10.2025.
 //
 
-import Foundation
 import Alamofire
+import Foundation
 
 struct OAuthCredential: AuthenticationCredential {
     let accessToken: String
@@ -36,7 +36,7 @@ final class OAuthAuthenticator: Authenticator {
                     with response: HTTPURLResponse,
                     failDueToAuthenticationError error: Error) -> Bool {
         // If authentication server CANNOT invalidate credentials, return `false`
-        return false
+        false
 
         // If authentication server CAN invalidate credentials, then inspect the response matching against what the
         // authentication server returns as an authentication failure. This is generally a 401 along with a custom
@@ -46,7 +46,7 @@ final class OAuthAuthenticator: Authenticator {
 
     func isRequest(_ urlRequest: URLRequest, authenticatedWith credential: OAuthCredential) -> Bool {
         // If authentication server CANNOT invalidate credentials, return `true`
-        return true
+        true
 
         // If authentication server CAN invalidate credentials, then compare the "Authorization" header value in the
         // `URLRequest` against the Bearer token generated with the access token of the `Credential`.

@@ -7,37 +7,56 @@ You are building a modern, type-safe, protocol-oriented REST networking library 
 ├── ASC/                                         # Main package
 │   ├── Package.swift                            # SPM manifest
 │   ├── Package.resolved                         # Dependency resolution
-│   ├── Sources/ASC/                             # Library source code
-│   │   ├── Auth/                                # Authentication components
+│   ├── Sources/ASC/                             # Library source code (18 files)
+│   │   ├── Auth/                                # Authentication components (4 files)
 │   │   │   ├── AuthInterceptor.swift            # Request interceptor for auth
 │   │   │   ├── AuthToken.swift                  # HTTP authentication token types
+│   │   │   ├── OAuthAuthenticator.swift         # OAuth authentication
 │   │   │   └── TokenStorage.swift               # Token storage protocol
-│   │   ├── Client/                              # Network client implementation
-│   │   │   ├── NetworkClient.swift              # Main client API
-│   │   │   ├── NetworkClientConfiguration.swift # Client config
-│   │   │   ├── RequestBuilder.swift             # URLRequest construction
+│   │   ├── Client/                              # Network client implementation (3 files)
 │   │   │   ├── ErrorMapper.swift                # Error translation
-│   │   │   └── ASCLogger.swift                  # Internal logging
-│   │   ├── Core/                                # Core protocols and types
+│   │   │   ├── NetworkClient.swift              # Main client API
+│   │   │   └── NetworkClientConfiguration.swift # Client config
+│   │   ├── Core/                                # Core protocols and types (6 files)
+│   │   │   ├── ASCError.swift                   # Base error protocol
+│   │   │   ├── EmptyParameters.swift            # Empty parameters struct
+│   │   │   ├── HTTPResponseType.swift           # HTTP response type enum (with HTTPStatusCode typealias)
+│   │   │   ├── HTTPStatus.swift                 # HTTP status code constants
 │   │   │   ├── NetworkRequest.swift             # Main protocol
-│   │   │   ├── ResponseTypes.swift              # Response types
-│   │   │   └── RetryPolicy.swift                # Retry configurations
-│   │   ├── Errors/                              # Error hierarchy
-│   │   │   └── ASCError.swift                   # Base error protocol
-│   │   └── Utils/                               # Utility extensions
-│   │       ├── HTTPHeader+Extension.swift       # HTTP header extensions
-│   │       └── NetworkReachability.swift        # Network reachability
-│   ├── Tests/ASCTests/                          # Test suite
+│   │   │   └── RequestBuilder.swift             # URLRequest construction
+│   │   ├── Extensions/                          # Extensions for external types (2 files)
+│   │   │   ├── HTTPURLResponse+Extension.swift  # HTTPURLResponse extension
+│   │   │   └── RetryPolicy+Extension.swift      # Retry policy presets extension
+│   │   └── Utils/                               # Utility classes (3 files)
+│   │       ├── ASCLogger.swift                  # Debug logging with request correlation
+│   │       ├── NetworkReachability.swift        # Network reachability
+│   │       └── Typealiases.swift                # Type aliases for Alamofire types
+│   ├── Tests/ASCTests/                          # Test suite (12 files)
 │   │   ├── ASCErrorTests.swift
+│   │   ├── ASCLoggerTests.swift
 │   │   ├── AuthInterceptorTests.swift
+│   │   ├── ErrorMapperTests.swift
+│   │   ├── NetworkClientTests.swift
+│   │   ├── NetworkReachabilityTests.swift
 │   │   ├── NetworkRequestTests.swift
-│   │   └── RequestBuilderTests.swift
+│   │   ├── RequestBuilderTests.swift
+│   │   ├── Helpers/
+│   │   │   └── TestHelpers.swift
+│   │   └── Mocks/
+│   │       ├── MockNetworkRequest.swift
+│   │       ├── MockTokenStorage.swift
+│   │       └── MockURLProtocol.swift
 │   └── .swiftlint.yml                           # Linting configuration
 ├── Examples/                                    # Example projects
 │   └── TestExample/                             # Test example app
+│       └── TestExample/
+│           ├── ContentView.swift                # Main SwiftUI view
+│           ├── DIContainer.swift                # Dependency injection container
+│           ├── Models.swift                     # Data models and API requests
+│           ├── TestExampleApp.swift             # App entry point
+│           └── UsersViewModel.swift            # ViewModel demonstrating ASC capabilities
 ├── README.md                                    # Library documentation
-├── LICENSE                                      # MIT license
-└── CLAUDE.md                                    # AI context documentation
+└── LICENSE                                      # MIT license
 
 # Tech Stack
 

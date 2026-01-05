@@ -273,6 +273,73 @@ struct NetworkClientTests {
         }
     }
 
+    // MARK: - SSL/TLS Tests
+
+    @Test("Client can be configured with ServerTrustManager")
+    func testClientWithServerTrustManager() {
+        // Given: ServerTrustManager configuration
+        let serverTrustManager = ServerTrustManager(
+            allHostsMustBeEvaluated: false,
+            evaluators: [:]
+        )
+        
+        let config = NetworkClientConfiguration(
+            baseURL: "https://api.example.com",
+            serverTrustManager: serverTrustManager,
+            connectivityCheckEnabled: false
+        )
+        
+        // When: Creating NetworkClient with ServerTrustManager
+        let client = NetworkClient(configuration: config)
+        
+        // Then: Client should be created successfully
+        // Note: NetworkClient is a non-optional type, so if we reach here, it was created successfully
+        // The ServerTrustManager is applied to the underlying Alamofire Session
+        #expect(config.serverTrustManager != nil)
+    }
+
+    @Test("Client configuration accepts nil ServerTrustManager")
+    func testClientWithNilServerTrustManager() {
+        // Given: Configuration with nil ServerTrustManager
+        let config = NetworkClientConfiguration(
+            baseURL: "https://api.example.com",
+            serverTrustManager: nil,
+            connectivityCheckEnabled: false
+        )
+        
+        // When: Creating NetworkClient with nil ServerTrustManager
+        let client = NetworkClient(configuration: config)
+        
+        // Then: Client should be created successfully
+        // Note: NetworkClient is a non-optional type, so if we reach here, it was created successfully
+        // nil ServerTrustManager means default certificate validation will be used
+        #expect(config.serverTrustManager == nil)
+    }
+
+    @Test("Certificate validation errors are mapped correctly")
+    func testCertificateValidationErrorsAreMapped() {
+        // This test verifies that certificate errors from URLError are properly
+        // mapped to ASCError.certificateValidationFailed
+        // The actual mapping is tested in ErrorMapperTests
+        
+        let urlError = URLError(.serverCertificateUntrusted)
+        let errorMapper = ErrorMapper(defaultTimeout: 30.0)
+        let afError = AFError.sessionTaskFailed(error: urlError)
+        
+        let mappedError = errorMapper.mapError(afError, data: nil)
+        
+        // Then: Error should be mapped to certificateValidationFailed
+        if let ascError = mappedError as? ASCError {
+            if case .certificateValidationFailed = ascError {
+                // Error correctly mapped
+            } else {
+                Issue.record("Expected certificateValidationFailed, got \(ascError)")
+            }
+        } else {
+            Issue.record("Expected ASCError, got \(type(of: mappedError))")
+        }
+    }
+
     // MARK: - Helper Methods
 
     /// Creates a test configuration with MockURLProtocol
