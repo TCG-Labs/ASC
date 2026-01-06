@@ -259,7 +259,13 @@ Task { try await demonstratePatterns() }
 
 ## 🎯 Advanced Features
 
-### File Upload (Multipart Form-Data)
+### File Upload
+
+ASC supports three types of file uploads based on Alamofire's upload API:
+
+#### 1. Upload Data (`.data`)
+
+For small data that can be loaded into memory:
 
 ```swift
 struct UploadAvatarRequest: NetworkRequest {
@@ -270,8 +276,8 @@ struct UploadAvatarRequest: NetworkRequest {
 
     var path: String { "/users/\(userId)/avatar" }
     var method: HTTPMethod { .post }
-    var files: [String: Data]? {
-        ["avatar": imageData]
+    var fileUpload: FileUpload? {
+        .data(imageData)
     }
 }
 
@@ -279,6 +285,76 @@ let imageData = UIImage(named: "avatar")?.jpegData(compressionQuality: 0.8)
 let user = try await client.execute(
     UploadAvatarRequest(userId: "123", imageData: imageData!)
 )
+```
+
+#### 2. Upload File (`.file`)
+
+For large files from file system (memory-efficient):
+
+```swift
+struct UploadVideoRequest: NetworkRequest {
+    typealias Response = Video
+
+    let videoURL: URL
+
+    var path: String { "/videos" }
+    var method: HTTPMethod { .post }
+    var fileUpload: FileUpload? {
+        .file(videoURL)
+    }
+}
+
+let response = try await client.execute(
+    UploadVideoRequest(videoURL: videoFileURL)
+)
+```
+
+#### 3. Upload Multipart Form Data (`.multipart`)
+
+For multiple files and/or parameters together:
+
+```swift
+struct UploadDocumentsRequest: NetworkRequest {
+    typealias Response = UploadResponse
+
+    let imageData: Data
+    let documentURL: URL
+    let description: String
+
+    var path: String { "/documents" }
+    var method: HTTPMethod { .post }
+    var fileUpload: FileUpload? {
+        .multipart([
+            .data("image", data: imageData, fileName: "image.jpg", mimeType: "image/jpeg"),
+            .file("document", fileURL: documentURL, fileName: "doc.pdf", mimeType: "application/pdf"),
+            .parameter("description", value: description)
+        ])
+    }
+}
+
+let response = try await client.execute(
+    UploadDocumentsRequest(
+        imageData: imageData,
+        documentURL: documentURL,
+        description: "My documents"
+    )
+)
+```
+
+#### Progress Tracking
+
+Track upload progress using `executeWithProgress()`:
+
+```swift
+for try await item in client.executeWithProgress(uploadRequest) {
+    switch item {
+    case let .progress(progress):
+        print("Upload progress: \(progress.fractionCompleted * 100)%")
+        print("Uploaded: \(progress.bytesUploaded) / \(progress.totalBytes) bytes")
+    case let .response(response):
+        print("Upload complete: \(response)")
+    }
+}
 ```
 
 ### Request Interceptor (Authentication)
@@ -349,7 +425,111 @@ let profile = try await client.execute(GetProfileRequest())
 // Request includes: Authorization: Bearer your-api-key
 ```
 
-For advanced scenarios (custom retry logic, token refresh), implement Alamofire's `RequestInterceptor` directly:
+#### OAuth Authentication with Automatic Token Refresh
+
+For OAuth 2.0 with automatic token refresh on 401 errors, use `OAuthAuthenticator`:
+
+```swift
+import ASC
+import Alamofire
+
+// 1. Implement TokenStorage with refresh request
+struct RefreshTokenResponse: Codable {
+    let accessToken: String
+    let refreshToken: String
+    let expiresIn: Int
+}
+
+struct RefreshTokenRequest: NetworkRequest {
+    typealias Response = RefreshTokenResponse
+    typealias Parameters = Empty
+
+    let refreshToken: String
+
+    var path: String { "/oauth/refresh" }
+    var method: HTTPMethod { .post }
+    var parameters: [String: String]? {
+        ["refresh_token": refreshToken]
+    }
+}
+
+final class OAuthTokenStorage: TokenStorage {
+    private var accessToken: String?
+    private var refreshToken: String?
+    private var expiration: Date?
+
+    var authToken: AuthToken? {
+        guard let token = accessToken else { return nil }
+        return .bearer(token: token)
+    }
+
+    var refreshRequest: (any NetworkRequest)? {
+        guard let refreshToken = refreshToken else { return nil }
+        return RefreshTokenRequest(refreshToken: refreshToken)
+    }
+
+    func executeRefreshToken(with client: NetworkClient) async throws {
+        guard let request = refreshRequest else {
+            throw ASCError.invalidToken
+        }
+
+        let response = try await client.execute(request)
+
+        // Update tokens
+        self.accessToken = response.accessToken
+        self.refreshToken = response.refreshToken
+        self.expiration = Date(timeIntervalSinceNow: TimeInterval(response.expiresIn))
+    }
+
+    func flush() {
+        accessToken = nil
+        refreshToken = nil
+        expiration = nil
+    }
+}
+
+// 2. Create OAuth credential
+let credential = OAuthCredential(
+    accessToken: "initial-access-token",
+    refreshToken: "initial-refresh-token",
+    userID: "user123",
+    expiration: Date(timeIntervalSinceNow: 3600)
+)
+
+// 3. Create OAuth authenticator and interceptor
+let storage = OAuthTokenStorage()
+let authenticator = OAuthAuthenticator(storage: storage)
+let interceptor = AuthenticationInterceptor(
+    authenticator: authenticator,
+    credential: credential
+)
+
+// 4. Configure client with interceptor
+let config = NetworkClientConfiguration(
+    baseURL: "https://api.example.com",
+    interceptors: [interceptor]
+)
+let client = NetworkClient(configuration: config)
+
+// 5. Use client - tokens will be automatically refreshed on 401
+struct GetProfileRequest: NetworkRequest {
+    typealias Response = UserProfile
+
+    var path: String { "/me" }
+    var method: HTTPMethod { .get }
+}
+
+let profile = try await client.execute(GetProfileRequest())
+// If token expires, OAuthAuthenticator will automatically refresh it and retry the request
+```
+
+**How it works:**
+- When a request receives a 401 Unauthorized response, `OAuthAuthenticator.refresh()` is automatically called
+- The refresh method uses `TokenStorage.executeRefreshToken()` to get new tokens
+- After successful refresh, the original request is automatically retried with the new token
+- All token updates are handled by your `TokenStorage` implementation
+
+For advanced scenarios (custom retry logic, manual token refresh), implement Alamofire's `RequestInterceptor` directly:
 
 ```swift
 import Alamofire
@@ -482,7 +662,8 @@ let customPolicy = Alamofire.RetryPolicy(
 
 ```swift
 struct DeleteUserRequest: NetworkRequest {
-    typealias Response = ASCEmptyResponse  // or EmptyResponse
+    typealias Response = Empty
+    typealias Parameters = Empty
 
     let userId: String
 
@@ -490,8 +671,8 @@ struct DeleteUserRequest: NetworkRequest {
     var method: HTTPMethod { .delete }
 }
 
-// No return value for empty responses
-try await client.execute(DeleteUserRequest(userId: "123"))
+// Empty response is decoded and returned
+let response: Empty = try await client.execute(DeleteUserRequest(userId: "123"))
 ```
 
 ## 🔧 Error Handling
@@ -692,43 +873,49 @@ class UserViewModel {
 
 ### File Upload Patterns
 
-Choose the right upload method based on file size:
+Choose the right upload method based on your needs:
+
+**Use `.data(Data)` for:**
+- Small files (< 10MB) that can be loaded into memory
+- Simple single-file uploads
+- When you already have data in memory
+
+**Use `.file(URL)` for:**
+- Large files (> 10MB) to avoid loading entire file into memory
+- Files from file system
+- Memory-efficient uploads
+
+**Use `.multipart([MultipartItem])` for:**
+- Multiple files in a single request
+- Files combined with text parameters
+- Complex upload scenarios with mixed content types
 
 ```swift
-// Small files (< 10MB) - use FileUpload with MIME types
+// Small file - use .data
 struct UploadPhotoRequest: NetworkRequest {
     typealias Response = Photo
     let imageData: Data
 
     var path: String { "/photos" }
     var method: HTTPMethod { .post }
-    var fileUploads: [String: FileUpload]? {
-        [
-            "photo": .jpeg(data: imageData, fileName: "photo.jpg")
-        ]
+    var fileUpload: FileUpload? {
+        .data(imageData)
     }
 }
 
-// Large files (> 10MB) - use LargeFileUpload with file URLs
+// Large file - use .file (memory-efficient)
 struct UploadVideoRequest: NetworkRequest {
     typealias Response = Video
     let videoURL: URL
 
     var path: String { "/videos" }
     var method: HTTPMethod { .post }
-    var largeFileUploads: [LargeFileUpload]? {
-        [
-            LargeFileUpload(
-                fileURL: videoURL,
-                fieldName: "video",
-                fileName: "video.mp4",
-                mimeType: "video/mp4"
-            )
-        ]
+    var fileUpload: FileUpload? {
+        .file(videoURL)
     }
 }
 
-// Multiple files with metadata
+// Multiple files with parameters - use .multipart
 struct UploadDocumentsRequest: NetworkRequest {
     typealias Response = UploadResult
     let files: [URL]
@@ -736,20 +923,22 @@ struct UploadDocumentsRequest: NetworkRequest {
 
     var path: String { "/documents" }
     var method: HTTPMethod { .post }
-    var largeFileUploads: [LargeFileUpload]? {
+    var fileUpload: FileUpload? {
+        .multipart(
         files.map { url in
-            LargeFileUpload(
-                fileURL: url,
-                fieldName: "documents[]",  // Note: array syntax
-                fileName: url.lastPathComponent
-            )
-        }
-    }
-    var parameters: Parameters? {
-        ["category": category, "count": files.count]
+                .file("documents[]", fileURL: url, fileName: url.lastPathComponent, mimeType: "application/octet-stream")
+            } + [.parameter("category", value: category)]
+        )
     }
 }
 ```
+
+**Best Practices:**
+- Use `.data` for files < 10MB
+- Use `.file` for files > 10MB to avoid memory issues
+- Use `.multipart` when you need to upload multiple files or combine files with parameters
+- Always specify correct MIME types for proper server handling
+- Use `executeWithProgress()` for large uploads to show progress to users
 
 ### Retry Policy Selection
 

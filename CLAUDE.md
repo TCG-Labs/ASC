@@ -48,7 +48,7 @@ swiftlint --fix
     - `NetworkClientConfiguration.swift` - Configuration (463 lines)
   - **Core/**: Protocols and types (6 files, ~576 lines)
     - `ASCError.swift` - Unified error handling (271 lines)
-    - `EmptyParameters.swift` - Empty parameters struct (20 lines)
+    - `Typealiases.swift` - Type aliases for Alamofire types including `Empty` (45 lines)
     - `HTTPResponseType.swift` - HTTP response type enum with HTTPStatusCode typealias (180 lines)
     - `HTTPStatus.swift` - HTTP status code constants (70 lines)
     - `NetworkRequest.swift` - Request protocol + Alamofire re-export (187 lines)

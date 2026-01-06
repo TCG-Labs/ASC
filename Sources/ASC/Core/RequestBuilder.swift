@@ -109,7 +109,7 @@ internal final class RequestBuilder: Sendable {
     // MARK: - Private Methods
 
     /// Builds the URL for a request.
-    private func buildURL<Request: NetworkRequest>(
+    internal func buildURL<Request: NetworkRequest>(
         from request: Request
     ) throws -> URL {
         guard let effectiveBaseURL = request.baseURL ?? baseURL else {

@@ -114,7 +114,8 @@ struct MockAuthenticatedRequest: NetworkRequest {
 
 /// Mock request with empty response
 struct MockEmptyRequest: NetworkRequest {
-    typealias Response = ASCEmptyResponse
+    typealias Response = Empty
+    typealias Parameters = Empty
 
     var baseURL: String?
     var path: String

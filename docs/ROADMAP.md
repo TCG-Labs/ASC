@@ -52,7 +52,7 @@
 ```swift
 struct GetUserRequest: NetworkRequest {
     typealias Response = User
-    typealias Parameters = EmptyParameters
+    typealias Parameters = Empty
     
     let userId: String
     
@@ -68,7 +68,7 @@ let user = try await client.execute(GetUserRequest(userId: "123"))
 - ✅ Протокол `NetworkRequest` с associated types
 - ✅ Default implementations через extensions
 - ✅ Type-safe запросы и ответы
-- ✅ Поддержка `EmptyParameters` для запросов без параметров
+- ✅ Поддержка `Empty` для запросов без параметров
 
 **Что нужно доработать**:
 - Нет критичных доработок
@@ -112,7 +112,7 @@ struct CreatePostRequest: NetworkRequest {
 
 // DELETE запрос
 struct DeletePostRequest: NetworkRequest {
-    typealias Response = ASCEmptyResponse
+    typealias Response = Empty
     let postId: String
     var path: String { "/posts/\(postId)" }
     var method: HTTPMethod { .delete }
@@ -122,7 +122,7 @@ struct DeletePostRequest: NetworkRequest {
 **Что реализовано**:
 - ✅ GET, POST, PUT, PATCH, DELETE, HEAD, OPTIONS
 - ✅ Автоматическое кодирование параметров
-- ✅ Поддержка пустых ответов (`ASCEmptyResponse`)
+- ✅ Поддержка пустых ответов (`Empty`)
 
 **Что нужно доработать**:
 - Нет критичных доработок

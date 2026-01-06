@@ -37,6 +37,7 @@ import ASC
 /// This ViewModel showcases:
 /// - GET requests (list and single item)
 /// - POST requests (create user)
+/// - DELETE requests (delete post)
 /// - Error handling
 /// - Different client configurations via DI
 @MainActor
@@ -176,6 +177,32 @@ final class UsersViewModel: ObservableObject {
         } catch {
             errorMessage = "Failed to create user: \(error.localizedDescription)"
             debugPrint("❌ Error creating user: \(error)")
+        }
+
+        isLoading = false
+    }
+
+    /// Deletes a post by ID.
+    ///
+    /// - Parameter postId: Post ID to delete
+    func deletePost(postId: Int) async {
+        isLoading = true
+        errorMessage = nil
+
+        do {
+            try await client.execute(DeletePostRequest(postId: postId))
+            debugPrint("✅ Deleted post with ID: \(postId)")
+
+            // Remove deleted post from the list
+            userPosts.removeAll { $0.id == postId }
+
+            // Also clear comments if they were for this post
+            if !postComments.isEmpty {
+                postComments = []
+            }
+        } catch {
+            errorMessage = "Failed to delete post: \(error.localizedDescription)"
+            debugPrint("❌ Error deleting post: \(error)")
         }
 
         isLoading = false

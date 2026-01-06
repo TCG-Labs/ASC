@@ -34,6 +34,10 @@ struct ContentView: View {
     @StateObject private var viewModel = UsersViewModel()
     @State private var selectedEnvironment: Env = DIContainer.shared.currentEnvironment
     @State private var showingCreateUser = false
+    @State private var networkStatus: NetworkReachability.Status = .unreachable
+    @State private var monitoringTask: Task<Void, Never>?
+    
+    private let reachability = NetworkReachability()
 
     var body: some View {
         NavigationStack {
@@ -55,6 +59,17 @@ struct ContentView: View {
             }
             .navigationTitle("ASC Demo")
             .toolbar {
+                if #available(iOS 26.0, *) {
+                    ToolbarItem(placement: .navigationBarLeading) {
+                        NetworkStatusView(status: networkStatus)
+                            .fixedSize()
+                    }
+                    .sharedBackgroundVisibility(.hidden)
+                } else {
+                    ToolbarItem(placement: .navigationBarLeading) {
+                        NetworkStatusView(status: networkStatus)
+                    }
+                }
                 ToolbarItem(placement: .navigationBarTrailing) {
                     Button {
                         showingCreateUser = true
@@ -65,6 +80,22 @@ struct ContentView: View {
             }
             .sheet(isPresented: $showingCreateUser) {
                 CreateUserView(viewModel: viewModel)
+            }
+            .onAppear {
+                reachability.startMonitoring()
+                networkStatus = reachability.currentStatus
+                monitoringTask = Task {
+                    for await status in reachability.statusStream {
+                        await MainActor.run {
+                            networkStatus = status
+                        }
+                    }
+                }
+            }
+            .onDisappear {
+                monitoringTask?.cancel()
+                monitoringTask = nil
+                reachability.stopMonitoring()
             }
         }
     }
@@ -148,6 +179,70 @@ struct ContentView: View {
         }
         .refreshable {
             await viewModel.loadUsers()
+        }
+    }
+}
+
+// MARK: - Network Status View
+
+private struct NetworkStatusView: View {
+    let status: NetworkReachability.Status
+
+    var body: some View {
+        HStack(spacing: 4) {
+            Image(systemName: iconName)
+                .foregroundColor(iconColor)
+            Text(statusText)
+                .font(.caption)
+                .foregroundColor(textColor)
+        }
+    }
+
+    private var iconName: String {
+        switch status {
+        case .reachable(.wifi):
+            return "wifi"
+        case .reachable(.cellular):
+            return "antenna.radiowaves.left.and.right"
+        case .reachable(.wired):
+            return "cable.connector"
+        case .reachable(.other):
+            return "network"
+        case .unreachable:
+            return "wifi.slash"
+        }
+    }
+
+    private var statusText: String {
+        switch status {
+        case .reachable(.wifi):
+            return "WiFi"
+        case .reachable(.cellular):
+            return "Cellular"
+        case .reachable(.wired):
+            return "Wired"
+        case .reachable(.other):
+            return "Online"
+        case .unreachable:
+            return "Offline"
+        }
+    }
+
+    private var iconColor: Color {
+        switch status {
+        case .unreachable:
+            return .red
+        default:
+            return .primary
+        }
+    }
+
+    private var textColor: Color {
+        switch status {
+        case .unreachable:
+            return .red
+        default:
+            return .secondary
         }
     }
 }
@@ -237,6 +332,8 @@ private struct UserDetailView: View {
 private struct PostDetailView: View {
     let post: Post
     @ObservedObject var viewModel: UsersViewModel
+    @Environment(\.dismiss) private var dismiss
+    @State private var showingDeleteConfirmation = false
 
     var body: some View {
         List {
@@ -271,6 +368,30 @@ private struct PostDetailView: View {
         }
         .navigationTitle("Post")
         .navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+            ToolbarItem(placement: .navigationBarTrailing) {
+                Button(role: .destructive) {
+                    showingDeleteConfirmation = true
+                } label: {
+                    Label("Delete", systemImage: "trash")
+                }
+            }
+        }
+        .confirmationDialog(
+            "Delete Post",
+            isPresented: $showingDeleteConfirmation,
+            titleVisibility: .visible
+        ) {
+            Button("Delete", role: .destructive) {
+                Task {
+                    await viewModel.deletePost(postId: post.id)
+                    dismiss()
+                }
+            }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("Are you sure you want to delete this post? This action cannot be undone.")
+        }
         .onAppear {
             Task {
                 await viewModel.loadPostComments(postId: post.id)

@@ -36,7 +36,7 @@ import Foundation
 /// ```swift
 /// struct GetUserRequest: NetworkRequest {
 ///     typealias Response = User
-///     typealias Parameters = EmptyParameters
+///     typealias Parameters = Empty
 ///
 ///     let userId: String
 ///
@@ -47,7 +47,7 @@ import Foundation
 public protocol NetworkRequest: Sendable {
     /// The parameters type conforming to Encodable.
     ///
-    /// Use `EmptyParameters` for requests without parameters (GET, DELETE, etc.).
+    /// Use `Empty` for requests without parameters (GET, DELETE, etc.).
     /// For requests with parameters, define a custom Encodable struct.
     ///
     /// Example:
@@ -63,6 +63,21 @@ public protocol NetworkRequest: Sendable {
     associatedtype Parameters: Encodable & Sendable
 
     /// The expected response type conforming to Decodable.
+    ///
+    /// Use `Empty` for requests that don't return a response body (204 No Content, etc.).
+    /// For requests with response data, define a custom Decodable struct.
+    ///
+    /// Example:
+    /// ```swift
+    /// struct DeleteUserRequest: NetworkRequest {
+    ///     typealias Response = Empty
+    ///     typealias Parameters = Empty
+    ///
+    ///     let userId: String
+    ///     var path: String { "/users/\(userId)" }
+    ///     var method: HTTPMethod { .delete }
+    /// }
+    /// ```
     associatedtype Response: Decodable & Sendable
 
     /// The base URL for the request.
@@ -169,6 +184,67 @@ public protocol NetworkRequest: Sendable {
     /// ```
     var enableAuthorization: Bool { get }
 
+    /// File upload configuration for this request.
+    ///
+    /// Supports three types of uploads based on Alamofire's API:
+    /// - `.data(Data)` - Upload Data directly from memory
+    /// - `.file(URL)` - Upload a File from file system (memory-efficient)
+    /// - `.multipart([MultipartItem])` - Upload Multipart Form Data with multiple fields
+    ///
+    /// When this property is set, the request will automatically use the appropriate
+    /// Alamofire upload method (`AF.upload(data:to:)`, `AF.upload(fileURL:to:)`, or `AF.upload(multipartFormData:to:)`).
+    ///
+    /// For more information, see [Alamofire Documentation - Uploading Data to a Server](https://github.com/Alamofire/Alamofire/blob/master/Documentation/Usage.md#uploading-data-to-a-server).
+    ///
+    /// Example:
+    /// ```swift
+    /// struct UploadImageRequest: NetworkRequest {
+    ///     typealias Response = UploadResponse
+    ///     typealias Parameters = Empty
+    ///
+    ///     let imageData: Data
+    ///
+    ///     var path: String { "/upload" }
+    ///     var method: HTTPMethod { .post }
+    ///     var fileUpload: FileUpload? {
+    ///         .data(imageData)
+    ///     }
+    /// }
+    ///
+    /// struct UploadLargeFileRequest: NetworkRequest {
+    ///     typealias Response = UploadResponse
+    ///     typealias Parameters = Empty
+    ///
+    ///     let fileURL: URL
+    ///
+    ///     var path: String { "/upload" }
+    ///     var method: HTTPMethod { .post }
+    ///     var fileUpload: FileUpload? {
+    ///         .file(fileURL)
+    ///     }
+    /// }
+    ///
+    /// struct UploadMultipleFilesRequest: NetworkRequest {
+    ///     typealias Response = UploadResponse
+    ///     typealias Parameters = Empty
+    ///
+    ///     let imageData: Data
+    ///     let documentURL: URL
+    ///     let description: String
+    ///
+    ///     var path: String { "/upload" }
+    ///     var method: HTTPMethod { .post }
+    ///     var fileUpload: FileUpload? {
+    ///         .multipart([
+    ///             .data("image", data: imageData, fileName: "image.jpg", mimeType: "image/jpeg"),
+    ///             .file("document", fileURL: documentURL, fileName: "doc.pdf", mimeType: "application/pdf"),
+    ///             .parameter("description", value: description)
+    ///         ])
+    ///     }
+    /// }
+    /// ```
+    var fileUpload: FileUpload? { get }
+
     /// Validates the response after successful decoding.
     ///
     /// Override this method to implement custom business logic validation.
@@ -226,6 +302,9 @@ public extension NetworkRequest {
     /// Default authorization is disabled
     var enableAuthorization: Bool { false }
 
+    /// Default file upload is nil (no file upload).
+    var fileUpload: FileUpload? { nil }
+
     /// Default implementation performs no validation.
     ///
     /// Override this method in your request to add custom validation logic.
@@ -252,12 +331,12 @@ public extension NetworkRequest {
     var retryPolicy: Alamofire.RetryPolicy? { nil }
 }
 
-// MARK: - EmptyParameters Extension
+// MARK: - Empty Extension
 
 /// Extension for requests without parameters.
 ///
-/// Provides default nil implementation for parameters property when using EmptyParameters.
-public extension NetworkRequest where Parameters == EmptyParameters {
+/// Provides default nil implementation for parameters property when using Empty.
+public extension NetworkRequest where Parameters == Empty {
     /// Default implementation returns nil for empty parameters.
-    var parameters: EmptyParameters? { nil }
+    var parameters: Empty? { nil }
 }

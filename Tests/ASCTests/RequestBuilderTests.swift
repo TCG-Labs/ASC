@@ -30,8 +30,8 @@ struct RequestBuilderTests {
     // MARK: - Test Helpers
 
     struct TestRequest: NetworkRequest {
-        typealias Response = EmptyResponse
-        typealias Parameters = EmptyParameters
+        typealias Response = Empty
+        typealias Parameters = Empty
 
         var baseURL: String?
         var path: String
@@ -139,8 +139,8 @@ struct RequestBuilderTests {
     @Test("Request has correct HTTP method")
     func testRequestHasCorrectHTTPMethod() throws {
         struct PostRequest: NetworkRequest {
-            typealias Response = EmptyResponse
-            typealias Parameters = EmptyParameters
+            typealias Response = Empty
+            typealias Parameters = Empty
 
             var baseURL: String? { "https://api.example.com" }
             var path: String { "/posts" }

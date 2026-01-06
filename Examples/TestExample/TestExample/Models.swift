@@ -58,7 +58,7 @@ nonisolated struct Comment: Codable, Identifiable, Sendable {
 }
 
 /// User creation request model.
-nonisolated struct CreateUserReq: Codable, Sendable {
+nonisolated struct CreateUserParams: Codable, Sendable {
     let name: String
     let username: String
     let email: String
@@ -77,7 +77,7 @@ nonisolated struct CreateUserRes: Codable, Sendable {
 /// Request to get all users.
 struct GetUsersRequest: NetworkRequest {
     typealias Response = [User]
-    typealias Parameters = EmptyParameters
+    typealias Parameters = Empty
 
     var path: String { "/users" }
     var method: HTTPMethod { .get }
@@ -86,7 +86,7 @@ struct GetUsersRequest: NetworkRequest {
 /// Request to get a specific user by ID.
 struct GetUserRequest: NetworkRequest {
     typealias Response = User
-    typealias Parameters = EmptyParameters
+    typealias Parameters = Empty
 
     let userId: Int
 
@@ -97,7 +97,7 @@ struct GetUserRequest: NetworkRequest {
 /// Request to create a new user.
 struct CreateUserRequest: NetworkRequest {
     typealias Response = CreateUserRes
-    typealias Parameters = CreateUserReq
+    typealias Parameters = CreateUserParams
 
     let name: String
     let username: String
@@ -106,14 +106,14 @@ struct CreateUserRequest: NetworkRequest {
     var path: String { "/users" }
     var method: HTTPMethod { .post }
     var parameters: Parameters? {
-        CreateUserReq(name: name, username: username, email: email)
+        Parameters(name: name, username: username, email: email)
     }
 }
 
 /// Request to get posts for a specific user.
 struct GetUserPostsRequest: NetworkRequest {
     typealias Response = [Post]
-    typealias Parameters = EmptyParameters
+    typealias Parameters = Empty
 
     let userId: Int
 
@@ -124,7 +124,7 @@ struct GetUserPostsRequest: NetworkRequest {
 /// Request to get all posts.
 struct GetPostsRequest: NetworkRequest {
     typealias Response = [Post]
-    typealias Parameters = EmptyParameters
+    typealias Parameters = Empty
 
     var path: String { "/posts" }
     var method: HTTPMethod { .get }
@@ -133,10 +133,21 @@ struct GetPostsRequest: NetworkRequest {
 /// Request to get comments for a specific post.
 struct GetPostCommentsRequest: NetworkRequest {
     typealias Response = [Comment]
-    typealias Parameters = EmptyParameters
+    typealias Parameters = Empty
 
     let postId: Int
 
     var path: String { "/posts/\(postId)/comments" }
     var method: HTTPMethod { .get }
+}
+
+/// Request to delete a post.
+struct DeletePostRequest: NetworkRequest {
+    typealias Response = Empty
+    typealias Parameters = Empty
+
+    let postId: Int
+
+    var path: String { "/posts/\(postId)" }
+    var method: HTTPMethod { .delete }
 }
