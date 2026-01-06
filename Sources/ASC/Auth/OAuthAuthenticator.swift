@@ -24,19 +24,36 @@
 
 // OAuth authenticator with automatic token refresh support.
 
-import Alamofire
 import Foundation
+import Alamofire
+import JWTDecode
+
+// MARK: - OAuthAuthenticator
 
 /// OAuth credential containing access token, refresh token, and expiration information.
 public struct OAuthCredential: AuthenticationCredential, Sendable {
-    /// Access token for API requests.
-    public let accessToken: String
-
-    /// Refresh token for obtaining new access tokens.
-    public let refreshToken: String
+    public let authToken: AuthToken
 
     /// Token expiration date.
-    public let expiration: Date
+    public var expiration: Date? {
+        switch authToken {
+            case .bearer(let token):
+                expirationDate(token: token) ?? .now
+            case .basic(let username, let password):
+                nil
+            case .custom(let token):
+                nil
+        }
+    }
+
+    /// Require refresh if within 5 minutes of expiration.
+    public var requiresRefresh: Bool {
+        if let expiration {
+            Date(timeIntervalSinceNow: 60 * 5) > expiration
+        } else {
+            false
+        }
+    }
 
     /// Creates a new OAuth credential.
     ///
@@ -45,17 +62,22 @@ public struct OAuthCredential: AuthenticationCredential, Sendable {
     ///   - refreshToken: Refresh token for obtaining new access tokens
     ///   - userID: User ID associated with the credential
     ///   - expiration: Token expiration date
-    public init(accessToken: String, refreshToken: String, expiration: Date) {
-        self.accessToken = accessToken
-        self.refreshToken = refreshToken
-        self.expiration = expiration
+    public init(authToken: AuthToken) {
+        self.authToken = authToken
     }
 
-    /// Require refresh if within 5 minutes of expiration.
-    public var requiresRefresh: Bool {
-        Date(timeIntervalSinceNow: 60 * 5) > expiration
+    func expirationDate(token: String) -> Date? {
+        do {
+            let jwt = try decode(jwt: token)
+            return jwt.expiresAt
+        } catch let error {
+            debugPrint(error.localizedDescription)
+            return nil
+        }
     }
 }
+
+// MARK: - OAuthAuthenticator
 
 /// OAuth authenticator that automatically refreshes tokens on 401 errors.
 ///
@@ -72,22 +94,23 @@ public struct OAuthCredential: AuthenticationCredential, Sendable {
 /// )
 /// ```
 public final class OAuthAuthenticator: Authenticator, @unchecked Sendable {
-    public static func buildAuthInterceptor(storage: any TokenStorage) -> AuthenticationInterceptor<OAuthAuthenticator> {
+    public static func buildAuthInterceptor(storage: any OAuthTokenStorage) -> AuthenticationInterceptor<OAuthAuthenticator> {
         let authenticator: OAuthAuthenticator = .init(storage: storage)
-        return .init(authenticator: authenticator)
+        let credential = storage.getAuthCredential()
+        return .init(authenticator: authenticator, credential: credential)
     }
 
     // MARK: - Properties
 
     /// Token storage for managing tokens.
-    private let storage: any TokenStorage
+    private let storage: any OAuthTokenStorage
 
     // MARK: - Initialization
 
     /// Creates a new OAuth authenticator.
     ///
     /// - Parameter storage: Token storage for managing tokens
-    public init(storage: any TokenStorage) {
+    public init(storage: any OAuthTokenStorage) {
         self.storage = storage
     }
 
@@ -95,7 +118,7 @@ public final class OAuthAuthenticator: Authenticator, @unchecked Sendable {
 
     /// Applies the credential to the request by adding Authorization header.
     public func apply(_ credential: OAuthCredential, to urlRequest: inout URLRequest) {
-        urlRequest.headers.add(.authorization(bearerToken: credential.accessToken))
+        urlRequest.headers.add(credential.authToken.header)
     }
 
     /// Refreshes the credential using the refresh token.
@@ -112,55 +135,23 @@ public final class OAuthAuthenticator: Authenticator, @unchecked Sendable {
         for session: Session,
         completion: @escaping @Sendable (Result<OAuthCredential, Error>) -> Void
     ) {
-        // Get refresh request from TokenStorage
-        guard storage.refreshRequest != nil else {
-            completion(.failure(ASCError.tokenRefreshFailed(
-                NSError(domain: "OAuthAuthenticator", code: -1, userInfo: [
-                    NSLocalizedDescriptionKey: "No refresh request configured in TokenStorage"
-                ])
-            )))
-            return
-        }
-
         // Execute refresh using TokenStorage's executeRefreshToken method
         // This uses async/await, so we need to bridge to completion-based API
         Task { @Sendable in
             do {
-                // Create a temporary NetworkClient for refresh (without OAuthAuthenticator to avoid circular dependency)
-                // Use ephemeral session type to avoid sharing state
-                let refreshConfig = NetworkClientConfiguration(
-                    baseURL: nil, // Use baseURL from refreshRequest
-                    sessionType: .ephemeral,
-                    connectivityCheckEnabled: false
-                )
-                let refreshClient = NetworkClient(configuration: refreshConfig)
-
                 // Execute refresh token using TokenStorage's method
                 // This will execute the refreshRequest and update tokens in storage
-                try await storage.executeRefreshToken(with: refreshClient)
+                try await storage.executeRefreshToken()
 
                 // Get updated tokens from storage
-                guard let updatedToken = storage.authToken,
-                      case let .bearer(newAccessToken) = updatedToken else {
-                    completion(.failure(ASCError.tokenRefreshFailed(
-                        NSError(domain: "OAuthAuthenticator", code: -1, userInfo: [
-                            NSLocalizedDescriptionKey: "Failed to get updated token from storage after refresh"
-                        ])
-                    )))
+                guard
+                    let credential = storage.getAuthCredential()
+                else {
+                    completion(.failure(ASCError.invalidToken))
                     return
                 }
 
-                // Create new credential with updated access token
-                // Note: We keep the same refreshToken and userID, expiration is set to 1 hour from now
-                // In a real implementation, these should come from the refresh response
-                // TokenStorage.executeRefreshToken should update all necessary token information
-                let newCredential = OAuthCredential(
-                    accessToken: newAccessToken,
-                    refreshToken: credential.refreshToken, // Keep existing refresh token (or update if rotation is used)
-                    expiration: Date(timeIntervalSinceNow: 3600) // 1 hour expiration
-                )
-
-                completion(.success(newCredential))
+                completion(.success(credential))
             } catch {
                 // Map errors to appropriate ASCError types
                 if let ascError = error as? ASCError {

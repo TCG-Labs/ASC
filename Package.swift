@@ -17,12 +17,14 @@ let package = Package(
     ],
     dependencies: [
         .package(url: "https://github.com/Alamofire/Alamofire", from: "5.10.2"),
+        .package(url: "https://github.com/auth0/JWTDecode.swift", exact: "3.3.0")
     ],
     targets: [
         .target(
             name: "ASC",
             dependencies: [
                 "Alamofire",
+                .product(name: "JWTDecode", package: "JWTDecode.swift"),
             ]
         ),
         .testTarget(

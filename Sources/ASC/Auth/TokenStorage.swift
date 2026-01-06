@@ -25,18 +25,14 @@
 // Storage for authentication tokens.
 
 import Foundation
+import JWTDecode
 
+// MARK: - TokenStorage
 /// Storage for authentication tokens.
 ///
 /// Implement this protocol to provide custom token storage (Keychain, UserDefaults, etc.).
 public protocol TokenStorage: Sendable {
     var authToken: AuthToken? { get }
-
-    /// Network request for refreshing tokens
-    var refreshRequest: (any NetworkRequest)? { get }
-
-    /// Executes token refresh using the provided client
-    func executeRefreshToken(with client: NetworkClient) async throws
 
     /// Flushes the storage state (clears all stored tokens)
     func flush()
@@ -45,10 +41,25 @@ public protocol TokenStorage: Sendable {
 public extension TokenStorage {
     /// Default auth token is nil.
     var authToken: AuthToken? { nil }
+}
 
-    /// Default refresh request is nil.
-    var refreshRequest: (any NetworkRequest)? { nil }
+// MARK: - OAuthTokenStorage
+public protocol OAuthTokenStorage: TokenStorage {
+    func getAuthCredential() -> OAuthCredential?
+
+    /// Executes token refresh
+    func executeRefreshToken() async throws
+}
+
+extension OAuthTokenStorage {
+    public func getAuthCredential() -> OAuthCredential? {
+        if let authToken {
+            .init(authToken: authToken)
+        } else {
+            nil
+        }
+    }
 
     /// Default implementation does nothing.
-    func executeRefreshToken(with client: NetworkClient) async throws { }
+    public func executeRefreshToken() async throws { }
 }
