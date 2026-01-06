@@ -50,7 +50,7 @@ public final class NetworkClient: Sendable {
     private let configuration: NetworkClientConfiguration
 
     /// Alamofire session used for networking.
-    private let session: Session
+    public let session: Session
 
     /// Request builder for constructing URLRequests.
     private let requestBuilder: RequestBuilder
