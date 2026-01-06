@@ -394,6 +394,88 @@ struct NetworkClientFileUploadTests {
         #expect(response.id == 9)
     }
 
+    // MARK: - Validation Tests
+
+    @Test("Upload request validates response using request.validate")
+    func testUploadRequestValidatesResponse() async throws {
+        // Given
+        MockURLProtocol.reset()
+        defer { MockURLProtocol.reset() }
+
+        let uploadData = "test content".data(using: .utf8)!
+        let responseData = try JSONEncoder().encode(MockResponse(id: 1, name: "Test"))
+        MockURLProtocol.setSuccessResponse(data: responseData)
+
+        struct ValidatedUploadRequest: NetworkRequest {
+            typealias Response = MockResponse
+            typealias Parameters = Empty
+
+            let uploadData: Data
+            let shouldFailValidation: Bool
+
+            var path: String { "/upload" }
+            var method: HTTPMethod { .post }
+            var fileUpload: FileUpload? {
+                .data(uploadData)
+            }
+
+            func validate(response: MockResponse) throws {
+                if shouldFailValidation {
+                    throw ASCError.validationFailed("Custom validation failed")
+                }
+            }
+        }
+
+        // When & Then - успешная валидация
+        let request1 = ValidatedUploadRequest(uploadData: uploadData, shouldFailValidation: false)
+        let client = NetworkClient(configuration: createTestConfiguration())
+        let response1 = try await client.execute(request1)
+        #expect(response1.id == 1)
+
+        // When & Then - неудачная валидация
+        let request2 = ValidatedUploadRequest(uploadData: uploadData, shouldFailValidation: true)
+        await #expect(throws: ASCError.self) {
+            try await client.execute(request2)
+        }
+    }
+
+    @Test("Upload request applies automatic status code validation")
+    func testUploadRequestAppliesAutomaticValidation() async throws {
+        // Given
+        MockURLProtocol.reset()
+        defer { MockURLProtocol.reset() }
+
+        let uploadData = "test content".data(using: .utf8)!
+        let responseData = try JSONEncoder().encode(MockResponse(id: 1, name: "Test"))
+
+        // Настройка с автоматической валидацией и допустимыми статус-кодами
+        let validationOptions = ValidationOptions(
+            isEnabled: true,
+            acceptableStatusCodes: 200..<300
+        )
+        let config = NetworkClientConfiguration(
+            baseURL: "https://api.example.com",
+            sessionType: .custom(createMockURLSessionConfiguration()),
+            connectivityCheckEnabled: false,
+            validation: validationOptions
+        )
+
+        // Когда статус-код валидный (200)
+        MockURLProtocol.setSuccessResponse(data: responseData, statusCode: 200)
+        let request1 = MockDataUploadRequest(uploadData: uploadData)
+        let client1 = NetworkClient(configuration: config)
+        let response1 = try await client1.execute(request1)
+        #expect(response1.id == 1)
+
+        // Когда статус-код невалидный (400)
+        MockURLProtocol.setSuccessResponse(data: responseData, statusCode: 400)
+        let request2 = MockDataUploadRequest(uploadData: uploadData)
+        let client2 = NetworkClient(configuration: config)
+        await #expect(throws: ASCError.self) {
+            try await client2.execute(request2)
+        }
+    }
+
     // MARK: - Helper Methods
 
     private func createTestConfiguration() -> NetworkClientConfiguration {

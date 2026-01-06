@@ -26,6 +26,8 @@ import Foundation
 import os.log
 import Synchronization
 
+let log: Logger = .init(subsystem: "com.asc.networking", category: "NetworkClient")
+
 /// Log level for ASC logger.
 public enum ASCLogLevel: Int, Sendable {
     /// No logging.
@@ -68,7 +70,6 @@ public final class ASCLogger: EventMonitor, Sendable {
 
     private static let sharedQueue = DispatchQueue(label: "com.asc.logger", qos: .utility)
     private let logLevel: ASCLogLevel
-    private let logger: Logger
 
     private let dateFormatter: DateFormatter = {
         let formatter: DateFormatter = .init()
@@ -86,15 +87,8 @@ public final class ASCLogger: EventMonitor, Sendable {
     ///
     /// - Parameters:
     ///   - logLevel: The minimum log level to display
-    ///   - subsystem: OSLog subsystem (default: "com.asc.networking")
-    ///   - category: OSLog category (default: "NetworkClient")
-    public init(
-        logLevel: ASCLogLevel,
-        subsystem: String = "com.asc.networking",
-        category: String = "NetworkClient"
-    ) {
+    public init(logLevel: ASCLogLevel) {
         self.logLevel = logLevel
-        self.logger = Logger(subsystem: subsystem, category: category)
     }
 
     // MARK: - EventMonitor
@@ -124,7 +118,7 @@ public final class ASCLogger: EventMonitor, Sendable {
 
         lines.append("└─────────────────────────────────────────────────────────────────")
 
-        logger.info("\(lines.joined(separator: "\n"))")
+        log.info("\(lines.joined(separator: "\n"))")
     }
 
     public func request<Value>(
@@ -161,7 +155,7 @@ public final class ASCLogger: EventMonitor, Sendable {
 
             lines.append("└─────────────────────────────────────────────────────────────────")
 
-            logger.info("\(lines.joined(separator: "\n"))")
+            log.info("\(lines.joined(separator: "\n"))")
         }
 
         if let error = response.error {
@@ -296,7 +290,7 @@ public final class ASCLogger: EventMonitor, Sendable {
 
         lines.append("└─────────────────────────────────────────────────────────────────")
 
-        logger.error("\(lines.joined(separator: "\n"))")
+        log.error("\(lines.joined(separator: "\n"))")
     }
 
     private func formatBytes(_ bytes: Int?) -> String {

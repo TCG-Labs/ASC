@@ -151,3 +151,44 @@ struct DeletePostRequest: NetworkRequest {
     var path: String { "/posts/\(postId)" }
     var method: HTTPMethod { .delete }
 }
+
+/// Response model for file upload.
+nonisolated struct UploadResponse: Codable, Sendable {
+    let id: Int
+    let url: String?
+    let filename: String?
+}
+
+/// Request to upload a file.
+struct UploadFileRequest: NetworkRequest {
+    typealias Response = UploadResponse
+    typealias Parameters = Empty
+
+    let fileData: Data
+    let fileName: String
+    let mimeType: String
+
+    var path: String { "/posts" } // Используем posts endpoint для демо
+    var method: HTTPMethod { .post }
+    var fileUpload: FileUpload? {
+        .multipart([
+            .data(fieldName: "file_name", data: fileData)
+        ])
+    }
+}
+
+/// Request to upload a file from file system.
+struct UploadFileFromURLRequest: NetworkRequest {
+    typealias Response = UploadResponse
+    typealias Parameters = Empty
+
+    let fileURL: URL
+    let fileName: String
+    let mimeType: String
+
+    var path: String { "/posts" }
+    var method: HTTPMethod { .post }
+    var fileUpload: FileUpload? {
+        .file(fileURL)
+    }
+}

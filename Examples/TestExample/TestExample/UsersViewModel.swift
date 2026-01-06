@@ -38,6 +38,7 @@ import ASC
 /// - GET requests (list and single item)
 /// - POST requests (create user)
 /// - DELETE requests (delete post)
+/// - File uploads (upload file from Data or URL)
 /// - Error handling
 /// - Different client configurations via DI
 @MainActor
@@ -55,6 +56,9 @@ final class UsersViewModel: ObservableObject {
 
     /// Comments for the selected post.
     @Published var postComments: [Comment] = []
+
+    /// Upload result.
+    @Published var uploadResult: UploadResponse?
 
     /// Loading state indicator.
     @Published var isLoading = false
@@ -203,6 +207,56 @@ final class UsersViewModel: ObservableObject {
         } catch {
             errorMessage = "Failed to delete post: \(error.localizedDescription)"
             debugPrint("❌ Error deleting post: \(error)")
+        }
+
+        isLoading = false
+    }
+
+    /// Uploads a file from Data.
+    ///
+    /// - Parameters:
+    ///   - data: File data to upload
+    ///   - fileName: Name of the file
+    ///   - mimeType: MIME type of the file
+    func uploadFile(data: Data, fileName: String, mimeType: String) async {
+        isLoading = true
+        errorMessage = nil
+        uploadResult = nil
+
+        do {
+            let response = try await client.execute(
+                UploadFileRequest(fileData: data, fileName: fileName, mimeType: mimeType)
+            )
+            uploadResult = response
+            debugPrint("✅ File uploaded successfully: \(fileName)")
+        } catch {
+            errorMessage = "Failed to upload file: \(error.localizedDescription)"
+            debugPrint("❌ Error uploading file: \(error)")
+        }
+
+        isLoading = false
+    }
+
+    /// Uploads a file from file system URL.
+    ///
+    /// - Parameters:
+    ///   - fileURL: URL of the file to upload
+    ///   - fileName: Name of the file
+    ///   - mimeType: MIME type of the file
+    func uploadFile(from fileURL: URL, fileName: String, mimeType: String) async {
+        isLoading = true
+        errorMessage = nil
+        uploadResult = nil
+
+        do {
+            let response = try await client.execute(
+                UploadFileFromURLRequest(fileURL: fileURL, fileName: fileName, mimeType: mimeType)
+            )
+            uploadResult = response
+            debugPrint("✅ File uploaded successfully from URL: \(fileName)")
+        } catch {
+            errorMessage = "Failed to upload file: \(error.localizedDescription)"
+            debugPrint("❌ Error uploading file: \(error)")
         }
 
         isLoading = false

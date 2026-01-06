@@ -74,6 +74,7 @@ struct TestExampleApp: App {
             configuration: NetworkClientConfiguration(
                 baseURL: "https://jsonplaceholder.typicode.com",
                 defaultTimeout: 30.0,
+                eventMonitors: [BaseEventMonitor()],
                 logLevel: .verbose,
                 connectivityCheckEnabled: true
             )

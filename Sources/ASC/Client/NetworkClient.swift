@@ -145,72 +145,72 @@ public final class NetworkClient: Sendable {
         _ = try await executeRequest(request, responseType: Empty.self)
     }
 
-    /// Executes a network request with file upload and returns progress stream.
-    ///
-    /// Use this method when you need to track upload progress for file uploads.
-    /// Returns an AsyncThrowingStream that yields progress updates as the upload progresses.
-    ///
-    /// - Parameter request: The request to execute (must have fileUpload property set)
-    /// - Returns: AsyncThrowingStream with UploadProgress updates, followed by the final response
-    /// - Throws: `ASCError` if request doesn't have fileUpload or if upload fails
-    public func executeWithProgress<Request: NetworkRequest>(
-        _ request: Request
-    ) -> AsyncThrowingStream<UploadProgressOrResponse<Request.Response>, Error> {
-        AsyncThrowingStream { continuation in
-            Task { @Sendable in
-                do {
-                    guard let fileUpload = request.fileUpload else {
-                        continuation.finish(throwing: ASCError.invalidFormat("Request must have fileUpload property set to use executeWithProgress"))
-                        return
-                    }
-
-                    try Task.checkCancellation()
-                    try checkConnectivity()
-
-                    let url = try requestBuilder.buildURL(from: request)
-                    let interceptor = buildRequestInterceptor(request, retryPolicy: request.retryPolicy)
-
-                    // Create upload request using centralized method
-                    let uploadRequest = try createUploadRequest(request, fileUpload: fileUpload, url: url, interceptor: interceptor)
-
-                    // Set request priority
-                    uploadRequest.task?.priority = configuration.defaultPriority
-
-                    // Apply automatic validation if enabled
-                    let validatedRequest = configuration.automaticValidation
-                        ? uploadRequest.validate(statusCode: configuration.acceptableStatusCodes)
-                        : uploadRequest
-
-                    // Track upload progress before execution
-                    uploadRequest.uploadProgress { progress in
-                        let uploadProgress = UploadProgress(
-                            fractionCompleted: progress.fractionCompleted,
-                            bytesUploaded: progress.completedUnitCount,
-                            totalBytes: progress.totalUnitCount
-                        )
-                        continuation.yield(.progress(uploadProgress))
-                    }
-
-                    // Execute request using same serialization logic as performUploadRequest
-                    // Note: We can't use performUploadRequest directly because we need access to UploadRequest
-                    // for progress tracking before execution
-                    let serializedRequest = validatedRequest.serializingDecodable(
-                        Request.Response.self,
-                        decoder: configuration.decoder
-                    )
-
-                    let response = await serializedRequest.response
-                    let value = try handleResponse(response)
-                    try request.validate(response: value)
-
-                    continuation.yield(.response(value))
-                    continuation.finish()
-                } catch {
-                    continuation.finish(throwing: error)
-                }
-            }
-        }
-    }
+//    /// Executes a network request with file upload and returns progress stream.
+//    ///
+//    /// Use this method when you need to track upload progress for file uploads.
+//    /// Returns an AsyncThrowingStream that yields progress updates as the upload progresses.
+//    ///
+//    /// - Parameter request: The request to execute (must have fileUpload property set)
+//    /// - Returns: AsyncThrowingStream with UploadProgress updates, followed by the final response
+//    /// - Throws: `ASCError` if request doesn't have fileUpload or if upload fails
+//    public func executeWithProgress<Request: NetworkRequest>(
+//        _ request: Request
+//    ) -> AsyncThrowingStream<UploadProgressOrResponse<Request.Response>, Error> {
+//        AsyncThrowingStream { continuation in
+//            Task { @Sendable in
+//                do {
+//                    guard let fileUpload = request.fileUpload else {
+//                        continuation.finish(throwing: ASCError.invalidFormat("Request must have fileUpload property set to use executeWithProgress"))
+//                        return
+//                    }
+//
+//                    try Task.checkCancellation()
+//                    try checkConnectivity()
+//
+//                    let url = try requestBuilder.buildURL(from: request)
+//                    let interceptor = buildRequestInterceptor(request, retryPolicy: request.retryPolicy)
+//
+//                    // Create upload request using centralized method
+//                    let uploadRequest = try createUploadRequest(request, fileUpload: fileUpload, url: url, interceptor: interceptor)
+//
+//                    // Set request priority
+//                    uploadRequest.task?.priority = configuration.defaultPriority
+//
+//                    // Apply automatic validation if enabled
+//                    let validatedRequest = configuration.automaticValidation
+//                        ? uploadRequest.validate(statusCode: configuration.acceptableStatusCodes)
+//                        : uploadRequest
+//
+//                    // Track upload progress before execution
+//                    uploadRequest.uploadProgress { progress in
+//                        let uploadProgress = UploadProgress(
+//                            fractionCompleted: progress.fractionCompleted,
+//                            bytesUploaded: progress.completedUnitCount,
+//                            totalBytes: progress.totalUnitCount
+//                        )
+//                        continuation.yield(.progress(uploadProgress))
+//                    }
+//
+//                    // Execute request using same serialization logic as performUploadRequest
+//                    // Note: We can't use performUploadRequest directly because we need access to UploadRequest
+//                    // for progress tracking before execution
+//                    let serializedRequest = validatedRequest.serializingDecodable(
+//                        Request.Response.self,
+//                        decoder: configuration.decoder
+//                    )
+//
+//                    let response = await serializedRequest.response
+//                    let value = try handleResponse(response)
+//                    try request.validate(response: value)
+//
+//                    continuation.yield(.response(value))
+//                    continuation.finish()
+//                } catch {
+//                    continuation.finish(throwing: error)
+//                }
+//            }
+//        }
+//    }
 
     // MARK: - Private Methods
     private func buildRequestInterceptor(_ request: any NetworkRequest, retryPolicy: Alamofire.RetryPolicy?) -> Interceptor {
@@ -410,7 +410,11 @@ public final class NetworkClient: Sendable {
                             multipartFormData.append(data, withName: fieldName, fileName: fileName, mimeType: mimeType)
 
                         case let .file(fieldName, fileURL, fileName, mimeType):
-                            multipartFormData.append(fileURL, withName: fieldName, fileName: fileName, mimeType: mimeType)
+                            if let fileName, let mimeType {
+                                multipartFormData.append(fileURL, withName: fieldName, fileName: fileName, mimeType: mimeType)
+                            } else {
+                                multipartFormData.append(fileURL, withName: fieldName)
+                            }
 
                         case let .parameter(fieldName, value):
                             if let valueData = value.data(using: .utf8) {

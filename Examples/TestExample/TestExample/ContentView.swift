@@ -28,6 +28,12 @@
 import SwiftUI
 import ASC
 
+// MARK: - Navigation Destination
+
+private enum NavigationDestination: Hashable {
+    case uploadFile
+}
+
 // MARK: - Content View
 
 struct ContentView: View {
@@ -76,6 +82,12 @@ struct ContentView: View {
                     } label: {
                         Image(systemName: "plus")
                     }
+                }
+            }
+            .navigationDestination(for: NavigationDestination.self) { destination in
+                switch destination {
+                case .uploadFile:
+                    FileUploadView(viewModel: viewModel)
                 }
             }
             .sheet(isPresented: $showingCreateUser) {
@@ -169,6 +181,13 @@ struct ContentView: View {
 
     private var usersListView: some View {
         List {
+            NavigationLink(value: NavigationDestination.uploadFile) {
+                HStack {
+                    Image(systemName: "arrow.up.doc")
+                    Text("Upload File")
+                }
+            }
+            
             ForEach(viewModel.users) { user in
                 NavigationLink {
                     UserDetailView(user: user, viewModel: viewModel)
@@ -397,6 +416,74 @@ private struct PostDetailView: View {
                 await viewModel.loadPostComments(postId: post.id)
             }
         }
+    }
+}
+
+// MARK: - File Upload View
+
+private struct FileUploadView: View {
+    @ObservedObject var viewModel: UsersViewModel
+    @State private var selectedFileData: Data?
+    @State private var selectedFileName: String?
+
+    var body: some View {
+        Form {
+            Section("Upload File") {
+                Button("Select File") {
+                    // Создаем тестовый файл для демонстрации
+                    createTestFile()
+                }
+
+                if let fileName = selectedFileName {
+                    Text("Selected: \(fileName)")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                }
+
+                Button("Upload File") {
+                    guard let data = selectedFileData,
+                          let fileName = selectedFileName else {
+                        return
+                    }
+                    Task {
+                        await viewModel.uploadFile(
+                            data: data,
+                            fileName: fileName,
+                            mimeType: "text/plain"
+                        )
+                    }
+                }
+                .disabled(selectedFileData == nil || viewModel.isLoading)
+            }
+
+            if let result = viewModel.uploadResult {
+                Section("Upload Result") {
+                    Text("ID: \(result.id)")
+                    if let url = result.url {
+                        Text("URL: \(url)")
+                            .font(.caption)
+                    }
+                    if let filename = result.filename {
+                        Text("Filename: \(filename)")
+                            .font(.caption)
+                    }
+                }
+            }
+
+            if let error = viewModel.errorMessage {
+                Section("Error") {
+                    Text(error)
+                        .foregroundColor(.red)
+                }
+            }
+        }
+        .navigationTitle("Upload File")
+    }
+
+    private func createTestFile() {
+        let content = "Test file content\nCreated at \(Date())"
+        selectedFileData = content.data(using: .utf8)
+        selectedFileName = "test_\(UUID().uuidString.prefix(8)).txt"
     }
 }
 

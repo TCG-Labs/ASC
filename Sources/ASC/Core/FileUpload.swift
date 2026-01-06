@@ -91,7 +91,7 @@ public enum MultipartItem: Sendable {
     ///   - data: The data to upload
     ///   - fileName: The name of the file
     ///   - mimeType: The MIME type of the data
-    case data(fieldName: String, data: Data, fileName: String, mimeType: String)
+    case data(fieldName: String, data: Data, fileName: String? = nil, mimeType: String? = nil)
 
     /// File field in multipart form (memory-efficient).
     ///
@@ -100,7 +100,7 @@ public enum MultipartItem: Sendable {
     ///   - fileURL: The URL of the file to upload
     ///   - fileName: The name of the file
     ///   - mimeType: The MIME type of the file
-    case file(fieldName: String, fileURL: URL, fileName: String, mimeType: String)
+    case file(fieldName: String, fileURL: URL, fileName: String? = nil, mimeType: String? = nil)
 
     /// Parameter field in multipart form.
     ///
