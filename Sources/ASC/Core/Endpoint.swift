@@ -1,4 +1,4 @@
-// NetworkRequest.swift
+// Endpoint.swift
 // ASC - Alamofire Swift Client
 //
 //  Copyright (c) 2025 TCG Labs
@@ -34,9 +34,9 @@ import Foundation
 ///
 /// Example:
 /// ```swift
-/// struct GetUserRequest: NetworkRequest {
+/// struct GetUserRequest: Endpoint {
 ///     typealias Response = User
-///     typealias Parameters = Empty
+///     typealias Request = Empty
 ///
 ///     let userId: String
 ///
@@ -44,23 +44,23 @@ import Foundation
 ///     var method: HTTPMethod { .get }
 /// }
 /// ```
-public protocol NetworkRequest: Sendable {
-    /// The parameters type conforming to Encodable.
+public protocol Endpoint: Sendable {
+    /// The request type conforming to Encodable.
     ///
     /// Use `Empty` for requests without parameters (GET, DELETE, etc.).
     /// For requests with parameters, define a custom Encodable struct.
     ///
     /// Example:
     /// ```swift
-    /// struct CreateUserRequest: NetworkRequest {
+    /// struct CreateUserRequest: Endpoint {
     ///     struct UserData: Encodable, Sendable {
     ///         let email: String
     ///         let name: String
     ///     }
-    ///     typealias Parameters = UserData
+    ///     typealias Request = UserData
     /// }
     /// ```
-    associatedtype Parameters: Encodable & Sendable
+    associatedtype Request: Encodable & Sendable
 
     /// The expected response type conforming to Decodable.
     ///
@@ -69,9 +69,9 @@ public protocol NetworkRequest: Sendable {
     ///
     /// Example:
     /// ```swift
-    /// struct DeleteUserRequest: NetworkRequest {
+    /// struct DeleteUserRequest: Endpoint {
     ///     typealias Response = Empty
-    ///     typealias Parameters = Empty
+    ///     typealias Request = Empty
     ///
     ///     let userId: String
     ///     var path: String { "/users/\(userId)" }
@@ -108,19 +108,19 @@ public protocol NetworkRequest: Sendable {
     ///
     /// Example:
     /// ```swift
-    /// struct SearchRequest: NetworkRequest {
+    /// struct SearchRequest: Endpoint {
     ///     struct Query: Encodable, Sendable {
     ///         let q: String
     ///         let limit: Int
     ///     }
-    ///     typealias Parameters = Query
+    ///     typealias Request = Query
     ///
     ///     var parameters: Query? {
     ///         Query(q: "swift", limit: 10)
     ///     }
     /// }
     /// ```
-    var parameters: Parameters? { get }
+    var parameters: Request? { get }
 
     /// Custom parameter encoder for this request.
     ///
@@ -135,12 +135,12 @@ public protocol NetworkRequest: Sendable {
     ///
     /// Example:
     /// ```swift
-    /// struct CreateUserRequest: NetworkRequest {
+    /// struct CreateUserRequest: Endpoint {
     ///     struct UserData: Encodable, Sendable {
     ///         let name: String
     ///         let email: String
     ///     }
-    ///     typealias Parameters = UserData
+    ///     typealias Request = UserData
     ///
     ///     var path: String { "/users" }
     ///     var method: HTTPMethod { .post }
@@ -176,7 +176,7 @@ public protocol NetworkRequest: Sendable {
     ///
     /// Example:
     /// ```swift
-    /// struct GetProfileRequest: NetworkRequest {
+    /// struct GetProfileRequest: Endpoint {
     ///     typealias Response = UserProfile
     ///
     ///     var enableAuthorization: Bool { true }  // Adds Authorization header
@@ -198,35 +198,35 @@ public protocol NetworkRequest: Sendable {
     ///
     /// Example:
     /// ```swift
-    /// struct UploadImageRequest: NetworkRequest {
+    /// struct UploadImageRequest: Endpoint {
     ///     typealias Response = UploadResponse
-    ///     typealias Parameters = Empty
+    ///     typealias Request = Empty
     ///
     ///     let imageData: Data
     ///
     ///     var path: String { "/upload" }
     ///     var method: HTTPMethod { .post }
-    ///     var fileUpload: FileUpload? {
+    ///     var uploadData: UploadData? {
     ///         .data(imageData)
     ///     }
     /// }
     ///
-    /// struct UploadLargeFileRequest: NetworkRequest {
+    /// struct UploadLargeFileRequest: Endpoint {
     ///     typealias Response = UploadResponse
-    ///     typealias Parameters = Empty
+    ///     typealias Request = Empty
     ///
     ///     let fileURL: URL
     ///
     ///     var path: String { "/upload" }
     ///     var method: HTTPMethod { .post }
-    ///     var fileUpload: FileUpload? {
+    ///     var uploadData: UploadData? {
     ///         .file(fileURL)
     ///     }
     /// }
     ///
-    /// struct UploadMultipleFilesRequest: NetworkRequest {
+    /// struct UploadMultipleFilesRequest: Endpoint {
     ///     typealias Response = UploadResponse
-    ///     typealias Parameters = Empty
+    ///     typealias Request = Empty
     ///
     ///     let imageData: Data
     ///     let documentURL: URL
@@ -234,7 +234,7 @@ public protocol NetworkRequest: Sendable {
     ///
     ///     var path: String { "/upload" }
     ///     var method: HTTPMethod { .post }
-    ///     var fileUpload: FileUpload? {
+    ///     var uploadData: UploadData? {
     ///         .multipart([
     ///             .data("image", data: imageData, fileName: "image.jpg", mimeType: "image/jpeg"),
     ///             .file("document", fileURL: documentURL, fileName: "doc.pdf", mimeType: "application/pdf"),
@@ -243,7 +243,7 @@ public protocol NetworkRequest: Sendable {
     ///     }
     /// }
     /// ```
-    var fileUpload: FileUpload? { get }
+    var uploadData: UploadData? { get }
 
     /// Validates the response after successful decoding.
     ///
@@ -259,7 +259,7 @@ public protocol NetworkRequest: Sendable {
     ///
     /// Example:
     /// ```swift
-    /// struct GetUserRequest: NetworkRequest {
+    /// struct GetUserRequest: Endpoint {
     ///     typealias Response = UserResponse
     ///
     ///     func validate(response: UserResponse) throws {
@@ -280,7 +280,7 @@ public protocol NetworkRequest: Sendable {
 
 // MARK: - Default Implementations
 
-public extension NetworkRequest {
+public extension Endpoint {
     /// Default base URL is nil (use client's default)
     var baseURL: String? { nil }
 
@@ -288,7 +288,7 @@ public extension NetworkRequest {
     var headers: HTTPHeaders? { nil }
 
     /// Default parameters are nil
-    var parameters: Parameters? { nil }
+    var parameters: Request? { nil }
 
     /// Default parameter encoder is nil (automatic selection based on HTTP method)
     var parameterEncoder: ParameterEncoder? { nil }
@@ -303,7 +303,7 @@ public extension NetworkRequest {
     var enableAuthorization: Bool { false }
 
     /// Default file upload is nil (no file upload).
-    var fileUpload: FileUpload? { nil }
+    var uploadData: UploadData? { nil }
 
     /// Default implementation performs no validation.
     ///
@@ -313,10 +313,10 @@ public extension NetworkRequest {
     }
 }
 
-// MARK: - NetworkRequest+RetryPolicy Extension
+// MARK: - Endpoint+RetryPolicy Extension
 
-/// Extension to add retry policy to NetworkRequest.
-public extension NetworkRequest {
+/// Extension to add retry policy to Endpoint.
+public extension Endpoint {
     /// Retry policy for this request.
     ///
     /// Override this to customize retry behavior for specific requests.
@@ -324,7 +324,7 @@ public extension NetworkRequest {
     ///
     /// Example:
     /// ```swift
-    /// struct MyRequest: NetworkRequest {
+    /// struct MyRequest: Endpoint {
     ///     var retryPolicy: Alamofire.RetryPolicy? { .default }
     /// }
     /// ```
@@ -336,7 +336,7 @@ public extension NetworkRequest {
 /// Extension for requests without parameters.
 ///
 /// Provides default nil implementation for parameters property when using Empty.
-public extension NetworkRequest where Parameters == Empty {
+public extension Endpoint where Request == Empty {
     /// Default implementation returns nil for empty parameters.
     var parameters: Empty? { nil }
 }

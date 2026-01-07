@@ -28,52 +28,52 @@ import Testing
 
 // MARK: - Mock Upload Requests
 
-struct MockDataUploadRequest: NetworkRequest {
+struct MockDataUploadRequest: Endpoint {
     typealias Response = MockResponse
-    typealias Parameters = Empty
+    typealias Request = Empty
 
-    let uploadData: Data
+    let uploadDataValue: Data
 
     var path: String { "/upload" }
     var method: HTTPMethod { .post }
-    var fileUpload: FileUpload? {
-        .data(uploadData)
+    var uploadData: UploadData? {
+        .data(uploadDataValue)
     }
 }
 
-struct MockFileUploadRequest: NetworkRequest {
+struct MockFileUploadRequest: Endpoint {
     typealias Response = MockResponse
-    typealias Parameters = Empty
+    typealias Request = Empty
 
     let fileURL: URL
 
     var path: String { "/upload" }
     var method: HTTPMethod { .post }
-    var fileUpload: FileUpload? {
+    var uploadData: UploadData? {
         .file(fileURL)
     }
 }
 
-struct MockMultipartUploadRequest: NetworkRequest {
+struct MockMultipartUploadRequest: Endpoint {
     typealias Response = MockResponse
-    typealias Parameters = Empty
+    typealias Request = Empty
 
     let items: [MultipartItem]
 
     var path: String { "/upload" }
     var method: HTTPMethod { .post }
-    var fileUpload: FileUpload? {
+    var uploadData: UploadData? {
         .multipart(items)
     }
 }
 
-struct MockMultipartWithParametersRequest: NetworkRequest {
+struct MockMultipartWithParametersRequest: Endpoint {
     typealias Response = MockResponse
 
     struct Params: Encodable, Sendable {
         let description: String
     }
-    typealias Parameters = Params
+    typealias Request = Params
 
     let items: [MultipartItem]
     let description: String
@@ -83,7 +83,7 @@ struct MockMultipartWithParametersRequest: NetworkRequest {
     var parameters: Params? {
         Params(description: description)
     }
-    var fileUpload: FileUpload? {
+    var uploadData: UploadData? {
         .multipart(items)
     }
 }
@@ -102,7 +102,7 @@ struct NetworkClientFileUploadTests {
         let responseData = try JSONEncoder().encode(MockResponse(id: 1, name: "Uploaded"))
         MockURLProtocol.setSuccessResponse(data: responseData)
 
-        let request = MockDataUploadRequest(uploadData: uploadData)
+        let request = MockDataUploadRequest(uploadDataValue: uploadData)
         let client = NetworkClient(configuration: createTestConfiguration())
 
         // When
@@ -301,7 +301,7 @@ struct NetworkClientFileUploadTests {
 //        let responseData = try JSONEncoder().encode(MockResponse(id: 7, name: "Progress test"))
 //        MockURLProtocol.setSuccessResponse(data: responseData)
 //
-//        let request = MockDataUploadRequest(uploadData: uploadData)
+//        let request = MockDataUploadRequest(uploadDataValue: uploadData)
 //        let client = NetworkClient(configuration: createTestConfiguration())
 //
 //        // When
@@ -406,17 +406,17 @@ struct NetworkClientFileUploadTests {
         let responseData = try JSONEncoder().encode(MockResponse(id: 1, name: "Test"))
         MockURLProtocol.setSuccessResponse(data: responseData)
 
-        struct ValidatedUploadRequest: NetworkRequest {
+        struct ValidatedUploadRequest: Endpoint {
             typealias Response = MockResponse
-            typealias Parameters = Empty
+            typealias Request = Empty
 
-            let uploadData: Data
+            let uploadDataValue: Data
             let shouldFailValidation: Bool
 
             var path: String { "/upload" }
             var method: HTTPMethod { .post }
-            var fileUpload: FileUpload? {
-                .data(uploadData)
+            var uploadData: UploadData? {
+                .data(uploadDataValue)
             }
 
             func validate(response: MockResponse) throws {
@@ -427,13 +427,13 @@ struct NetworkClientFileUploadTests {
         }
 
         // When & Then - успешная валидация
-        let request1 = ValidatedUploadRequest(uploadData: uploadData, shouldFailValidation: false)
+        let request1 = ValidatedUploadRequest(uploadDataValue: uploadData, shouldFailValidation: false)
         let client = NetworkClient(configuration: createTestConfiguration())
         let response1 = try await client.execute(request1)
         #expect(response1.id == 1)
 
         // When & Then - неудачная валидация
-        let request2 = ValidatedUploadRequest(uploadData: uploadData, shouldFailValidation: true)
+        let request2 = ValidatedUploadRequest(uploadDataValue: uploadData, shouldFailValidation: true)
         await #expect(throws: ASCError.self) {
             try await client.execute(request2)
         }

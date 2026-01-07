@@ -22,7 +22,7 @@ You are building a modern, type-safe, protocol-oriented REST networking library 
 │   │   │   ├── EmptyParameters.swift            # Empty parameters struct
 │   │   │   ├── HTTPResponseType.swift           # HTTP response type enum (with HTTPStatusCode typealias)
 │   │   │   ├── HTTPStatus.swift                 # HTTP status code constants
-│   │   │   ├── NetworkRequest.swift             # Main protocol
+│   │   │   ├── Endpoint.swift                   # Main protocol
 │   │   │   └── RequestBuilder.swift             # URLRequest construction
 │   │   ├── Extensions/                          # Extensions for external types (2 files)
 │   │   │   ├── HTTPURLResponse+Extension.swift  # HTTPURLResponse extension
@@ -38,12 +38,12 @@ You are building a modern, type-safe, protocol-oriented REST networking library 
 │   │   ├── ErrorMapperTests.swift
 │   │   ├── NetworkClientTests.swift
 │   │   ├── NetworkReachabilityTests.swift
-│   │   ├── NetworkRequestTests.swift
+│   │   ├── EndpointTests.swift
 │   │   ├── RequestBuilderTests.swift
 │   │   ├── Helpers/
 │   │   │   └── TestHelpers.swift
 │   │   └── Mocks/
-│   │       ├── MockNetworkRequest.swift
+│   │       ├── MockEndpoint.swift
 │   │       ├── MockTokenStorage.swift
 │   │       └── MockURLProtocol.swift
 │   └── .swiftlint.yml                           # Linting configuration
@@ -54,7 +54,7 @@ You are building a modern, type-safe, protocol-oriented REST networking library 
 │           ├── DIContainer.swift                # Dependency injection container
 │           ├── Models.swift                     # Data models and API requests
 │           ├── TestExampleApp.swift             # App entry point
-│           └── UsersViewModel.swift            # ViewModel demonstrating ASC capabilities
+│           └── UsersViewModel.swift             # ViewModel demonstrating ASC capabilities
 ├── README.md                                    # Library documentation
 └── LICENSE                                      # MIT license
 
@@ -87,7 +87,7 @@ You are building a modern, type-safe, protocol-oriented REST networking library 
 
 ## 2. Library Architecture
 
-- **Protocol-Oriented Programming**: Core `NetworkRequest` protocol defines API
+- **Protocol-Oriented Programming**: Core `Endpoint` protocol defines API
 - **Type Safety**: Compile-time type checking for requests/responses
 - **Value Types**: Prefer structs for data models and requests
 - **Generic Constraints**: Use associated types for type-safe responses
@@ -102,7 +102,7 @@ You are building a modern, type-safe, protocol-oriented REST networking library 
 - Verbs for methods (execute, build, map, validate)
 - Boolean: use is/has/should prefixes
 - Clear, descriptive names following Apple style
-- Protocols: Descriptive names (e.g., `NetworkRequest`, `ASCError`)
+- Protocols: Descriptive names (e.g., `Endpoint`, `ASCError`)
 - Error types: Suffix with `Error` (e.g., `NetworkError`, `ResponseError`)
 - Files: Match main type name (e.g., `NetworkClient.swift` for `NetworkClient`)
 - Prefixes: Use `ASC` prefix for types that might conflict (e.g., `ASCEmptyResponse`)
@@ -137,7 +137,7 @@ You are building a modern, type-safe, protocol-oriented REST networking library 
 
 - Reuse NetworkClient instances (don't create new sessions)
 - Lazy loading where appropriate
-- Memory-efficient file uploads (LargeFileUpload for >10MB)
+- Memory-efficient file uploads (LargeUploadData for >10MB)
 - Background task handling with proper threading
 - Proper resource cleanup with Task cancellation
 - Use withTaskCancellationHandler for cancellable operations
@@ -170,7 +170,7 @@ You are building a modern, type-safe, protocol-oriented REST networking library 
 - Swift Testing framework (NOT XCTest)
 - Use @Test for test functions, @Suite for test suites
 - Use #expect for assertions (not XCTAssert)
-- Test files: ASCErrorTests.swift, AuthInterceptorTests.swift, NetworkRequestTests.swift, RequestBuilderTests.swift
+- Test files: ASCErrorTests.swift, AuthInterceptorTests.swift, EndpointTests.swift, RequestBuilderTests.swift
 - Test public API behavior, not implementation details
 - Test edge cases and error scenarios
 - Async tests with async/await
@@ -186,7 +186,7 @@ You are building a modern, type-safe, protocol-oriented REST networking library 
   }
   ```
 
-## 9. NetworkRequest Protocol Pattern
+## 9. Endpoint Protocol Pattern
 
 - Core protocol defining request configuration
 - Associated type `Response` for type safety
@@ -198,7 +198,7 @@ You are building a modern, type-safe, protocol-oriented REST networking library 
 - Custom validation with `validate(response:)` method
 - Example:
   ```swift
-  struct GetUserRequest: NetworkRequest {
+  struct GetUserRequest: Endpoint {
       typealias Response = User
       
       let userId: String
@@ -216,11 +216,11 @@ You are building a modern, type-safe, protocol-oriented REST networking library 
 - **Namespace Enum** (recommended for different response types):
   ```swift
   enum UserAPI {
-      struct GetUser: NetworkRequest {
+      struct GetUser: Endpoint {
           typealias Response = User
           // ...
       }
-      struct UpdateUser: NetworkRequest {
+      struct UpdateUser: Endpoint {
           typealias Response = User
           // ...
       }
@@ -230,7 +230,7 @@ You are building a modern, type-safe, protocol-oriented REST networking library 
 
 - **Simple Enum** (for same response type):
   ```swift
-  enum PostAPI: NetworkRequest {
+  enum PostAPI: Endpoint {
       typealias Response = Post
       case get(id: String)
       case create(title: String)
@@ -248,21 +248,21 @@ You are building a modern, type-safe, protocol-oriented REST networking library 
 
 - Three upload methods based on use case:
   1. **files** - Simple uploads (field name → Data)
-  2. **fileUploads** - With MIME types (field name → FileUpload)
-  3. **largeFileUploads** - For large files >10MB (array of LargeFileUpload)
+  2. **uploadDatas** - With MIME types (field name → UploadData)
+  3. **largeUploadDatas** - For large files >10MB (array of LargeUploadData)
 - Large files use file-based encoding (memory-efficient)
 - Multipart form-data automatically used when files present
 - Progress tracking available with `executeWithProgress()`
 - Example:
   ```swift
-  struct UploadVideoRequest: NetworkRequest {
+  struct UploadVideoRequest: Endpoint {
       typealias Response = Video
       let videoURL: URL
       
       var path: String { "/videos" }
       var method: HTTPMethod { .post }
-      var largeFileUploads: [LargeFileUpload]? {
-          [LargeFileUpload(
+      var largeUploadDatas: [LargeUploadData]? {
+          [LargeUploadData(
               fileURL: videoURL,
               fieldName: "video",
               fileName: "video.mp4",
@@ -317,7 +317,7 @@ You are building a modern, type-safe, protocol-oriented REST networking library 
   /// - Parameter request: The request to execute
   /// - Returns: Decoded response of type `Request.Response`
   /// - Throws: `NetworkError`, `ResponseError`, or `AuthenticationError`
-  public func execute<Request: NetworkRequest>(
+  public func execute<Request: Endpoint>(
       _ request: Request
   ) async throws -> Request.Response {
       // ...

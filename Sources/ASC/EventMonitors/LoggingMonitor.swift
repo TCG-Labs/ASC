@@ -77,7 +77,7 @@ public enum ASCLogLevel: Int, Sendable {
         return formatter
     }()
 
-    public var queue: DispatchQueue {
+    var queue: DispatchQueue {
         Self.sharedQueue
     }
 
@@ -87,13 +87,13 @@ public enum ASCLogLevel: Int, Sendable {
     ///
     /// - Parameters:
     ///   - logLevel: The minimum log level to display
-    public init(logLevel: ASCLogLevel) {
+    init(logLevel: ASCLogLevel) {
         self.logLevel = logLevel
     }
 
     // MARK: - Request
 
-    public func request(_ request: Request, didResumeTask task: URLSessionTask) {
+    func request(_ request: Request, didResumeTask task: URLSessionTask) {
         if request is UploadRequest {
             return
         }
@@ -125,7 +125,7 @@ public enum ASCLogLevel: Int, Sendable {
         log.info("\(lines.joined(separator: "\n"))")
     }
 
-    public func request(_ request: UploadRequest, didCreateUploadable uploadable: UploadRequest.Uploadable) {
+    func request(_ request: UploadRequest, didCreateUploadable uploadable: UploadRequest.Uploadable) {
         guard logLevel.rawValue >= ASCLogLevel.debug.rawValue else { return }
 
         let date: Date = .now
@@ -152,7 +152,7 @@ public enum ASCLogLevel: Int, Sendable {
 
     // MARK: - Response
 
-    public func request<Value>(
+    func request<Value>(
         _ request: DataRequest,
         didParseResponse response: DataResponse<Value, AFError>
     ) {
@@ -194,7 +194,7 @@ public enum ASCLogLevel: Int, Sendable {
         }
     }
 
-    public func request(
+    func request(
         _ request: Request,
         didCompleteTask task: URLSessionTask,
         with error: AFError?

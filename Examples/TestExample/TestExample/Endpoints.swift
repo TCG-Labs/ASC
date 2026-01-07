@@ -1,5 +1,5 @@
 //
-//  Models.swift
+//  Endpoints.swift
 //  TestExample
 //
 //  Created by Claude on 25.10.2025.
@@ -28,10 +28,48 @@
 import Foundation
 import ASC
 
-// MARK: - Models
+// MARK: - Request Models
+
+/// Login request parameters.
+nonisolated struct LoginRequest: Codable, Sendable {
+    let email: String
+    let password: String
+}
+
+/// User creation request model.
+nonisolated struct CreateUserRequest: Codable, Sendable {
+    let name: String
+    let username: String
+    let email: String
+}
+
+// MARK: - Response Models
+
+/// Login response model.
+nonisolated struct LoginResponse: Codable, Sendable {
+    // Add response fields as needed based on API response
+    // For example: token, user, etc.
+}
+
+/// Post model from JSONPlaceholder API.
+nonisolated struct PostResponse: Codable, Identifiable, Sendable {
+    let id: Int
+    let userId: Int
+    let title: String
+    let body: String
+}
+
+/// Comment model from JSONPlaceholder API.
+nonisolated struct CommentResponse: Codable, Identifiable, Sendable {
+    let id: Int
+    let postId: Int
+    let name: String
+    let email: String
+    let body: String
+}
 
 /// User model from JSONPlaceholder API.
-nonisolated struct User: Codable, Identifiable, Sendable {
+nonisolated struct UserResponse: Codable, Identifiable, Sendable {
     let id: Int
     let name: String
     let username: String
@@ -40,53 +78,29 @@ nonisolated struct User: Codable, Identifiable, Sendable {
     let website: String?
 }
 
-/// Post model from JSONPlaceholder API.
-nonisolated struct Post: Codable, Identifiable, Sendable {
-    let id: Int
-    let userId: Int
-    let title: String
-    let body: String
-}
-
-/// Comment model from JSONPlaceholder API.
-nonisolated struct Comment: Codable, Identifiable, Sendable {
-    let id: Int
-    let postId: Int
-    let name: String
-    let email: String
-    let body: String
-}
-
-/// User creation request model.
-nonisolated struct CreateUserParams: Codable, Sendable {
-    let name: String
-    let username: String
-    let email: String
-}
-
 /// User creation response model.
-nonisolated struct CreateUserRes: Codable, Sendable {
+nonisolated struct CreateUserResponse: Codable, Sendable {
     let id: Int
     let name: String
     let username: String
     let email: String
 }
 
-// MARK: - API Requests
+// MARK: - API Endpoints
 
 /// Request to get all users.
-struct GetUsersRequest: NetworkRequest {
-    typealias Response = [User]
-    typealias Parameters = Empty
+struct GetUsersEndpoint: Endpoint {
+    typealias Response = [UserResponse]
+    typealias Request = Empty
 
     var path: String { "/users" }
     var method: HTTPMethod { .get }
 }
 
 /// Request to get a specific user by ID.
-struct GetUserRequest: NetworkRequest {
-    typealias Response = User
-    typealias Parameters = Empty
+struct GetUserEndpoint: Endpoint {
+    typealias Response = UserResponse
+    typealias Request = Empty
 
     let userId: Int
 
@@ -95,9 +109,9 @@ struct GetUserRequest: NetworkRequest {
 }
 
 /// Request to create a new user.
-struct CreateUserRequest: NetworkRequest {
-    typealias Response = CreateUserRes
-    typealias Parameters = CreateUserParams
+struct CreateUserEndpoint: Endpoint {
+    typealias Response = CreateUserResponse
+    typealias Request = CreateUserRequest
 
     let name: String
     let username: String
@@ -105,15 +119,15 @@ struct CreateUserRequest: NetworkRequest {
 
     var path: String { "/users" }
     var method: HTTPMethod { .post }
-    var parameters: Parameters? {
-        Parameters(name: name, username: username, email: email)
+    var parameters: Request? {
+        Request(name: name, username: username, email: email)
     }
 }
 
 /// Request to get posts for a specific user.
-struct GetUserPostsRequest: NetworkRequest {
-    typealias Response = [Post]
-    typealias Parameters = Empty
+struct GetUserPostsEndpoint: Endpoint {
+    typealias Response = [PostResponse]
+    typealias Request = Empty
 
     let userId: Int
 
@@ -122,18 +136,18 @@ struct GetUserPostsRequest: NetworkRequest {
 }
 
 /// Request to get all posts.
-struct GetPostsRequest: NetworkRequest {
-    typealias Response = [Post]
-    typealias Parameters = Empty
+struct GetPostsEndpoint: Endpoint {
+    typealias Response = [PostResponse]
+    typealias Request = Empty
 
     var path: String { "/posts" }
     var method: HTTPMethod { .get }
 }
 
 /// Request to get comments for a specific post.
-struct GetPostCommentsRequest: NetworkRequest {
-    typealias Response = [Comment]
-    typealias Parameters = Empty
+struct GetPostCommentsEndpoint: Endpoint {
+    typealias Response = [CommentResponse]
+    typealias Request = Empty
 
     let postId: Int
 
@@ -142,9 +156,9 @@ struct GetPostCommentsRequest: NetworkRequest {
 }
 
 /// Request to delete a post.
-struct DeletePostRequest: NetworkRequest {
+struct DeletePostEndpoint: Endpoint {
     typealias Response = Empty
-    typealias Parameters = Empty
+    typealias Request = Empty
 
     let postId: Int
 
@@ -160,9 +174,9 @@ nonisolated struct UploadResponse: Codable, Sendable {
 }
 
 /// Request to upload a file.
-struct UploadFileRequest: NetworkRequest {
+struct UploadFileEndpoint: Endpoint {
     typealias Response = UploadResponse
-    typealias Parameters = Empty
+    typealias Request = Empty
 
     let fileData: Data
     let fileName: String
@@ -170,7 +184,7 @@ struct UploadFileRequest: NetworkRequest {
 
     var path: String { "/posts" } // Используем posts endpoint для демо
     var method: HTTPMethod { .post }
-    var fileUpload: FileUpload? {
+    var uploadData: UploadData? {
         .multipart([
             .data(fieldName: "file_name", data: fileData)
         ])
@@ -178,9 +192,9 @@ struct UploadFileRequest: NetworkRequest {
 }
 
 /// Request to upload a file from file system.
-struct UploadFileFromURLRequest: NetworkRequest {
+struct UploadFileFromURLEndpoint: Endpoint {
     typealias Response = UploadResponse
-    typealias Parameters = Empty
+    typealias Request = Empty
 
     let fileURL: URL
     let fileName: String
@@ -188,36 +202,22 @@ struct UploadFileFromURLRequest: NetworkRequest {
 
     var path: String { "/posts" }
     var method: HTTPMethod { .post }
-    var fileUpload: FileUpload? {
+    var uploadData: UploadData? {
         .file(fileURL)
     }
 }
 
-// MARK: - Auth Models
-
-/// Login request parameters.
-nonisolated struct LoginRequestParams: Codable, Sendable {
-    let email: String
-    let password: String
-}
-
-/// Login response model.
-nonisolated struct LoginResponse: Codable, Sendable {
-    // Add response fields as needed based on API response
-    // For example: token, user, etc.
-}
-
 /// Request to login user.
-struct LoginRequest: NetworkRequest {
+struct LoginEndpoint: Endpoint {
     typealias Response = LoginResponse
-    typealias Parameters = LoginRequestParams
+    typealias Request = LoginRequest
 
     let email: String
     let password: String
 
     var path: String { "/api/v1/auth/login" }
     var method: HTTPMethod { .post }
-    var parameters: Parameters? {
-        LoginRequestParams(email: email, password: password)
+    var parameters: Request? {
+        LoginRequest(email: email, password: password)
     }
 }

@@ -22,8 +22,6 @@
 //  SOFTWARE.
 //
 
-// OAuth authenticator with automatic token refresh support.
-
 import Foundation
 import Alamofire
 import JWTDecode
@@ -39,8 +37,10 @@ public struct OAuthCredential: AuthenticationCredential, Sendable {
         switch authToken {
             case .bearer(let token):
                 expirationDate(token: token) ?? .now
+
             case .basic(let username, let password):
                 nil
+
             case .custom(let token):
                 nil
         }
@@ -178,7 +178,7 @@ public final class OAuthAuthenticator: Authenticator, @unchecked Sendable {
         // authentication server returns as an authentication failure. This is generally a 401 along with a custom
         // header value.
 
-        return false
+        false
     }
 
     /// Determines if a request is already authenticated with the given credential.
@@ -191,6 +191,6 @@ public final class OAuthAuthenticator: Authenticator, @unchecked Sendable {
         // let bearerToken = HTTPHeader.authorization(bearerToken: credential.accessToken).value
         // return urlRequest.headers["Authorization"] == bearerToken
 
-        return true
+        true
     }
 }

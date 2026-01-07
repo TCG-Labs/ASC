@@ -155,7 +155,7 @@ final class UnauthorizedStatusExampleViewModel: ObservableObject {
         logoutHandler.onResponseReceived = { [weak self] info in
             guard let self = self else { return }
             self.lastResponseEvent = info
-            
+
             // Check if it's a 401 status
             if info.response.statusCode == HTTPStatus.unauthorized {
                 self.unauthorizedEventCount += 1
@@ -176,7 +176,7 @@ final class UnauthorizedStatusExampleViewModel: ObservableObject {
 
         do {
             // Use real login endpoint - will return 401 if credentials are invalid
-            let response = try await authClient.execute(LoginRequest(
+            let response = try await authClient.execute(LoginEndpoint(
                 email: "example@mail.com",
                 password: "Qwerty123"
             ))
@@ -197,7 +197,7 @@ final class UnauthorizedStatusExampleViewModel: ObservableObject {
         errorMessage = nil
 
         do {
-            let users = try await client.execute(GetUsersRequest())
+            let users = try await client.execute(GetUsersEndpoint())
             print("✅ [ViewModel] Loaded \(users.count) users")
             errorMessage = nil
         } catch {
@@ -216,4 +216,3 @@ final class UnauthorizedStatusExampleViewModel: ObservableObject {
     }
 
 }
-

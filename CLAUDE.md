@@ -51,7 +51,7 @@ swiftlint --fix
     - `Typealiases.swift` - Type aliases for Alamofire types including `Empty` (45 lines)
     - `HTTPResponseType.swift` - HTTP response type enum with HTTPStatusCode typealias (180 lines)
     - `HTTPStatus.swift` - HTTP status code constants (70 lines)
-    - `NetworkRequest.swift` - Request protocol + Alamofire re-export (187 lines)
+    - `Endpoint.swift` - Request protocol + Alamofire re-export (187 lines)
     - `RequestBuilder.swift` - URLRequest construction (218 lines)
   - **Extensions/**: Extensions for external types (2 files, ~75 lines)
     - `HTTPURLResponse+Extension.swift` - HTTPURLResponse extension (15 lines)
@@ -61,10 +61,10 @@ swiftlint --fix
     - `NetworkReachability.swift` - Connectivity monitoring (216 lines)
     - `Typealiases.swift` - Type aliases for Alamofire types (42 lines)
 - **Tests/ASCTests/**: Test suite (112 tests, 6 suites)
-  - Core tests: ASCErrorTests (27), NetworkRequestTests (21), URLBuilderTests (10)
+  - Core tests: ASCErrorTests (27), EndpointTests (21), URLBuilderTests (10)
   - Component tests: ErrorMapperTests (28), NetworkClientTests (17), AuthInterceptorTests (9)
   - **Helpers/**: Test utilities (TestHelpers.swift)
-  - **Mocks/**: Mock implementations (MockURLProtocol, MockNetworkRequest, MockTokenStorage)
+  - **Mocks/**: Mock implementations (MockURLProtocol, MockEndpoint, MockTokenStorage)
 
 ### Dependencies
 - **Alamofire** (5.10.2+): Core networking library
@@ -75,7 +75,7 @@ Uses Swift Testing framework (not XCTest). Tests use `@Test` attribute and `#exp
 
 **Mock Infrastructure:**
 - **MockURLProtocol**: Thread-safe HTTP response mocking using `Mutex<T>` for Swift 6 concurrency
-- **MockNetworkRequest**: Reusable request types (GET, POST, authenticated, empty, validated, custom encoded)
+- **MockEndpoint**: Reusable request types (GET, POST, authenticated, empty, validated, custom encoded)
 - **MockTokenStorage**: Thread-safe token storage for authentication testing
 - **TestHelpers**: Factory methods for creating test data, responses, and errors
 
@@ -89,7 +89,7 @@ Uses Swift Testing framework (not XCTest). Tests use `@Test` attribute and `#exp
 
 ### Core Design: Protocol-Based Architecture
 
-#### NetworkRequest Protocol
+#### Endpoint Protocol
 Defines all network request parameters:
 - Base URL, path, HTTP method
 - Headers, query parameters, body
@@ -99,8 +99,8 @@ Defines all network request parameters:
 **Organization Pattern**: Use **Namespace Enum + Nested Structs**:
 ```swift
 enum UserAPI {
-    struct GetUser: NetworkRequest { /* ... */ }
-    struct CreateUser: NetworkRequest { /* ... */ }
+    struct GetUser: Endpoint { /* ... */ }
+    struct CreateUser: Endpoint { /* ... */ }
 }
 // Usage: client.execute(UserAPI.GetUser(userId: "123"))
 ```
@@ -200,10 +200,10 @@ ASC uses `@_exported import Alamofire` to **re-export all Alamofire types**:
 - ✅ Uses battle-tested implementations from Alamofire
 - ✅ Zero conversion overhead
 - ✅ Automatic updates when Alamofire improves
-- ✅ Minimal imports inside library - only NetworkRequest.swift imports Alamofire
+- ✅ Minimal imports inside library - only Endpoint.swift imports Alamofire
 
 ### How It Works
-- **NetworkRequest.swift** uses `@_exported import Alamofire`
+- **Endpoint.swift** uses `@_exported import Alamofire`
 - All other library files don't need to import Alamofire
 - When users `import ASC`, they get all Alamofire types automatically
 
@@ -216,7 +216,7 @@ All Alamofire types are available including:
 - `Session`, `DataRequest`, `UploadRequest`, and all other Alamofire types
 
 ### Public Typealiases
-For commonly used types, ASC also defines typealiases in **NetworkRequest.swift** for better discoverability:
+For commonly used types, ASC also defines typealiases in **Endpoint.swift** for better discoverability:
 - `HTTPMethod`, `HTTPHeaders`, `HTTPHeader`
 - `Parameters`, `ParameterEncoding`, `JSONEncoding`, `URLEncoding`
 - `RetryPolicy`, `RequestInterceptor`, `EventMonitor`
@@ -234,7 +234,7 @@ import ASC
 let client = NetworkClient(baseURL: "https://api.example.com")
 
 enum UserAPI {
-    struct GetUser: NetworkRequest {
+    struct GetUser: Endpoint {
         typealias Response = User
         let userId: String
         var path: String { "/users/\(userId)" }
@@ -391,7 +391,7 @@ Task {
 import ASC
 
 enum DataAPI {
-    struct GetCriticalData: NetworkRequest {
+    struct GetCriticalData: Endpoint {
         typealias Response = Data
         var path: String { "/critical-data" }
         var method: HTTPMethod { .get }
@@ -409,7 +409,7 @@ import ASC
 let client = NetworkClient()
 
 // Request provides its own base URL
-struct CustomRequest: NetworkRequest {
+struct CustomRequest: Endpoint {
     typealias Response = User
     var baseURL: String? { "https://custom-api.example.com" }
     var path: String { "/users" }
@@ -455,7 +455,7 @@ let user = try await client.execute(CustomRequest())
 - Test breakdown:
   - **Core Tests** (58 tests):
     - ASCErrorTests: 27 tests (error enum, descriptions, recovery suggestions)
-    - NetworkRequestTests: 21 tests (protocol defaults, encoding, validation)
+    - EndpointTests: 21 tests (protocol defaults, encoding, validation)
     - URLBuilderTests: 10 tests (URL construction, validation)
   - **Component Tests** (54 tests):
     - ErrorMapperTests: 28 tests (AFError/URLError mapping, error messages)

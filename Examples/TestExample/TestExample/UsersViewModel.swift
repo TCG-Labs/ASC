@@ -46,16 +46,16 @@ final class UsersViewModel: ObservableObject {
     // MARK: - Published Properties
 
     /// List of users loaded from API.
-    @Published var users: [User] = []
+    @Published var users: [UserResponse] = []
 
     /// Currently selected user.
-    @Published var selectedUser: User?
+    @Published var selectedUser: UserResponse?
 
     /// Posts for the selected user.
-    @Published var userPosts: [Post] = []
+    @Published var userPosts: [PostResponse] = []
 
     /// Comments for the selected post.
-    @Published var postComments: [Comment] = []
+    @Published var postComments: [CommentResponse] = []
 
     /// Upload result.
     @Published var uploadResult: UploadResponse?
@@ -91,7 +91,7 @@ final class UsersViewModel: ObservableObject {
             errorMessage = nil
 
             do {
-                users = try await client.execute(GetUsersRequest())
+                users = try await client.execute(GetUsersEndpoint())
                 debugPrint("✅ Loaded \(users.count) users")
             } catch {
                 errorMessage = "Failed to load users: \(error.localizedDescription)"
@@ -112,7 +112,7 @@ final class UsersViewModel: ObservableObject {
         errorMessage = nil
 
         do {
-            selectedUser = try await client.execute(GetUserRequest(userId: id))
+            selectedUser = try await client.execute(GetUserEndpoint(userId: id))
             debugPrint("✅ Loaded user: \(selectedUser?.name ?? "Unknown")")
         } catch {
             errorMessage = "Failed to load user: \(error.localizedDescription)"
@@ -133,7 +133,7 @@ final class UsersViewModel: ObservableObject {
         errorMessage = nil
 
         do {
-            userPosts = try await client.execute(GetUserPostsRequest(userId: userId))
+            userPosts = try await client.execute(GetUserPostsEndpoint(userId: userId))
             debugPrint("✅ Loaded \(userPosts.count) posts for user \(userId)")
         } catch {
             errorMessage = "Failed to load posts: \(error.localizedDescription)"
@@ -151,7 +151,7 @@ final class UsersViewModel: ObservableObject {
         errorMessage = nil
 
         do {
-            postComments = try await client.execute(GetPostCommentsRequest(postId: postId))
+            postComments = try await client.execute(GetPostCommentsEndpoint(postId: postId))
             debugPrint("✅ Loaded \(postComments.count) comments for post \(postId)")
         } catch {
             errorMessage = "Failed to load comments: \(error.localizedDescription)"
@@ -173,7 +173,7 @@ final class UsersViewModel: ObservableObject {
 
         do {
             let response = try await client.execute(
-                CreateUserRequest(name: name, username: username, email: email)
+                CreateUserEndpoint(name: name, username: username, email: email)
             )
             debugPrint("✅ Created user with ID: \(response.id)")
             // Reload users to include the new one
@@ -194,7 +194,7 @@ final class UsersViewModel: ObservableObject {
         errorMessage = nil
 
         do {
-            try await client.execute(DeletePostRequest(postId: postId))
+            try await client.execute(DeletePostEndpoint(postId: postId))
             debugPrint("✅ Deleted post with ID: \(postId)")
 
             // Remove deleted post from the list
@@ -225,7 +225,7 @@ final class UsersViewModel: ObservableObject {
 
         do {
             let response = try await client.execute(
-                UploadFileRequest(fileData: data, fileName: fileName, mimeType: mimeType)
+                UploadFileEndpoint(fileData: data, fileName: fileName, mimeType: mimeType)
             )
             uploadResult = response
             debugPrint("✅ File uploaded successfully: \(fileName)")
@@ -250,7 +250,7 @@ final class UsersViewModel: ObservableObject {
 
         do {
             let response = try await client.execute(
-                UploadFileFromURLRequest(fileURL: fileURL, fileName: fileName, mimeType: mimeType)
+                UploadFileFromURLEndpoint(fileURL: fileURL, fileName: fileName, mimeType: mimeType)
             )
             uploadResult = response
             debugPrint("✅ File uploaded successfully from URL: \(fileName)")
@@ -269,4 +269,3 @@ final class UsersViewModel: ObservableObject {
         postComments = []
     }
 }
-

@@ -27,7 +27,7 @@
 import Alamofire
 import Foundation
 
-/// Builds URLRequests from NetworkRequest configurations.
+/// Builds URLRequests from Endpoint configurations.
 ///
 /// Encapsulates all logic for constructing URLRequests including:
 /// - URL construction
@@ -70,14 +70,12 @@ internal final class RequestBuilder: Sendable {
 
     // MARK: - Public Methods
 
-    /// Builds a complete URLRequest from a NetworkRequest.
+    /// Builds a complete URLRequest from an Endpoint.
     ///
-    /// - Parameter request: The network request to build from
+    /// - Parameter request: The endpoint to build from
     /// - Returns: Fully configured URLRequest
     /// - Throws: RequestBuildError if URL construction fails
-    internal func buildURLRequest<Request: NetworkRequest>(
-        from request: Request
-    ) throws -> URLRequest {
+    internal func buildURLRequest<E: Endpoint>(from request: E) throws -> URLRequest {
         // Step 1: Build the URL
         let url = try buildURL(from: request)
 
@@ -109,9 +107,7 @@ internal final class RequestBuilder: Sendable {
     // MARK: - Private Methods
 
     /// Builds the URL for a request.
-    internal func buildURL<Request: NetworkRequest>(
-        from request: Request
-    ) throws -> URL {
+    internal func buildURL<E: Endpoint>(from request: E) throws -> URL {
         guard let effectiveBaseURL = request.baseURL ?? baseURL else {
             throw RequestBuildError.missingBaseURL
         }
@@ -126,8 +122,8 @@ internal final class RequestBuilder: Sendable {
     }
 
     /// Builds HTTP headers for a request.
-    private func buildHeaders<Request: NetworkRequest>(
-        for request: Request
+    private func buildHeaders<E: Endpoint>(
+        for request: E
     ) -> HTTPHeaders {
         var headers = defaultHeaders.copy()
 
@@ -199,7 +195,7 @@ internal enum RequestBuildError: Error, LocalizedError {
             return "Check the base URL and path configuration"
 
         case .missingBaseURL:
-            return "Provide baseURL either in NetworkClient configuration or in the request"
+            return "Provide baseURL either in NetworkClient configuration or in the endpoint"
         }
     }
 }

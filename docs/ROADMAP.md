@@ -45,14 +45,14 @@
 
 **Статус**: ✅ **Реализовано**
 
-**Описание**: Основной протокол `NetworkRequest` определяет контракт для всех сетевых запросов. Использует associated types для типобезопасности на этапе компиляции.
+**Описание**: Основной протокол `Endpoint` определяет контракт для всех сетевых запросов. Использует associated types для типобезопасности на этапе компиляции.
 
 **Пример использования**:
 
 ```swift
-struct GetUserRequest: NetworkRequest {
+struct GetUserRequest: Endpoint {
     typealias Response = User
-    typealias Parameters = Empty
+    typealias Request = Empty
     
     let userId: String
     
@@ -65,7 +65,7 @@ let user = try await client.execute(GetUserRequest(userId: "123"))
 ```
 
 **Что реализовано**:
-- ✅ Протокол `NetworkRequest` с associated types
+- ✅ Протокол `Endpoint` с associated types
 - ✅ Default implementations через extensions
 - ✅ Type-safe запросы и ответы
 - ✅ Поддержка `Empty` для запросов без параметров
@@ -85,20 +85,20 @@ let user = try await client.execute(GetUserRequest(userId: "123"))
 
 ```swift
 // GET запрос
-struct GetPostsRequest: NetworkRequest {
+struct GetPostsRequest: Endpoint {
     typealias Response = [Post]
     var path: String { "/posts" }
     var method: HTTPMethod { .get }
 }
 
 // POST запрос
-struct CreatePostRequest: NetworkRequest {
+struct CreatePostRequest: Endpoint {
     typealias Response = Post
     struct PostData: Encodable, Sendable {
         let title: String
         let content: String
     }
-    typealias Parameters = PostData
+    typealias Request = PostData
     
     let title: String
     let content: String
@@ -111,7 +111,7 @@ struct CreatePostRequest: NetworkRequest {
 }
 
 // DELETE запрос
-struct DeletePostRequest: NetworkRequest {
+struct DeletePostRequest: Endpoint {
     typealias Response = Empty
     let postId: String
     var path: String { "/posts/\(postId)" }
@@ -339,7 +339,7 @@ let config = NetworkClientConfiguration(
 )
 
 // В запросе
-struct GetProfileRequest: NetworkRequest {
+struct GetProfileRequest: Endpoint {
     typealias Response = UserProfile
     var path: String { "/me" }
     var method: HTTPMethod { .get }
@@ -371,15 +371,15 @@ struct GetProfileRequest: NetworkRequest {
 
 ```swift
 // Preset политики
-struct CriticalRequest: NetworkRequest {
+struct CriticalRequest: Endpoint {
     var retryPolicy: Alamofire.RetryPolicy? { .aggressive }  // 5 попыток
 }
 
-struct StandardRequest: NetworkRequest {
+struct StandardRequest: Endpoint {
     var retryPolicy: Alamofire.RetryPolicy? { .default }  // 3 попытки
 }
 
-struct NonCriticalRequest: NetworkRequest {
+struct NonCriticalRequest: Endpoint {
     var retryPolicy: Alamofire.RetryPolicy? { .conservative }  // 2 попытки
 }
 
@@ -623,7 +623,7 @@ let disabledEvaluator = DisabledTrustEvaluator()
 **Пример использования**:
 
 ```swift
-struct GetUserRequest: NetworkRequest {
+struct GetUserRequest: Endpoint {
     typealias Response = UserResponse
     
     let userId: String
@@ -664,7 +664,7 @@ struct GetUserRequest: NetworkRequest {
 
 ```swift
 // Простая загрузка (маленькие файлы < 10MB)
-struct UploadAvatarRequest: NetworkRequest {
+struct UploadAvatarRequest: Endpoint {
     typealias Response = User
     let imageData: Data
     
@@ -676,15 +676,15 @@ struct UploadAvatarRequest: NetworkRequest {
 }
 
 // Загрузка с MIME типами
-struct UploadPhotoRequest: NetworkRequest {
+struct UploadPhotoRequest: Endpoint {
     typealias Response = Photo
     let imageData: Data
     
     var path: String { "/photos" }
     var method: HTTPMethod { .post }
-    var fileUploads: [String: FileUpload]? {
+    var uploadDatas: [String: UploadData]? {
         [
-            "photo": FileUpload(
+            "photo": UploadData(
                 data: imageData,
                 fileName: "photo.jpg",
                 mimeType: "image/jpeg"
@@ -694,15 +694,15 @@ struct UploadPhotoRequest: NetworkRequest {
 }
 
 // Загрузка больших файлов (> 10MB) - memory-efficient
-struct UploadVideoRequest: NetworkRequest {
+struct UploadVideoRequest: Endpoint {
     typealias Response = Video
     let videoURL: URL
     
     var path: String { "/videos" }
     var method: HTTPMethod { .post }
-    var largeFileUploads: [LargeFileUpload]? {
+    var largeUploadDatas: [LargeUploadData]? {
         [
-            LargeFileUpload(
+            LargeUploadData(
                 fileURL: videoURL,
                 fieldName: "video",
                 fileName: "video.mp4",
@@ -713,16 +713,16 @@ struct UploadVideoRequest: NetworkRequest {
 }
 
 // Множественные файлы
-struct UploadDocumentsRequest: NetworkRequest {
+struct UploadDocumentsRequest: Endpoint {
     typealias Response = UploadResult
     let files: [URL]
     let category: String
     
     var path: String { "/documents" }
     var method: HTTPMethod { .post }
-    var largeFileUploads: [LargeFileUpload]? {
+    var largeUploadDatas: [LargeUploadData]? {
         files.map { url in
-            LargeFileUpload(
+            LargeUploadData(
                 fileURL: url,
                 fieldName: "documents[]",
                 fileName: url.lastPathComponent
@@ -736,10 +736,10 @@ struct UploadDocumentsRequest: NetworkRequest {
 ```
 
 **Что нужно реализовать**:
-- ❌ Добавить `files: [String: Data]?` в `NetworkRequest`
-- ❌ Добавить `fileUploads: [String: FileUpload]?` с MIME типами
-- ❌ Добавить `largeFileUploads: [LargeFileUpload]?` для больших файлов
-- ❌ Создать типы `FileUpload` и `LargeFileUpload`
+- ❌ Добавить `files: [String: Data]?` в `Endpoint`
+- ❌ Добавить `uploadDatas: [String: UploadData]?` с MIME типами
+- ❌ Добавить `largeUploadDatas: [LargeUploadData]?` для больших файлов
+- ❌ Создать типы `UploadData` и `LargeUploadData`
 - ❌ Реализовать multipart encoding в `RequestBuilder`
 - ❌ Progress tracking для uploads
 - ❌ Тесты для всех типов uploads
@@ -812,7 +812,7 @@ let fileURL = try await client.resumeDownload(
 
 ```swift
 // Cache policy в запросе
-struct GetCachedDataRequest: NetworkRequest {
+struct GetCachedDataRequest: Endpoint {
     typealias Response = Data
     var path: String { "/data" }
     var method: HTTPMethod { .get }
@@ -822,7 +822,7 @@ struct GetCachedDataRequest: NetworkRequest {
 }
 
 // Высокоуровневый cache (будущее)
-struct CachedRequest: NetworkRequest {
+struct CachedRequest: Endpoint {
     typealias Response = User
     var cacheOptions: CacheOptions? {
         CacheOptions(
@@ -854,7 +854,7 @@ struct CachedRequest: NetworkRequest {
 
 ```swift
 // Автоматическая дедупликация
-struct GetUserRequest: NetworkRequest {
+struct GetUserRequest: Endpoint {
     typealias Response = User
     let userId: String
     var path: String { "/users/\(userId)" }
@@ -896,7 +896,7 @@ let config = NetworkClientConfiguration(
 )
 
 // Per-request rate limiting
-struct LimitedRequest: NetworkRequest {
+struct LimitedRequest: Endpoint {
     var rateLimit: RateLimit? {
         RateLimit(maxRequests: 10, perInterval: 1)  // 10 запросов в секунду
     }
@@ -1172,11 +1172,11 @@ v1.0.0 (MVP)          v1.1.0              v1.2.0              v1.3.0+
 ### Детальный план v1.0.0
 
 **Неделя 1: File Uploads**
-- [ ] Добавить `files: [String: Data]?` в `NetworkRequest`
-- [ ] Добавить `fileUploads: [String: FileUpload]?` с MIME типами
-- [ ] Добавить `largeFileUploads: [LargeFileUpload]?` для больших файлов
+- [ ] Добавить `files: [String: Data]?` в `Endpoint`
+- [ ] Добавить `uploadDatas: [String: UploadData]?` с MIME типами
+- [ ] Добавить `largeUploadDatas: [LargeUploadData]?` для больших файлов
 - [ ] Реализовать multipart encoding в `RequestBuilder`
-- [ ] Создать типы `FileUpload` и `LargeFileUpload`
+- [ ] Создать типы `UploadData` и `LargeUploadData`
 - [ ] Тесты для всех типов uploads
 - [ ] Документация с примерами
 
@@ -1238,7 +1238,7 @@ v1.0.0 (MVP)          v1.1.0              v1.2.0              v1.3.0+
 
 ```swift
 // Простой тип для маленьких файлов
-public struct FileUpload: Sendable {
+public struct UploadData: Sendable {
     public let data: Data
     public let fileName: String
     public let mimeType: String
@@ -1251,7 +1251,7 @@ public struct FileUpload: Sendable {
 }
 
 // Тип для больших файлов (memory-efficient)
-public struct LargeFileUpload: Sendable {
+public struct LargeUploadData: Sendable {
     public let fileURL: URL
     public let fieldName: String
     public let fileName: String
@@ -1271,23 +1271,23 @@ public struct LargeFileUpload: Sendable {
 }
 ```
 
-**Изменения в NetworkRequest**:
+**Изменения в Endpoint**:
 
 ```swift
-public protocol NetworkRequest: Sendable {
+public protocol Endpoint: Sendable {
     // ... существующие свойства
     
     /// Simple file uploads (field name → Data)
     /// Use for small files (< 10MB)
     var files: [String: Data]? { get }
     
-    /// File uploads with MIME types (field name → FileUpload)
+    /// File uploads with MIME types (field name → UploadData)
     /// Use for files with specific MIME types
-    var fileUploads: [String: FileUpload]? { get }
+    var uploadDatas: [String: UploadData]? { get }
     
-    /// Large file uploads (array of LargeFileUpload)
+    /// Large file uploads (array of LargeUploadData)
     /// Use for large files (> 10MB) - memory-efficient
-    var largeFileUploads: [LargeFileUpload]? { get }
+    var largeUploadDatas: [LargeUploadData]? { get }
 }
 ```
 

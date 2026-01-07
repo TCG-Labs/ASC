@@ -1,4 +1,4 @@
-// FileUpload.swift
+// UploadData.swift
 // ASC - Alamofire Swift Client
 //
 //  Copyright (c) 2025 TCG Labs
@@ -38,20 +38,20 @@ import Foundation
 /// Example:
 /// ```swift
 /// // Upload Data
-/// let upload: FileUpload = .data(someData)
+/// let upload: UploadData = .data(someData)
 ///
 /// // Upload File
 /// let fileURL = URL(fileURLWithPath: "/path/to/file.jpg")
-/// let upload: FileUpload = .file(fileURL)
+/// let upload: UploadData = .file(fileURL)
 ///
 /// // Upload Multipart Form Data
-/// let upload: FileUpload = .multipart([
+/// let upload: UploadData = .multipart([
 ///     .data("field1", data: data1, fileName: "file1.jpg", mimeType: "image/jpeg"),
 ///     .file("field2", fileURL: fileURL, fileName: "file2.pdf", mimeType: "application/pdf"),
 ///     .parameter("name", value: "John")
 /// ])
 /// ```
-public enum FileUpload: Sendable {
+public enum UploadData: Sendable {
     /// Upload Data directly from memory.
     ///
     /// Use for small data that can be loaded into memory.
@@ -109,4 +109,3 @@ public enum MultipartItem: Sendable {
     ///   - value: The string value of the parameter
     case parameter(fieldName: String, value: String)
 }
-

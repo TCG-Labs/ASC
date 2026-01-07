@@ -23,10 +23,10 @@
 **Статус**: Полностью реализовано
 
 **Файлы**: 
-- `Sources/ASC/Core/NetworkRequest.swift` (187 строк)
+- `Sources/ASC/Core/Endpoint.swift` (187 строк)
 
 **Описание реализации**:
-- Протокол `NetworkRequest` с associated types `Response` и `Parameters`
+- Протокол `Endpoint` с associated types `Response` и `Parameters`
 - Default implementations через extensions для всех опциональных свойств
 - Type-safe запросы и ответы на этапе компиляции
 - Поддержка `Empty` для запросов без параметров (GET, DELETE, HEAD, OPTIONS)
@@ -36,9 +36,9 @@
 
 ```swift
 // Простой GET запрос
-struct GetUserRequest: NetworkRequest {
+struct GetUserRequest: Endpoint {
     typealias Response = User
-    typealias Parameters = Empty
+    typealias Request = Empty
     
     let userId: String
     
@@ -47,14 +47,14 @@ struct GetUserRequest: NetworkRequest {
 }
 
 // POST запрос с параметрами
-struct CreateUserRequest: NetworkRequest {
+struct CreateUserRequest: Endpoint {
     typealias Response = User
     
     struct UserData: Encodable, Sendable {
         let name: String
         let email: String
     }
-    typealias Parameters = UserData
+    typealias Request = UserData
     
     let name: String
     let email: String
@@ -71,7 +71,7 @@ let user = try await client.execute(GetUserRequest(userId: "123"))
 let newUser = try await client.execute(CreateUserRequest(name: "John", email: "john@example.com"))
 ```
 
-**Тесты**: `Tests/ASCTests/NetworkRequestTests.swift` (21 тест)
+**Тесты**: `Tests/ASCTests/EndpointTests.swift` (21 тест)
 - Тесты default implementations
 - Тесты кастомных реализаций
 - Тесты валидации
@@ -89,7 +89,7 @@ let newUser = try await client.execute(CreateUserRequest(name: "John", email: "j
 **Статус**: Полностью реализовано
 
 **Файлы**: 
-- `Sources/ASC/Core/NetworkRequest.swift`
+- `Sources/ASC/Core/Endpoint.swift`
 - `Sources/ASC/Client/RequestBuilder.swift` (218 строк)
 
 **Описание реализации**:
@@ -105,21 +105,21 @@ let newUser = try await client.execute(CreateUserRequest(name: "John", email: "j
 
 ```swift
 // GET запрос
-struct GetPostsRequest: NetworkRequest {
+struct GetPostsRequest: Endpoint {
     typealias Response = [Post]
-    typealias Parameters = Empty
+    typealias Request = Empty
     var path: String { "/posts" }
     var method: HTTPMethod { .get }
 }
 
 // POST запрос с телом
-struct CreatePostRequest: NetworkRequest {
+struct CreatePostRequest: Endpoint {
     typealias Response = Post
     struct PostData: Encodable, Sendable {
         let title: String
         let content: String
     }
-    typealias Parameters = PostData
+    typealias Request = PostData
     
     let title: String
     let content: String
@@ -132,9 +132,9 @@ struct CreatePostRequest: NetworkRequest {
 }
 
 // DELETE запрос (пустой ответ)
-struct DeletePostRequest: NetworkRequest {
+struct DeletePostRequest: Endpoint {
     typealias Response = Empty
-    typealias Parameters = Empty
+    typealias Request = Empty
     
     let postId: String
     var path: String { "/posts/\(postId)" }
@@ -196,13 +196,13 @@ struct UserResponse: Decodable {
 }
 
 // Кастомный encoder для запроса
-struct SearchRequest: NetworkRequest {
+struct SearchRequest: Endpoint {
     typealias Response = [SearchResult]
     
     struct Query: Encodable, Sendable {
         let tags: [String]
     }
-    typealias Parameters = Query
+    typealias Request = Query
     
     let tags: [String]
     var path: String { "/search" }
@@ -495,7 +495,7 @@ let config = NetworkClientConfiguration(
 let client = NetworkClient(configuration: config)
 
 // В запросе
-struct GetProfileRequest: NetworkRequest {
+struct GetProfileRequest: Endpoint {
     typealias Response = UserProfile
     var path: String { "/me" }
     var method: HTTPMethod { .get }
@@ -518,7 +518,7 @@ let profile = try await client.execute(GetProfileRequest())
 
 **Файлы**: 
 - `Sources/ASC/Extensions/RetryPolicy+Extension.swift` (60 строк)
-- `Sources/ASC/Core/NetworkRequest.swift` (extension для retryPolicy)
+- `Sources/ASC/Core/Endpoint.swift` (extension для retryPolicy)
 
 **Описание реализации**:
 - Extension для `Alamofire.RetryPolicy` с preset policies:
@@ -527,7 +527,7 @@ let profile = try await client.execute(GetProfileRequest())
   - `.default` - 3 попытки с exponential backoff (base: 2, scale: 0.5)
   - `.aggressive` - 5 попыток с exponential backoff (base: 2, scale: 1.0)
 - Exponential backoff для всех preset policies
-- Per-request retry policy через `NetworkRequest.retryPolicy`
+- Per-request retry policy через `Endpoint.retryPolicy`
 - Default retry policy в конфигурации клиента
 - Автоматический retry на:
   - Common server errors (408, 500, 502, 503, 504)
@@ -538,21 +538,21 @@ let profile = try await client.execute(GetProfileRequest())
 
 ```swift
 // Preset политики
-struct CriticalRequest: NetworkRequest {
+struct CriticalRequest: Endpoint {
     typealias Response = PaymentResult
     var path: String { "/payments" }
     var method: HTTPMethod { .post }
     var retryPolicy: Alamofire.RetryPolicy? { .aggressive }  // 5 попыток
 }
 
-struct StandardRequest: NetworkRequest {
+struct StandardRequest: Endpoint {
     typealias Response = User
     var path: String { "/users/123" }
     var method: HTTPMethod { .get }
     var retryPolicy: Alamofire.RetryPolicy? { .default }  // 3 попытки
 }
 
-struct NonCriticalRequest: NetworkRequest {
+struct NonCriticalRequest: Endpoint {
     typealias Response = Analytics
     var path: String { "/analytics" }
     var method: HTTPMethod { .post }
@@ -566,7 +566,7 @@ let customPolicy = Alamofire.RetryPolicy(
     exponentialBackoffScale: 0.5
 )
 
-struct CustomRetryRequest: NetworkRequest {
+struct CustomRetryRequest: Endpoint {
     typealias Response = Data
     var path: String { "/data" }
     var method: HTTPMethod { .get }
@@ -574,7 +574,7 @@ struct CustomRetryRequest: NetworkRequest {
 }
 ```
 
-**Тесты**: `Tests/ASCTests/NetworkRequestTests.swift` (тесты RetryPolicy)
+**Тесты**: `Tests/ASCTests/EndpointTests.swift` (тесты RetryPolicy)
 
 **Документация**: README.md раздел "Retry Policy"
 
@@ -838,11 +838,11 @@ let disabledEvaluator = DisabledTrustEvaluator()
 **Статус**: Полностью реализовано
 
 **Файлы**: 
-- `Sources/ASC/Core/NetworkRequest.swift`
+- `Sources/ASC/Core/Endpoint.swift`
 - `Sources/ASC/Client/NetworkClient.swift`
 
 **Описание реализации**:
-- Метод `validate(response:)` в протоколе NetworkRequest
+- Метод `validate(response:)` в протоколе Endpoint
 - Автоматическая валидация HTTP статус кодов (200-299 по умолчанию)
 - Настраиваемые acceptable status codes в конфигурации
 - Кастомная бизнес-логика валидации в запросах
@@ -852,7 +852,7 @@ let disabledEvaluator = DisabledTrustEvaluator()
 **Примеры использования**:
 
 ```swift
-struct GetUserRequest: NetworkRequest {
+struct GetUserRequest: Endpoint {
     typealias Response = UserResponse
     
     let userId: String
@@ -900,7 +900,7 @@ let config = NetworkClientConfiguration(
 
 ```swift
 // Простой тип для маленьких файлов (< 10MB)
-public struct FileUpload: Sendable {
+public struct UploadData: Sendable {
     public let data: Data
     public let fileName: String
     public let mimeType: String
@@ -913,7 +913,7 @@ public struct FileUpload: Sendable {
 }
 
 // Тип для больших файлов (> 10MB) - memory-efficient
-public struct LargeFileUpload: Sendable {
+public struct LargeUploadData: Sendable {
     public let fileURL: URL
     public let fieldName: String
     public let fileName: String
@@ -933,11 +933,11 @@ public struct LargeFileUpload: Sendable {
 }
 ```
 
-#### 2. Свойства в NetworkRequest
+#### 2. Свойства в Endpoint
 
 - `var files: [String: Data]? { get }` - простые загрузки (field name → Data)
-- `var fileUploads: [String: FileUpload]? { get }` - с MIME типами (field name → FileUpload)
-- `var largeFileUploads: [LargeFileUpload]? { get }` - для больших файлов (массив LargeFileUpload)
+- `var uploadDatas: [String: UploadData]? { get }` - с MIME типами (field name → UploadData)
+- `var largeUploadDatas: [LargeUploadData]? { get }` - для больших файлов (массив LargeUploadData)
 
 #### 3. Реализация в RequestBuilder
 
@@ -945,7 +945,7 @@ public struct LargeFileUpload: Sendable {
 - Использование `MultipartFormData` из Alamofire
 - Обработка всех трех типов uploads
 - Поддержка параметров вместе с файлами
-- Memory-efficient encoding для largeFileUploads (file-based)
+- Memory-efficient encoding для largeUploadDatas (file-based)
 
 #### 4. Progress tracking
 
@@ -959,8 +959,8 @@ public struct LargeFileUpload: Sendable {
 #### 5. Тесты
 
 - Тесты для `files` uploads (один файл, несколько файлов, файлы + параметры)
-- Тесты для `fileUploads` (разные MIME типы, множественные файлы)
-- Тесты для `largeFileUploads` (большие файлы > 10MB, множественные большие файлы)
+- Тесты для `uploadDatas` (разные MIME типы, множественные файлы)
+- Тесты для `largeUploadDatas` (большие файлы > 10MB, множественные большие файлы)
 - Тесты для progress tracking
 - Тесты для edge cases (пустые файлы, некорректные MIME типы, ошибки загрузки)
 
@@ -1010,7 +1010,7 @@ func refresh(_ credential: OAuthCredential,
 
 #### 2. Интеграция с TokenStorage
 
-- Добавить `refreshRequest: NetworkRequest?` в протокол TokenStorage
+- Добавить `refreshRequest: Endpoint?` в протокол TokenStorage
 - Реализация refresh request в хранилищах токенов
 - Обновление токенов после успешного refresh
 - Обработка refresh token rotation (если поддерживается)
@@ -1059,7 +1059,7 @@ func refresh(_ credential: OAuthCredential,
 
 1. **Protocol-oriented API** ✅
    - Статус: Полностью реализовано
-   - Файлы: `Sources/ASC/Core/NetworkRequest.swift`
+   - Файлы: `Sources/ASC/Core/Endpoint.swift`
    - Тесты: 21 тест
    - Документация: Полная
 
@@ -1238,12 +1238,12 @@ func refresh(_ credential: OAuthCredential,
 
 **День 1-2: Типы данных**
 
-- [ ] Создать `FileUpload` struct в `Sources/ASC/Core/FileUpload.swift`
+- [ ] Создать `UploadData` struct в `Sources/ASC/Core/UploadData.swift`
   - Свойства: data, fileName, mimeType
   - Инициализатор с валидацией
   - Doc comments с примерами
   - Sendable conformance
-- [ ] Создать `LargeFileUpload` struct в `Sources/ASC/Core/LargeFileUpload.swift`
+- [ ] Создать `LargeUploadData` struct в `Sources/ASC/Core/LargeUploadData.swift`
   - Свойства: fileURL, fieldName, fileName, mimeType
   - Инициализатор с валидацией fileURL
   - Doc comments с примерами
@@ -1253,48 +1253,48 @@ func refresh(_ credential: OAuthCredential,
   - Тесты валидации
   - Тесты Sendable conformance
 
-**День 3-4: Расширение NetworkRequest**
+**День 3-4: Расширение Endpoint**
 
-- [ ] Добавить `files: [String: Data]?` в протокол NetworkRequest
+- [ ] Добавить `files: [String: Data]?` в протокол Endpoint
   - Default implementation возвращает nil
   - Doc comments с примерами использования
   - Описание когда использовать (маленькие файлы < 10MB)
-- [ ] Добавить `fileUploads: [String: FileUpload]?` в протокол NetworkRequest
+- [ ] Добавить `uploadDatas: [String: UploadData]?` в протокол Endpoint
   - Default implementation возвращает nil
   - Doc comments с примерами использования
   - Описание когда использовать (файлы с MIME типами)
-- [ ] Добавить `largeFileUploads: [LargeFileUpload]?` в протокол NetworkRequest
+- [ ] Добавить `largeUploadDatas: [LargeUploadData]?` в протокол Endpoint
   - Default implementation возвращает nil
   - Doc comments с примерами использования
   - Описание когда использовать (большие файлы > 10MB)
-- [ ] Обновить тесты NetworkRequest
+- [ ] Обновить тесты Endpoint
   - Тесты default implementations
   - Тесты кастомных реализаций
 
 **День 5: Multipart encoding в RequestBuilder**
 
 - [ ] Добавить логику определения multipart encoding
-  - Проверка наличия files/fileUploads/largeFileUploads
+  - Проверка наличия files/uploadDatas/largeUploadDatas
   - Автоматическое переключение на multipart form-data
   - Установка Content-Type: multipart/form-data
 - [ ] Реализовать обработку `files: [String: Data]?`
   - Использование MultipartFormData из Alamofire
   - Добавление файлов в multipart с автоматическим определением MIME типа
   - Обработка field names
-- [ ] Реализовать обработку `fileUploads: [String: FileUpload]?`
+- [ ] Реализовать обработку `uploadDatas: [String: UploadData]?`
   - Добавление файлов с указанными MIME типами
-  - Использование fileName из FileUpload
-- [ ] Реализовать обработку `largeFileUploads: [LargeFileUpload]?`
+  - Использование fileName из UploadData
+- [ ] Реализовать обработку `largeUploadDatas: [LargeUploadData]?`
   - Использование file-based encoding для memory efficiency
   - Обработка fileURL (проверка существования файла)
-  - Использование fieldName, fileName, mimeType из LargeFileUpload
+  - Использование fieldName, fileName, mimeType из LargeUploadData
 - [ ] Поддержка параметров вместе с файлами
   - Добавление параметров в multipart form-data
   - Правильный порядок добавления (параметры, затем файлы)
 - [ ] Обновить тесты RequestBuilder
   - Тесты для files
-  - Тесты для fileUploads
-  - Тесты для largeFileUploads
+  - Тесты для uploadDatas
+  - Тесты для largeUploadDatas
   - Тесты для комбинации файлов и параметров
 
 #### Неделя 2: Доработка и тесты
@@ -1323,11 +1323,11 @@ func refresh(_ credential: OAuthCredential,
   - Несколько файлов
   - Файлы + параметры
   - Разные типы данных (изображения, документы)
-- [ ] Тесты для `fileUploads`
+- [ ] Тесты для `uploadDatas`
   - Разные MIME типы (image/jpeg, application/pdf, etc.)
   - Множественные файлы
   - Кастомные имена файлов
-- [ ] Тесты для `largeFileUploads`
+- [ ] Тесты для `largeUploadDatas`
   - Большие файлы (> 10MB)
   - Множественные большие файлы
   - Проверка memory efficiency
@@ -1336,7 +1336,7 @@ func refresh(_ credential: OAuthCredential,
   - Некорректные MIME типы
   - Ошибки загрузки (network errors, server errors)
   - Отмена загрузки
-  - Несуществующие файлы для largeFileUploads
+  - Несуществующие файлы для largeUploadDatas
 
 **День 5: Документация**
 
@@ -1353,8 +1353,8 @@ func refresh(_ credential: OAuthCredential,
   - Примеры использования
 - [ ] Создать guide по выбору типа upload
   - Когда использовать files
-  - Когда использовать fileUploads
-  - Когда использовать largeFileUploads
+  - Когда использовать uploadDatas
+  - Когда использовать largeUploadDatas
   - Best practices
 
 ---
@@ -1365,7 +1365,7 @@ func refresh(_ credential: OAuthCredential,
 
 **День 1-2: Расширение TokenStorage**
 
-- [ ] Добавить `refreshRequest: NetworkRequest?` в протокол TokenStorage
+- [ ] Добавить `refreshRequest: Endpoint?` в протокол TokenStorage
   - Опциональное свойство для refresh запроса
   - Doc comments с описанием формата refresh запроса
   - Примеры реализации
@@ -1473,22 +1473,22 @@ func refresh(_ credential: OAuthCredential,
 #### File Uploads
 
 **Типы данных:**
-- [ ] Создать FileUpload struct в Sources/ASC/Core/FileUpload.swift
-- [ ] Создать LargeFileUpload struct в Sources/ASC/Core/LargeFileUpload.swift
+- [ ] Создать UploadData struct в Sources/ASC/Core/UploadData.swift
+- [ ] Создать LargeUploadData struct в Sources/ASC/Core/LargeUploadData.swift
 - [ ] Добавить тесты для типов (инициализация, валидация, Sendable)
 
-**Расширение NetworkRequest:**
-- [ ] Добавить files: [String: Data]? в NetworkRequest с default implementation
-- [ ] Добавить fileUploads: [String: FileUpload]? в NetworkRequest с default implementation
-- [ ] Добавить largeFileUploads: [LargeFileUpload]? в NetworkRequest с default implementation
+**Расширение Endpoint:**
+- [ ] Добавить files: [String: Data]? в Endpoint с default implementation
+- [ ] Добавить uploadDatas: [String: UploadData]? в Endpoint с default implementation
+- [ ] Добавить largeUploadDatas: [LargeUploadData]? в Endpoint с default implementation
 - [ ] Обновить doc comments для всех трех свойств
-- [ ] Обновить тесты NetworkRequest
+- [ ] Обновить тесты Endpoint
 
 **Реализация в RequestBuilder:**
 - [ ] Добавить логику определения multipart encoding
 - [ ] Реализовать обработку files: [String: Data]?
-- [ ] Реализовать обработку fileUploads: [String: FileUpload]?
-- [ ] Реализовать обработку largeFileUploads: [LargeFileUpload]?
+- [ ] Реализовать обработку uploadDatas: [String: UploadData]?
+- [ ] Реализовать обработку largeUploadDatas: [LargeUploadData]?
 - [ ] Поддержка параметров вместе с файлами
 - [ ] Обновить тесты RequestBuilder
 
@@ -1502,10 +1502,10 @@ func refresh(_ credential: OAuthCredential,
 - [ ] Тесты для files uploads (один файл)
 - [ ] Тесты для files uploads (несколько файлов)
 - [ ] Тесты для files uploads (файлы + параметры)
-- [ ] Тесты для fileUploads (разные MIME типы)
-- [ ] Тесты для fileUploads (множественные файлы)
-- [ ] Тесты для largeFileUploads (большие файлы > 10MB)
-- [ ] Тесты для largeFileUploads (множественные большие файлы)
+- [ ] Тесты для uploadDatas (разные MIME типы)
+- [ ] Тесты для uploadDatas (множественные файлы)
+- [ ] Тесты для largeUploadDatas (большие файлы > 10MB)
+- [ ] Тесты для largeUploadDatas (множественные большие файлы)
 - [ ] Тесты для edge cases (пустые файлы, некорректные MIME типы, ошибки)
 
 **Документация:**
@@ -1517,7 +1517,7 @@ func refresh(_ credential: OAuthCredential,
 #### OAuth Authenticator
 
 **Расширение TokenStorage:**
-- [ ] Добавить refreshRequest: NetworkRequest? в протокол TokenStorage
+- [ ] Добавить refreshRequest: Endpoint? в протокол TokenStorage
 - [ ] Обновить существующие реализации TokenStorage
 - [ ] Обновить MockTokenStorage для тестов
 - [ ] Обновить тесты TokenStorage
@@ -1614,7 +1614,7 @@ func refresh(_ credential: OAuthCredential,
 ## ⏱️ Временные оценки
 
 ### File Uploads
-- **Базовая реализация (типы + NetworkRequest)**: 2 дня
+- **Базовая реализация (типы + Endpoint)**: 2 дня
 - **Multipart encoding в RequestBuilder**: 1 день
 - **Progress tracking**: 2 дня
 - **Тесты**: 2 дня

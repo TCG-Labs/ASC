@@ -124,9 +124,9 @@ struct NetworkClientTests {
 
         MockURLProtocol.setSuccessResponse(data: Data(), statusCode: 204)
 
-        struct DeleteRequest: NetworkRequest {
+        struct DeleteRequest: Endpoint {
             typealias Response = Empty
-            typealias Parameters = Empty
+            typealias Request = Empty
 
             var path: String { "/delete" }
             var method: HTTPMethod { .delete }
@@ -146,9 +146,9 @@ struct NetworkClientTests {
         // This may fail if Alamofire requires data for 200 status
         MockURLProtocol.setSuccessResponse(data: Data(), statusCode: 204)
 
-        struct DeleteRequest: NetworkRequest {
+        struct DeleteRequest: Endpoint {
             typealias Response = Empty
-            typealias Parameters = Empty
+            typealias Request = Empty
 
             var path: String { "/delete" }
             var method: HTTPMethod { .delete }

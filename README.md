@@ -53,7 +53,7 @@ import ASC
 let client = NetworkClient(baseURL: "https://api.example.com")
 
 // 2. Define your request
-struct GetUserRequest: NetworkRequest {
+struct GetUserRequest: Endpoint {
     typealias Response = User
 
     let userId: String
@@ -70,7 +70,7 @@ print(user.name)
 ### POST Request with JSON Body
 
 ```swift
-struct CreatePostRequest: NetworkRequest {
+struct CreatePostRequest: Endpoint {
     typealias Response = Post
 
     let title: String
@@ -94,7 +94,7 @@ let post = try await client.execute(
 ### URL Encoding (Query Parameters)
 
 ```swift
-struct SearchRequest: NetworkRequest {
+struct SearchRequest: Endpoint {
     typealias Response = [SearchResult]
 
     let query: String
@@ -226,19 +226,19 @@ Task { try await runAdvancedExamples() }
 
 ---
 
-### [FileUploadExample.swift](ASC/Examples/FileUploadExample.swift) - 126 lines
+### [UploadDataExample.swift](ASC/Examples/UploadDataExample.swift) - 126 lines
 All three methods of uploading files.
 
 **What you'll learn:**
 - Simple uploads with `files`
-- Custom MIME types with `fileUploads`
-- Memory-efficient uploads with `largeFileUploads` (for files > 10MB)
+- Custom MIME types with `uploadDatas`
+- Memory-efficient uploads with `largeUploadDatas` (for files > 10MB)
 - Upload with metadata
 - Real uploads to httpbin.org
 
 **Run:**
 ```swift
-Task { try await runFileUploadExamples() }
+Task { try await runUploadDataExamples() }
 ```
 
 ---
@@ -268,7 +268,7 @@ ASC supports three types of file uploads based on Alamofire's upload API:
 For small data that can be loaded into memory:
 
 ```swift
-struct UploadAvatarRequest: NetworkRequest {
+struct UploadAvatarRequest: Endpoint {
     typealias Response = User
 
     let userId: String
@@ -276,7 +276,7 @@ struct UploadAvatarRequest: NetworkRequest {
 
     var path: String { "/users/\(userId)/avatar" }
     var method: HTTPMethod { .post }
-    var fileUpload: FileUpload? {
+    var uploadData: UploadData? {
         .data(imageData)
     }
 }
@@ -292,14 +292,14 @@ let user = try await client.execute(
 For large files from file system (memory-efficient):
 
 ```swift
-struct UploadVideoRequest: NetworkRequest {
+struct UploadVideoRequest: Endpoint {
     typealias Response = Video
 
     let videoURL: URL
 
     var path: String { "/videos" }
     var method: HTTPMethod { .post }
-    var fileUpload: FileUpload? {
+    var uploadData: UploadData? {
         .file(videoURL)
     }
 }
@@ -314,7 +314,7 @@ let response = try await client.execute(
 For multiple files and/or parameters together:
 
 ```swift
-struct UploadDocumentsRequest: NetworkRequest {
+struct UploadDocumentsRequest: Endpoint {
     typealias Response = UploadResponse
 
     let imageData: Data
@@ -323,7 +323,7 @@ struct UploadDocumentsRequest: NetworkRequest {
 
     var path: String { "/documents" }
     var method: HTTPMethod { .post }
-    var fileUpload: FileUpload? {
+    var uploadData: UploadData? {
         .multipart([
             .data("image", data: imageData, fileName: "image.jpg", mimeType: "image/jpeg"),
             .file("document", fileURL: documentURL, fileName: "doc.pdf", mimeType: "application/pdf"),
@@ -413,7 +413,7 @@ let config = NetworkClientConfiguration(
 let client = NetworkClient(configuration: config)
 
 // 3. Mark requests that need authentication
-struct GetProfileRequest: NetworkRequest {
+struct GetProfileRequest: Endpoint {
     typealias Response = UserProfile
     
     var path: String { "/me" }
@@ -440,9 +440,9 @@ struct RefreshTokenResponse: Codable {
     let expiresIn: Int
 }
 
-struct RefreshTokenRequest: NetworkRequest {
+struct RefreshTokenRequest: Endpoint {
     typealias Response = RefreshTokenResponse
-    typealias Parameters = Empty
+    typealias Request = Empty
 
     let refreshToken: String
 
@@ -463,7 +463,7 @@ final class OAuthTokenStorage: TokenStorage {
         return .bearer(token: token)
     }
 
-    var refreshRequest: (any NetworkRequest)? {
+    var refreshRequest: (any Endpoint)? {
         guard let refreshToken = refreshToken else { return nil }
         return RefreshTokenRequest(refreshToken: refreshToken)
     }
@@ -512,7 +512,7 @@ let config = NetworkClientConfiguration(
 let client = NetworkClient(configuration: config)
 
 // 5. Use client - tokens will be automatically refreshed on 401
-struct GetProfileRequest: NetworkRequest {
+struct GetProfileRequest: Endpoint {
     typealias Response = UserProfile
 
     var path: String { "/me" }
@@ -645,7 +645,7 @@ let client = NetworkClient(configuration: config)
 
 ```swift
 // Use predefined policies
-struct MyRequest: NetworkRequest {
+struct MyRequest: Endpoint {
     // ...
     var retryPolicy: Alamofire.RetryPolicy? { .aggressive }  // 5 retries with exponential backoff
 }
@@ -661,9 +661,9 @@ let customPolicy = Alamofire.RetryPolicy(
 ### Empty Response (204 No Content)
 
 ```swift
-struct DeleteUserRequest: NetworkRequest {
+struct DeleteUserRequest: Endpoint {
     typealias Response = Empty
-    typealias Parameters = Empty
+    typealias Request = Empty
 
     let userId: String
 
@@ -765,7 +765,7 @@ enum UserAPI {
     case deleteUser(id: String)
 }
 
-extension UserAPI: NetworkRequest {
+extension UserAPI: Endpoint {
     typealias Response = User
 
     var path: String {
@@ -892,38 +892,38 @@ Choose the right upload method based on your needs:
 
 ```swift
 // Small file - use .data
-struct UploadPhotoRequest: NetworkRequest {
+struct UploadPhotoRequest: Endpoint {
     typealias Response = Photo
     let imageData: Data
 
     var path: String { "/photos" }
     var method: HTTPMethod { .post }
-    var fileUpload: FileUpload? {
+    var uploadData: UploadData? {
         .data(imageData)
     }
 }
 
 // Large file - use .file (memory-efficient)
-struct UploadVideoRequest: NetworkRequest {
+struct UploadVideoRequest: Endpoint {
     typealias Response = Video
     let videoURL: URL
 
     var path: String { "/videos" }
     var method: HTTPMethod { .post }
-    var fileUpload: FileUpload? {
+    var uploadData: UploadData? {
         .file(videoURL)
     }
 }
 
 // Multiple files with parameters - use .multipart
-struct UploadDocumentsRequest: NetworkRequest {
+struct UploadDocumentsRequest: Endpoint {
     typealias Response = UploadResult
     let files: [URL]
     let category: String
 
     var path: String { "/documents" }
     var method: HTTPMethod { .post }
-    var fileUpload: FileUpload? {
+    var uploadData: UploadData? {
         .multipart(
         files.map { url in
                 .file("documents[]", fileURL: url, fileName: url.lastPathComponent, mimeType: "application/octet-stream")
@@ -946,25 +946,25 @@ Choose retry policies based on request importance:
 
 ```swift
 // Critical requests - aggressive retry
-struct PaymentRequest: NetworkRequest {
+struct PaymentRequest: Endpoint {
     // ...
     var retryPolicy: Alamofire.RetryPolicy? { .aggressive }  // 5 retries
 }
 
 // Standard requests - default retry
-struct GetFeedRequest: NetworkRequest {
+struct GetFeedRequest: Endpoint {
     // ...
     var retryPolicy: Alamofire.RetryPolicy? { .default }  // 3 retries
 }
 
 // Non-critical requests - conservative retry
-struct LogAnalyticsRequest: NetworkRequest {
+struct LogAnalyticsRequest: Endpoint {
     // ...
     var retryPolicy: Alamofire.RetryPolicy? { .conservative }  // 2 retries
 }
 
 // Real-time requests - no retry
-struct SearchRequest: NetworkRequest {
+struct SearchRequest: Endpoint {
     // ...
     var retryPolicy: Alamofire.RetryPolicy? { .none }  // No retries
 }
@@ -1088,7 +1088,7 @@ class APIService {
 }
 
 // 2. Use appropriate cache policy
-struct GetCachedDataRequest: NetworkRequest {
+struct GetCachedDataRequest: Endpoint {
     // ...
     var cachePolicy: URLRequest.CachePolicy? {
         .returnCacheDataElseLoad  // Use cache when available
@@ -1106,7 +1106,7 @@ func loadUserDashboard(userId: String) async throws {
 }
 
 // 4. Use streaming for large responses (if backend supports)
-struct DownloadLargeFileRequest: NetworkRequest {
+struct DownloadLargeFileRequest: Endpoint {
     typealias Response = Data
     // ...
     var timeout: TimeInterval? { 300 }  // 5 minutes for large downloads

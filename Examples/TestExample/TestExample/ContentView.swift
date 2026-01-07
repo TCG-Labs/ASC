@@ -42,7 +42,7 @@ struct ContentView: View {
     @State private var showingCreateUser = false
     @State private var networkStatus: NetworkReachability.Status = .unreachable
     @State private var monitoringTask: Task<Void, Never>?
-    
+
     private let reachability = NetworkReachability()
 
     var body: some View {
@@ -187,7 +187,7 @@ struct ContentView: View {
                     Text("Upload File")
                 }
             }
-            
+
             ForEach(viewModel.users) { user in
                 NavigationLink {
                     UserDetailView(user: user, viewModel: viewModel)
@@ -269,7 +269,7 @@ private struct NetworkStatusView: View {
 // MARK: - User Row View
 
 private struct UserRowView: View {
-    let user: User
+    let user: UserResponse
 
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
@@ -291,7 +291,7 @@ private struct UserRowView: View {
 // MARK: - User Detail View
 
 private struct UserDetailView: View {
-    let user: User
+    let user: UserResponse
     @ObservedObject var viewModel: UsersViewModel
 
     var body: some View {
@@ -349,7 +349,7 @@ private struct UserDetailView: View {
 // MARK: - Post Detail View
 
 private struct PostDetailView: View {
-    let post: Post
+    let post: PostResponse
     @ObservedObject var viewModel: UsersViewModel
     @Environment(\.dismiss) private var dismiss
     @State private var showingDeleteConfirmation = false

@@ -68,10 +68,15 @@ struct NetworkResponseMonitorTests {
         let urlConfig = URLSessionConfiguration.ephemeral
         urlConfig.protocolClasses = [MockURLProtocol.self]
 
+        var eventMonitors: [any EventMonitor] = []
+        if let handler = handler {
+            eventMonitors.append(NetworkResponseMonitor(handler: handler))
+        }
+
         return NetworkClientConfiguration(
             baseURL: "https://api.example.com",
             sessionType: .custom(urlConfig),
-            networkResponseHandler: handler,
+            eventMonitors: eventMonitors,
             connectivityCheckEnabled: false
         )
     }
@@ -257,10 +262,13 @@ struct NetworkResponseMonitorTests {
         let urlConfig = URLSessionConfiguration.ephemeral
         urlConfig.protocolClasses = [MockURLProtocol.self]
 
+        var eventMonitors: [any EventMonitor] = []
+        eventMonitors.append(NetworkResponseMonitor(handler: handler))
+
         let config = NetworkClientConfiguration(
             baseURL: "https://api.example.com",
             sessionType: .custom(urlConfig),
-            networkResponseHandler: handler,
+            eventMonitors: eventMonitors,
             connectivityCheckEnabled: false
         )
 
@@ -274,7 +282,7 @@ struct NetworkResponseMonitorTests {
             data: try JSONEncoder().encode(MockResponse(id: 1, name: "Test"))
         )
 
-        _ = try await client.execute(MockGetRequest())
+            _ = try await client.execute(MockGetRequest())
 
         // Wait for async notification
         try await Task.sleep(nanoseconds: 100_000_000) // 0.1 seconds
@@ -286,7 +294,7 @@ struct NetworkResponseMonitorTests {
     func testMonitorNotCreatedWithoutHandler() {
         let config = NetworkClientConfiguration(
             baseURL: "https://api.example.com",
-            networkResponseHandler: nil,
+            eventMonitors: [],
             connectivityCheckEnabled: false
         )
 

@@ -124,12 +124,10 @@ public final class NetworkClient: Sendable {
     /// Executes a network request and returns the decoded response.
     ///
     /// - Parameter request: The request to execute
-    /// - Returns: Decoded response of type `Request.Response`
+    /// - Returns: Decoded response of type `E.Response`
     /// - Throws: `ASCError`
-    public func execute<Request: NetworkRequest>(
-        _ request: Request
-    ) async throws -> Request.Response {
-        return try await executeRequest(request, responseType: Request.Response.self)
+    public func execute<E: Endpoint>(_ request: E) async throws -> E.Response {
+        try await executeRequest(request, responseType: E.Response.self)
     }
 
     /// Executes a network request with Empty response type.
@@ -139,9 +137,7 @@ public final class NetworkClient: Sendable {
     /// - Parameter request: The request to execute
     /// - Returns: Decoded `Empty` response
     /// - Throws: `ASCError`
-    public func execute<Request: NetworkRequest>(
-        _ request: Request
-    ) async throws where Request.Response == Empty {
+    public func execute<E: Endpoint>(_ request: E) async throws where E.Response == Empty {
         _ = try await executeRequest(request, responseType: Empty.self)
     }
 
@@ -150,17 +146,17 @@ public final class NetworkClient: Sendable {
 //    /// Use this method when you need to track upload progress for file uploads.
 //    /// Returns an AsyncThrowingStream that yields progress updates as the upload progresses.
 //    ///
-//    /// - Parameter request: The request to execute (must have fileUpload property set)
+//    /// - Parameter request: The request to execute (must have uploadData property set)
 //    /// - Returns: AsyncThrowingStream with UploadProgress updates, followed by the final response
-//    /// - Throws: `ASCError` if request doesn't have fileUpload or if upload fails
-//    public func executeWithProgress<Request: NetworkRequest>(
-//        _ request: Request
-//    ) -> AsyncThrowingStream<UploadProgressOrResponse<Request.Response>, Error> {
+//    /// - Throws: `ASCError` if request doesn't have uploadData or if upload fails
+//    public func executeWithProgress<E: Endpoint>(
+//        _ request: E
+//    ) -> AsyncThrowingStream<UploadProgressOrResponse<E.Response>, Error> {
 //        AsyncThrowingStream { continuation in
 //            Task { @Sendable in
 //                do {
-//                    guard let fileUpload = request.fileUpload else {
-//                        continuation.finish(throwing: ASCError.invalidFormat("Request must have fileUpload property set to use executeWithProgress"))
+//                    guard let uploadData = request.uploadData else {
+//                        continuation.finish(throwing: ASCError.invalidFormat("Request must have uploadData property set to use executeWithProgress"))
 //                        return
 //                    }
 //
@@ -171,7 +167,7 @@ public final class NetworkClient: Sendable {
 //                    let interceptor = buildRequestInterceptor(request, retryPolicy: request.retryPolicy)
 //
 //                    // Create upload request using centralized method
-//                    let uploadRequest = try createUploadRequest(request, fileUpload: fileUpload, url: url, interceptor: interceptor)
+//                    let uploadRequest = try createUploadRequest(request, uploadData: uploadData, url: url, interceptor: interceptor)
 //
 //                    // Set request priority
 //                    uploadRequest.task?.priority = configuration.defaultPriority
@@ -213,7 +209,7 @@ public final class NetworkClient: Sendable {
 //    }
 
     // MARK: - Private Methods
-    private func buildRequestInterceptor(_ request: any NetworkRequest, retryPolicy: Alamofire.RetryPolicy?) -> Interceptor {
+    private func buildRequestInterceptor(_ request: any Endpoint, retryPolicy: Alamofire.RetryPolicy?) -> Interceptor {
         let effectiveRetryPolicy = retryPolicy ?? configuration.defaultRetryPolicy
         let authInterceptor = request.enableAuthorization ? configuration.authInterceptor : nil
         var interceptors: [any RequestInterceptor] = []
@@ -237,18 +233,18 @@ public final class NetworkClient: Sendable {
     ///   - responseType: Expected response type
     /// - Returns: Decoded response
     /// - Throws: `ASCError`
-    private func executeRequest<Request: NetworkRequest, Response: Decodable & Sendable>(
-        _ request: Request,
+    private func executeRequest<E: Endpoint, Response: Decodable & Sendable>(
+        _ request: E,
         responseType: Response.Type
-    ) async throws -> Response where Request.Response == Response {
+    ) async throws -> Response where E.Response == Response {
         // Check if this is an upload request
-        if let fileUpload = request.fileUpload {
+        if let uploadData = request.uploadData {
             let url = try requestBuilder.buildURL(from: request)
             let interceptor = buildRequestInterceptor(request, retryPolicy: request.retryPolicy)
 
             return try await performUploadRequest(
                 request,
-                fileUpload: fileUpload,
+                uploadData: uploadData,
                 url: url,
                 interceptor: interceptor,
                 responseType: responseType
@@ -274,12 +270,12 @@ public final class NetworkClient: Sendable {
     /// the underlying Alamofire request is automatically cancelled.
     ///
     /// Calls request.validate() on successful response.
-    private func performRequest<Request: NetworkRequest, Response: Decodable & Sendable>(
-        _ request: Request,
+    private func performRequest<E: Endpoint, Response: Decodable & Sendable>(
+        _ request: E,
         urlRequest: URLRequest,
         responseType: Response.Type,
         retryPolicy: Alamofire.RetryPolicy?
-    ) async throws -> Response where Request.Response == Response {
+    ) async throws -> Response where E.Response == Response {
         try Task.checkCancellation()
         try checkConnectivity()
 
@@ -316,18 +312,18 @@ public final class NetworkClient: Sendable {
     /// Performs an upload request with file upload.
     ///
     /// Handles all three types of uploads: .data, .file, and .multipart
-    private func performUploadRequest<Request: NetworkRequest, Response: Decodable & Sendable>(
-        _ request: Request,
-        fileUpload: FileUpload,
+    private func performUploadRequest<E: Endpoint, Response: Decodable & Sendable>(
+        _ request: E,
+        uploadData: UploadData,
         url: URL,
         interceptor: Interceptor,
         responseType: Response.Type
-    ) async throws -> Response where Request.Response == Response {
+    ) async throws -> Response where E.Response == Response {
         try Task.checkCancellation()
         try checkConnectivity()
 
         // Create upload request using centralized method
-        let uploadRequest = try createUploadRequest(request, fileUpload: fileUpload, url: url, interceptor: interceptor)
+        let uploadRequest = try createUploadRequest(request, uploadData: uploadData, url: url, interceptor: interceptor)
 
         // Set request priority
         uploadRequest.task?.priority = configuration.defaultPriority
@@ -354,26 +350,25 @@ public final class NetworkClient: Sendable {
         }
     }
 
-
-    /// Creates an UploadRequest from FileUpload configuration.
+    /// Creates an UploadRequest from UploadData configuration.
     ///
     /// Centralized method for creating upload requests to avoid code duplication.
     /// Handles all three types of uploads: .data, .file, and .multipart
     ///
     /// - Parameters:
     ///   - request: The network request
-    ///   - fileUpload: File upload configuration
+    ///   - uploadData: Upload data configuration
     ///   - url: Target URL for upload
     ///   - interceptor: Request interceptor
     /// - Returns: Configured UploadRequest
     /// - Throws: ASCError if file validation fails
-    private func createUploadRequest<Request: NetworkRequest>(
-        _ request: Request,
-        fileUpload: FileUpload,
+    private func createUploadRequest<E: Endpoint>(
+        _ request: E,
+        uploadData: UploadData,
         url: URL,
         interceptor: Interceptor
     ) throws -> UploadRequest {
-        switch fileUpload {
+        switch uploadData {
         case let .data(data):
             // Upload Data directly from memory
             return session.upload(data, to: url, interceptor: interceptor)
@@ -515,4 +510,3 @@ public enum UploadProgressOrResponse<Response: Sendable>: Sendable {
     /// Final response after upload completes.
     case response(Response)
 }
-

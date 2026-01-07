@@ -39,10 +39,6 @@ final class MockTokenStorage: TokenStorage, @unchecked Sendable {
         set { _authToken.withLock { $0 = newValue } }
     }
 
-    var refreshRequest: (any NetworkRequest)? {
-        nil
-    }
-
     init(authToken: AuthToken? = nil) {
         self._authToken = Mutex(authToken)
     }

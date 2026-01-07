@@ -189,4 +189,3 @@ struct UnauthorizedStatusExampleView: View {
 #Preview {
     UnauthorizedStatusExampleView()
 }
-
