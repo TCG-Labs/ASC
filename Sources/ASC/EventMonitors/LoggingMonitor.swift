@@ -1,4 +1,4 @@
-// ASCLogger.swift
+// LoggingMonitor.swift
 // ASC - Alamofire Swift Client
 //
 //  Copyright (c) 2025 TCG Labs
@@ -65,7 +65,7 @@ public enum ASCLogLevel: Int, Sendable {
 /// )
 /// let client = NetworkClient(configuration: config)
 /// ```
-public final class ASCLogger: EventMonitor, Sendable {
+/*public*/ final class LoggingMonitor: EventMonitor, Sendable {
     // MARK: - Properties
 
     private static let sharedQueue = DispatchQueue(label: "com.asc.logger", qos: .utility)
@@ -91,9 +91,13 @@ public final class ASCLogger: EventMonitor, Sendable {
         self.logLevel = logLevel
     }
 
-    // MARK: - EventMonitor
+    // MARK: - Request
 
     public func request(_ request: Request, didResumeTask task: URLSessionTask) {
+        if request is UploadRequest {
+            return
+        }
+
         guard logLevel.rawValue >= ASCLogLevel.info.rawValue else { return }
         guard let urlRequest = request.request else { return }
 
@@ -120,6 +124,33 @@ public final class ASCLogger: EventMonitor, Sendable {
 
         log.info("\(lines.joined(separator: "\n"))")
     }
+
+    public func request(_ request: UploadRequest, didCreateUploadable uploadable: UploadRequest.Uploadable) {
+        guard logLevel.rawValue >= ASCLogLevel.debug.rawValue else { return }
+
+        let date: Date = .now
+        let stringDate = dateFormatter.string(from: date)
+
+        let urlRequest = request.request
+        let method = urlRequest?.httpMethod ?? "POST"
+        let url = urlRequest?.url?.absoluteString ?? "unknown"
+        let methodEmoji = methodEmoji(for: method)
+
+        var lines: [String] = []
+        lines.append("┌─ \(stringDate) [ASC] ▶️ \(methodEmoji) \(method)")
+        lines.append("│  \(url)")
+
+        if logLevel.rawValue >= ASCLogLevel.debug.rawValue {
+            lines.append(contentsOf: buildHeadersLines(urlRequest?.allHTTPHeaderFields, prefix: "│"))
+            lines.append(contentsOf: buildUploadableLines(urlRequest: urlRequest, uploadable: uploadable, prefix: "│"))
+        }
+
+        lines.append("└─────────────────────────────────────────────────────────────────")
+
+        log.debug("\(lines.joined(separator: "\n"))")
+    }
+
+    // MARK: - Response
 
     public func request<Value>(
         _ request: DataRequest,
@@ -422,5 +453,55 @@ public final class ASCLogger: EventMonitor, Sendable {
         }
 
         return string
+    }
+
+    // MARK: - Uploadable Formatting
+
+    private func buildUploadableLines(
+        urlRequest: URLRequest?,
+        uploadable: UploadRequest.Uploadable,
+        prefix: String = ""
+    ) -> [String] {
+        var lines: [String] = []
+
+        switch uploadable {
+        case .data(let data):
+            lines.append("\(prefix)  📦 Uploadable Data (\(self.formatBytes(data.count)))")
+
+            guard logLevel.rawValue >= ASCLogLevel.verbose.rawValue else {
+                return lines
+            }
+
+            if let jsonString = prettyPrintJSON(data, maxLines: 30) {
+                for line in jsonString.split(separator: "\n") {
+                    lines.append("\(prefix)     \(line)")
+                }
+            } else if let string = String(data: data, encoding: .utf8) {
+                let preview = string.prefix(500)
+                lines.append("\(prefix)     📝 Text: \n\(preview)\(string.count > 500 ? "..." : "")")
+            } else {
+                lines.append("\(prefix)     💾 Binary: \(data.count) bytes")
+            }
+
+        case .file(let fileURL, _):
+            let fileName = fileURL.lastPathComponent
+            let fileSize = fileSizeBytes(at: fileURL)
+            lines.append("\(prefix)  📄 Uploadable File: \(fileName) (\(self.formatBytes(fileSize)))")
+            lines.append("\(prefix)     Path: \(fileURL.path)")
+
+        case .stream:
+            lines.append("\(prefix)  🌊 Uploadable Stream (preview not available)")
+        }
+
+        if let contentType = urlRequest?.allHTTPHeaderFields?["Content-Type"] {
+            lines.append("\(prefix)  🧾 Content-Type: \(contentType)")
+        }
+
+        return lines
+    }
+
+    private func fileSizeBytes(at url: URL) -> Int? {
+        let attributes = try? FileManager.default.attributesOfItem(atPath: url.path)
+        return attributes?[.size] as? Int
     }
 }

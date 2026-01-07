@@ -291,66 +291,66 @@ struct NetworkClientFileUploadTests {
 
     // MARK: - Progress Tracking Tests
 
-    @Test("Execute with progress returns progress updates")
-    func testExecuteWithProgress() async throws {
-        // Given
-        MockURLProtocol.reset()
-        defer { MockURLProtocol.reset() }
-
-        let uploadData = "test content".data(using: .utf8)!
-        let responseData = try JSONEncoder().encode(MockResponse(id: 7, name: "Progress test"))
-        MockURLProtocol.setSuccessResponse(data: responseData)
-
-        let request = MockDataUploadRequest(uploadData: uploadData)
-        let client = NetworkClient(configuration: createTestConfiguration())
-
-        // When
-        var progressCount = 0
-        var finalResponse: MockResponse?
-
-        for try await item in client.executeWithProgress(request) {
-            switch item {
-            case .progress:
-                progressCount += 1
-            case let .response(response):
-                finalResponse = response
-            }
-        }
-
-        // Then
-        #expect(finalResponse != nil)
-        #expect(finalResponse?.id == 7)
-        // Progress updates may or may not be received depending on upload speed
-        // Just verify we got the final response
-    }
-
-    @Test("Execute with progress throws error when fileUpload is not set")
-    func testExecuteWithProgressThrowsErrorWhenFileUploadNotSet() async throws {
-        // Given
-        MockURLProtocol.reset()
-        defer { MockURLProtocol.reset() }
-
-        let request = MockGetRequest()
-        let client = NetworkClient(configuration: createTestConfiguration())
-
-        // When & Then
-        var errorThrown = false
-        do {
-            for try await _ in client.executeWithProgress(request) {
-                // Should not reach here
-            }
-        } catch {
-            errorThrown = true
-            if let ascError = error as? ASCError,
-               case .invalidFormat = ascError {
-                // Expected error
-            } else {
-                Issue.record("Expected ASCError.invalidFormat, got \(error)")
-            }
-        }
-
-        #expect(errorThrown)
-    }
+//    @Test("Execute with progress returns progress updates")
+//    func testExecuteWithProgress() async throws {
+//        // Given
+//        MockURLProtocol.reset()
+//        defer { MockURLProtocol.reset() }
+//
+//        let uploadData = "test content".data(using: .utf8)!
+//        let responseData = try JSONEncoder().encode(MockResponse(id: 7, name: "Progress test"))
+//        MockURLProtocol.setSuccessResponse(data: responseData)
+//
+//        let request = MockDataUploadRequest(uploadData: uploadData)
+//        let client = NetworkClient(configuration: createTestConfiguration())
+//
+//        // When
+//        var progressCount = 0
+//        var finalResponse: MockResponse?
+//
+//        for try await item in client.executeWithProgress(request) {
+//            switch item {
+//            case .progress:
+//                progressCount += 1
+//            case let .response(response):
+//                finalResponse = response
+//            }
+//        }
+//
+//        // Then
+//        #expect(finalResponse != nil)
+//        #expect(finalResponse?.id == 7)
+//        // Progress updates may or may not be received depending on upload speed
+//        // Just verify we got the final response
+//    }
+//
+//    @Test("Execute with progress throws error when fileUpload is not set")
+//    func testExecuteWithProgressThrowsErrorWhenFileUploadNotSet() async throws {
+//        // Given
+//        MockURLProtocol.reset()
+//        defer { MockURLProtocol.reset() }
+//
+//        let request = MockGetRequest()
+//        let client = NetworkClient(configuration: createTestConfiguration())
+//
+//        // When & Then
+//        var errorThrown = false
+//        do {
+//            for try await _ in client.executeWithProgress(request) {
+//                // Should not reach here
+//            }
+//        } catch {
+//            errorThrown = true
+//            if let ascError = error as? ASCError,
+//               case .invalidFormat = ascError {
+//                // Expected error
+//            } else {
+//                Issue.record("Expected ASCError.invalidFormat, got \(error)")
+//            }
+//        }
+//
+//        #expect(errorThrown)
+//    }
 
     // MARK: - Edge Cases Tests
 

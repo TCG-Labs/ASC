@@ -225,7 +225,7 @@ public struct NetworkClientConfiguration: Sendable {
 
     /// Log level for built-in logger.
     ///
-    /// When set to anything other than .none, an ASCLogger is automatically added to eventMonitors.
+    /// When set to anything other than .none, an LoggingMonitor is automatically added to eventMonitors.
     /// Default is .none (no logging).
     public let logLevel: ASCLogLevel
 
@@ -436,15 +436,13 @@ public struct NetworkClientConfiguration: Sendable {
         self.validation = validation
         self.defaultPriority = defaultPriority
 
-        // Automatically add ASCLogger if logging is enabled
+        // Automatically add LoggingMonitor if logging is enabled
+        var monitors = eventMonitors
         if logLevel != .none {
-            var monitors = eventMonitors
-            monitors.append(ASCLogger(logLevel: logLevel))
-            self.eventMonitors = monitors
-        } else {
-            self.eventMonitors = eventMonitors
+            monitors.append(LoggingMonitor(logLevel: logLevel))
         }
 
+        self.eventMonitors = monitors
         self.serverTrustManager = serverTrustManager
         self.redirectHandler = redirectHandler
         self.cachedResponseHandler = cachedResponseHandler

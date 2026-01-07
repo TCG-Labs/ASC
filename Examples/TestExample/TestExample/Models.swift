@@ -192,3 +192,32 @@ struct UploadFileFromURLRequest: NetworkRequest {
         .file(fileURL)
     }
 }
+
+// MARK: - Auth Models
+
+/// Login request parameters.
+nonisolated struct LoginRequestParams: Codable, Sendable {
+    let email: String
+    let password: String
+}
+
+/// Login response model.
+nonisolated struct LoginResponse: Codable, Sendable {
+    // Add response fields as needed based on API response
+    // For example: token, user, etc.
+}
+
+/// Request to login user.
+struct LoginRequest: NetworkRequest {
+    typealias Response = LoginResponse
+    typealias Parameters = LoginRequestParams
+
+    let email: String
+    let password: String
+
+    var path: String { "/api/v1/auth/login" }
+    var method: HTTPMethod { .post }
+    var parameters: Parameters? {
+        LoginRequestParams(email: email, password: password)
+    }
+}

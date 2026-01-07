@@ -36,7 +36,19 @@ struct TestExampleApp: App {
 
     var body: some Scene {
         WindowGroup {
-            ContentView()
+            TabView {
+                // Tab 1: Users
+                ContentView()
+                    .tabItem {
+                        Label("Users", systemImage: "person.2")
+                    }
+
+                // Tab 2: 401 Demo
+                UnauthorizedStatusExampleView()
+                    .tabItem {
+                        Label("401 Demo", systemImage: "lock.shield")
+                    }
+            }
         }
     }
 
@@ -69,12 +81,14 @@ struct TestExampleApp: App {
         )
 
         // Development environment - verbose logging for detailed debugging
+        // Also includes NetworkResponseHandler example
+        let logoutHandler = LogoutHandler()
         container.registerClient(
             for: .development,
             configuration: NetworkClientConfiguration(
                 baseURL: "https://jsonplaceholder.typicode.com",
                 defaultTimeout: 30.0,
-                eventMonitors: [BaseEventMonitor()],
+                eventMonitors: [NetworkResponseMonitor(handler: logoutHandler)],
                 logLevel: .verbose,
                 connectivityCheckEnabled: true
             )

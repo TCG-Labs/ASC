@@ -37,7 +37,7 @@ struct ASCLoggerTests {
         let logLevel = ASCLogLevel.debug
         
         // When: Creating logger instance
-        let logger = ASCLogger(logLevel: logLevel)
+        let logger = LoggingMonitor(logLevel: logLevel)
         
         // Then: Logger should be initialized with correct queue
         #expect(logger.queue.label == "com.asc.logger")
@@ -51,7 +51,7 @@ struct ASCLoggerTests {
         let logLevel = ASCLogLevel.info
         
         // When: Creating logger with custom configuration
-        let logger = ASCLogger(
+        let logger = LoggingMonitor(
             logLevel: logLevel,
             subsystem: subsystem,
             category: category
@@ -64,8 +64,8 @@ struct ASCLoggerTests {
     @Test("Logger instances share the same queue")
     func testLoggerHasSharedQueue() {
         // Given: Multiple logger instances with different configurations
-        let logger1 = ASCLogger(logLevel: .debug)
-        let logger2 = ASCLogger(logLevel: .verbose)
+        let logger1 = LoggingMonitor(logLevel: .debug)
+        let logger2 = LoggingMonitor(logLevel: .verbose)
         
         // When: Accessing queue property
         let queue1 = logger1.queue
