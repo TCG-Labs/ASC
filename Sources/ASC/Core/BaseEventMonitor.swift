@@ -35,39 +35,39 @@ public final class BaseEventMonitor: EventMonitor {
         if case .data(let data) = uploadable {
             body = data.toString
         }
-        log.debug("uploadable: \n\(body)")
+        log.debug("multipart data: \n\(body)")
     }
 
     // MARK: - Response
-    public func requestDidFinish(_ request: Request) {
-        guard let statusCode = request.response?.statusCode else {
-            log.error("⛔️ Cancel: \(request.description)")
-            return
-        }
+//    public func requestDidFinish(_ request: Request) {
+//        guard let statusCode = request.response?.statusCode else {
+//            log.error("⛔️ Cancel: \(request.description)")
+//            return
+//        }
+//
+//        log.debug("\n✅ \(request.description)\n🔸 Status code: \(statusCode)")
+//    }
 
-        log.debug("\n✅ \(request.description)\n🔸 Status code: \(statusCode)")
-    }
-
-    public func request<Value>(
-        _ request: DataRequest,
-        didParseResponse response: DataResponse<Value, AFError>
-    ) {
-        guard
-            let data = response.data
-        else {
-            log.error("\n🔸 Data: nil")
-            return
-        }
-
-        log.debug("\n🔸 Data: \(data.prettyPrintedJSONString ?? .init())")
-
-        do {
-            _ = try JSONSerialization.jsonObject(with: data, options: .mutableContainers)
-            log.debug("\n👍🏼 Serialization: OK")
-        } catch let error {
-            log.error("‼️ Serialization: \(error.localizedDescription)")
-        }
-    }
+//    public func request<Value>(
+//        _ request: DataRequest,
+//        didParseResponse response: DataResponse<Value, AFError>
+//    ) {
+//        guard
+//            let data = response.data
+//        else {
+//            log.error("\n🔸 Data: nil")
+//            return
+//        }
+//
+//        log.debug("\n🔸 Data: \(data.prettyPrintedJSONString ?? .init())")
+//
+//        do {
+//            _ = try JSONSerialization.jsonObject(with: data, options: .mutableContainers)
+//            log.debug("\n👍🏼 Serialization: OK")
+//        } catch let error {
+//            log.error("‼️ Serialization: \(error.localizedDescription)")
+//        }
+//    }
 
     public func urlSession(
         _ session: URLSession,
