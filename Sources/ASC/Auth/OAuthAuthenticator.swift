@@ -49,7 +49,8 @@ public struct OAuthCredential: AuthenticationCredential, Sendable {
     /// Require refresh if within 5 minutes of expiration.
     public var requiresRefresh: Bool {
         if let expiration {
-            Date(timeIntervalSinceNow: 60 * 5) > expiration
+//            Date(timeIntervalSinceNow: 60 * 5) > expiration
+            Date(timeIntervalSinceNow: 60 * 14) > expiration
         } else {
             false
         }
