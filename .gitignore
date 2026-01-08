@@ -43,6 +43,7 @@ DerivedData/
 
 # Archives
 *.xcarchive
+/docs/
 
 # CocoaPods (if ever used)
 Pods/

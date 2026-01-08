@@ -22,8 +22,8 @@
 //  SOFTWARE.
 //
 
-import Foundation
 import Alamofire
+import Foundation
 import JWTDecode
 
 // MARK: - OAuthAuthenticator
