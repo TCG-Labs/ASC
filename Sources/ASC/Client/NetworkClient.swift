@@ -123,22 +123,22 @@ public final class NetworkClient: Sendable {
 
     /// Executes a network request and returns the decoded response.
     ///
-    /// - Parameter request: The request to execute
+    /// - Parameter endpoint: The endpoint to execute
     /// - Returns: Decoded response of type `E.Response`
     /// - Throws: `ASCError`
-    public func execute<E: Endpoint>(_ request: E) async throws -> E.Response {
-        try await executeRequest(request, responseType: E.Response.self)
+    public func execute<E: Endpoint>(_ endpoint: E) async throws -> E.Response {
+        try await executeRequest(endpoint, responseType: E.Response.self)
     }
 
     /// Executes a network request with Empty response type.
     ///
     /// Useful for requests that return 204 No Content or similar.
     ///
-    /// - Parameter request: The request to execute
+    /// - Parameter endpoint: The endpoint to execute
     /// - Returns: Decoded `Empty` response
     /// - Throws: `ASCError`
-    public func execute<E: Endpoint>(_ request: E) async throws where E.Response == Empty {
-        _ = try await executeRequest(request, responseType: Empty.self)
+    public func execute<E: Endpoint>(_ endpoint: E) async throws where E.Response == Empty {
+        _ = try await executeRequest(endpoint, responseType: Empty.self)
     }
 
     public func download(
@@ -171,16 +171,16 @@ public final class NetworkClient: Sendable {
     }
 
     public func download<E: Endpoint>(
-        _ request: E,
+        _ endpoint: E,
         to destinationFolderURL: URL?,
         options: DownloadRequest.Options = [.createIntermediateDirectories, .removePreviousFile]
     ) async throws -> URL? {
         try Task.checkCancellation()
         try checkConnectivity()
 
-        let interceptor = buildRequestInterceptor(request, retryPolicy: request.retryPolicy)
+        let interceptor = buildRequestInterceptor(endpoint, retryPolicy: endpoint.retryPolicy)
         let destination = buildDownloadDestination(to: destinationFolderURL, options: options)
-        let urlRequest = try requestBuilder.buildURLRequest(from: request)
+        let urlRequest = try requestBuilder.buildURLRequest(from: endpoint)
         let downloadRequest = session.download(
             urlRequest,
             interceptor: interceptor,
@@ -272,9 +272,9 @@ public final class NetworkClient: Sendable {
 //    }
 
     // MARK: - Private Methods
-    private func buildRequestInterceptor(_ request: (any Endpoint)?, retryPolicy: Alamofire.RetryPolicy?) -> Interceptor {
+    private func buildRequestInterceptor(_ endpoint: (any Endpoint)?, retryPolicy: Alamofire.RetryPolicy?) -> Interceptor {
         let effectiveRetryPolicy = retryPolicy ?? configuration.defaultRetryPolicy
-        let authInterceptor = (request?.enableAuthorization ?? false) ? configuration.authInterceptor : nil
+        let authInterceptor = (endpoint?.enableAuthorization ?? false) ? configuration.authInterceptor : nil
         var interceptors: [any RequestInterceptor] = []
 
         if let effectiveRetryPolicy {
@@ -292,21 +292,21 @@ public final class NetworkClient: Sendable {
     ///
     /// Centralized request execution that always uses decoding.
     /// - Parameters:
-    ///   - request: The network request to execute
+    ///   - endpoint: The network endpoint to execute
     ///   - responseType: Expected response type
     /// - Returns: Decoded response
     /// - Throws: `ASCError`
     private func executeRequest<E: Endpoint, Response: Decodable & Sendable>(
-        _ request: E,
+        _ endpoint: E,
         responseType: Response.Type
     ) async throws -> Response where E.Response == Response {
         // Check if this is an upload request
-        if let uploadData = request.uploadData {
-            let url = try requestBuilder.buildURL(from: request)
-            let interceptor = buildRequestInterceptor(request, retryPolicy: request.retryPolicy)
+        if let uploadData = endpoint.uploadData {
+            let url = try requestBuilder.buildURL(from: endpoint)
+            let interceptor = buildRequestInterceptor(endpoint, retryPolicy: endpoint.retryPolicy)
 
             return try await performUploadRequest(
-                request,
+                endpoint,
                 uploadData: uploadData,
                 url: url,
                 interceptor: interceptor,
@@ -315,13 +315,13 @@ public final class NetworkClient: Sendable {
         }
 
         // Regular request (non-upload)
-        let urlRequest = try requestBuilder.buildURLRequest(from: request)
+        let urlRequest = try requestBuilder.buildURLRequest(from: endpoint)
 
         return try await performRequest(
-            request,
+            endpoint,
             urlRequest: urlRequest,
             responseType: responseType,
-            retryPolicy: request.retryPolicy
+            retryPolicy: endpoint.retryPolicy
         )
     }
 
@@ -334,7 +334,7 @@ public final class NetworkClient: Sendable {
     ///
     /// Calls request.validate() on successful response.
     private func performRequest<E: Endpoint, Response: Decodable & Sendable>(
-        _ request: E,
+        _ endpoint: E,
         urlRequest: URLRequest,
         responseType: Response.Type,
         retryPolicy: Alamofire.RetryPolicy?
@@ -342,7 +342,7 @@ public final class NetworkClient: Sendable {
         try Task.checkCancellation()
         try checkConnectivity()
 
-        let interceptor = buildRequestInterceptor(request, retryPolicy: retryPolicy)
+        let interceptor = buildRequestInterceptor(endpoint, retryPolicy: retryPolicy)
         let dataRequest = session.request(urlRequest, interceptor: interceptor)
 
         // Set request priority
@@ -361,7 +361,7 @@ public final class NetworkClient: Sendable {
             let response = await serializedRequest.response
             let value = try handleResponse(response)
 
-            try request.validate(response: value)
+            try endpoint.validate(response: value)
 
             return value
         } onCancel: {
@@ -375,7 +375,7 @@ public final class NetworkClient: Sendable {
     ///
     /// Handles all three types of uploads: .data, .file, and .multipart
     private func performUploadRequest<E: Endpoint, Response: Decodable & Sendable>(
-        _ request: E,
+        _ endpoint: E,
         uploadData: UploadData,
         url: URL,
         interceptor: Interceptor,
@@ -385,7 +385,7 @@ public final class NetworkClient: Sendable {
         try checkConnectivity()
 
         // Create upload request using centralized method
-        let uploadRequest = try createUploadRequest(request, uploadData: uploadData, url: url, interceptor: interceptor)
+        let uploadRequest = try createUploadRequest(endpoint, uploadData: uploadData, url: url, interceptor: interceptor)
 
         // Set request priority
         uploadRequest.task?.priority = configuration.defaultPriority
@@ -404,7 +404,7 @@ public final class NetworkClient: Sendable {
             let response = await serializedRequest.response
             let value = try handleResponse(response)
 
-            try request.validate(response: value)
+            try endpoint.validate(response: value)
 
             return value
         } onCancel: {
@@ -418,14 +418,14 @@ public final class NetworkClient: Sendable {
     /// Handles all three types of uploads: .data, .file, and .multipart
     ///
     /// - Parameters:
-    ///   - request: The network request
+    ///   - endpoint: The network endpoint
     ///   - uploadData: Upload data configuration
     ///   - url: Target URL for upload
     ///   - interceptor: Request interceptor
     /// - Returns: Configured UploadRequest
     /// - Throws: ASCError if file validation fails
     private func createUploadRequest<E: Endpoint>(
-        _ request: E,
+        _ endpoint: E,
         uploadData: UploadData,
         url: URL,
         interceptor: Interceptor
@@ -456,7 +456,7 @@ public final class NetworkClient: Sendable {
             return session.upload(
                 multipartFormData: { multipartFormData in
                     // Add parameters if present
-                    if let parameters = request.parameters {
+                    if let parameters = endpoint.parameters {
                         self.addParametersToMultipart(parameters, to: multipartFormData)
                     }
 
