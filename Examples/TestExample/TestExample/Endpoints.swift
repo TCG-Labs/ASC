@@ -221,3 +221,19 @@ struct LoginEndpoint: Endpoint {
         LoginRequest(email: email, password: password)
     }
 }
+
+// MARK: - Download Endpoints
+
+/// Endpoint for downloading an image from Picsum Photos API.
+struct DownloadImageEndpoint: Endpoint {
+    typealias Response = Empty
+    typealias Request = Empty
+
+    let imageId: Int
+    let width: Int
+    let height: Int
+
+    var baseURL: String? { "https://picsum.photos" }
+    var path: String { "/\(width)/\(height)" }
+    var method: HTTPMethod { .get }
+}

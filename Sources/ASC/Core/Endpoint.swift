@@ -122,43 +122,6 @@ public protocol Endpoint: Sendable {
     /// ```
     var parameters: Request? { get }
 
-    /// Custom parameter encoder for this request.
-    ///
-    /// If specified, this encoder will be used instead of the automatic encoder selection.
-    /// This allows fine-grained control over parameter encoding when needed.
-    ///
-    /// Common use cases:
-    /// - Custom array encoding (brackets, no brackets, indexed)
-    /// - Custom boolean encoding (0/1 vs true/false)
-    /// - Custom date formatting in query strings
-    /// - Custom nested object encoding
-    ///
-    /// Example:
-    /// ```swift
-    /// struct CreateUserRequest: Endpoint {
-    ///     struct UserData: Encodable, Sendable {
-    ///         let name: String
-    ///         let email: String
-    ///     }
-    ///     typealias Request = UserData
-    ///
-    ///     var path: String { "/users" }
-    ///     var method: HTTPMethod { .post }
-    ///
-    ///     var parameters: UserData? {
-    ///         UserData(name: "John", email: "john@example.com")
-    ///     }
-    ///
-    ///     // Custom encoder - use URL encoding in POST body instead of JSON
-    ///     var parameterEncoder: ParameterEncoder? {
-    ///         URLEncodedFormParameterEncoder.default
-    ///     }
-    /// }
-    /// // POST body will be: name=John&email=john@example.com (URL-encoded)
-    /// // Instead of default: {"name":"John","email":"john@example.com"} (JSON)
-    /// ```
-    var parameterEncoder: ParameterEncoder? { get }
-
     /// Request timeout interval in seconds.
     ///
     /// If not specified, the client's default timeout will be used.

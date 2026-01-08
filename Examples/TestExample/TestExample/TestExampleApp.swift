@@ -48,6 +48,12 @@ struct TestExampleApp: App {
                     .tabItem {
                         Label("401 Demo", systemImage: "lock.shield")
                     }
+
+                // Tab 3: Download Demo
+                DownloadExampleView()
+                    .tabItem {
+                        Label("Download", systemImage: "arrow.down.circle")
+                    }
             }
         }
     }

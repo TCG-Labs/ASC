@@ -194,6 +194,51 @@ public enum ASCLogLevel: Int, Sendable {
         }
     }
 
+    func request<Value: Sendable>(_ request: DownloadRequest, didParseResponse response: DownloadResponse<Value, AFError>) {
+        guard logLevel.rawValue >= ASCLogLevel.info.rawValue else { return }
+
+        if let httpResponse = response.response {
+            let statusCode = httpResponse.statusCode
+            let duration = response.metrics?.taskInterval.duration ?? 0
+            let method = response.request?.httpMethod ?? "GET"
+            let url = response.request?.url?.absoluteString ?? "unknown"
+            let statusEmoji = statusEmoji(for: statusCode)
+            let durationEmoji = durationEmoji(for: duration)
+
+            // Get file information
+            let fileURL = response.fileURL
+            let fileSize = calculateDownloadFileSize(from: response)
+            let fileName = fileURL?.lastPathComponent ?? "unknown"
+
+            let date: Date = .now
+            let stringDate = dateFormatter.string(from: date)
+
+            var lines: [String] = []
+            lines.append("┌─ 📥 \(stringDate) [ASC] ◀️ \(statusEmoji) \(method) (\(statusCode))")
+            lines.append("│  \(url)")
+            lines.append("│  \(durationEmoji) \(String(format: "%.3f", duration))s • 📦 \(self.formatBytes(fileSize))")
+
+            // File information
+            if let fileURL = fileURL {
+                lines.append("│  📄 File: \(fileName)")
+                lines.append("│  📍 Path: \(fileURL.path)")
+            }
+
+            if logLevel.rawValue >= ASCLogLevel.debug.rawValue {
+                let headers = httpResponse.allHeaderFields as? [String: String]
+                lines.append(contentsOf: buildHeadersLines(headers, prefix: "│"))
+            }
+
+            lines.append("└─────────────────────────────────────────────────────────────────")
+
+            log.info("\(lines.joined(separator: "\n"))")
+        }
+
+        if let error = response.error {
+            logError(error, for: request)
+        }
+    }
+
     func request(
         _ request: Request,
         didCompleteTask task: URLSessionTask,
@@ -237,6 +282,34 @@ public enum ASCLogLevel: Int, Sendable {
         }
 
         return Int(totalBytes)
+    }
+
+    /// Calculates the size of the downloaded file.
+    ///
+    /// Tries to determine the file size from the file system first,
+    /// then falls back to the Content-Length HTTP header if available.
+    ///
+    /// - Parameter response: Download response from Alamofire
+    /// - Returns: File size in bytes, or nil if unable to determine
+    private func calculateDownloadFileSize<Value>(
+        from response: DownloadResponse<Value, AFError>
+    ) -> Int? {
+        // Try to get file size from file URL
+        if let fileURL = response.fileURL {
+            if let attributes = try? FileManager.default.attributesOfItem(atPath: fileURL.path),
+               let fileSize = attributes[.size] as? Int64 {
+                return Int(fileSize)
+            }
+        }
+
+        // Fallback: try to get from Content-Length header
+        if let httpResponse = response.response,
+           let contentLengthString = httpResponse.value(forHTTPHeaderField: "Content-Length"),
+           let contentLength = Int64(contentLengthString) {
+            return Int(contentLength)
+        }
+
+        return nil
     }
 
     private func buildHeadersLines(_ headers: [String: String]?, prefix: String = "") -> [String] {

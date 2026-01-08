@@ -141,6 +141,69 @@ public final class NetworkClient: Sendable {
         _ = try await executeRequest(request, responseType: Empty.self)
     }
 
+    public func download(
+        from url: String,
+        to destinationFolderURL: URL?,
+        options: DownloadRequest.Options = [.createIntermediateDirectories, .removePreviousFile]
+    ) async throws -> URL? {
+        try Task.checkCancellation()
+        try checkConnectivity()
+
+        let interceptor = buildRequestInterceptor(nil, retryPolicy: nil)
+        let destination = buildDownloadDestination(to: destinationFolderURL, options: options)
+        let downloadRequest = session.download(url, interceptor: interceptor, to: destination)
+
+        // Set request priority
+        downloadRequest.task?.priority = configuration.defaultPriority
+
+        // Apply automatic validation if enabled
+        let validatedRequest = configuration.automaticValidation
+            ? downloadRequest.validate(statusCode: configuration.acceptableStatusCodes)
+            : downloadRequest
+        let serializedRequest = validatedRequest.serializingDownloadedFileURL()
+
+        return try await withTaskCancellationHandler {
+            let fileURL = try await serializedRequest.value
+            return fileURL
+        } onCancel: {
+            downloadRequest.cancel()
+        }
+    }
+
+    public func download<E: Endpoint>(
+        _ request: E,
+        to destinationFolderURL: URL?,
+        options: DownloadRequest.Options = [.createIntermediateDirectories, .removePreviousFile]
+    ) async throws -> URL? {
+        try Task.checkCancellation()
+        try checkConnectivity()
+
+        let interceptor = buildRequestInterceptor(request, retryPolicy: request.retryPolicy)
+        let destination = buildDownloadDestination(to: destinationFolderURL, options: options)
+        let urlRequest = try requestBuilder.buildURLRequest(from: request)
+        let downloadRequest = session.download(
+            urlRequest,
+            interceptor: interceptor,
+            to: destination
+        )
+
+        // Set request priority
+        downloadRequest.task?.priority = configuration.defaultPriority
+
+        // Apply automatic validation if enabled
+        let validatedRequest = configuration.automaticValidation
+            ? downloadRequest.validate(statusCode: configuration.acceptableStatusCodes)
+            : downloadRequest
+        let serializedRequest = validatedRequest.serializingDownloadedFileURL()
+
+        return try await withTaskCancellationHandler {
+            let fileURL = try await serializedRequest.value
+            return fileURL
+        } onCancel: {
+            downloadRequest.cancel()
+        }
+    }
+
 //    /// Executes a network request with file upload and returns progress stream.
 //    ///
 //    /// Use this method when you need to track upload progress for file uploads.
@@ -209,9 +272,9 @@ public final class NetworkClient: Sendable {
 //    }
 
     // MARK: - Private Methods
-    private func buildRequestInterceptor(_ request: any Endpoint, retryPolicy: Alamofire.RetryPolicy?) -> Interceptor {
+    private func buildRequestInterceptor(_ request: (any Endpoint)?, retryPolicy: Alamofire.RetryPolicy?) -> Interceptor {
         let effectiveRetryPolicy = retryPolicy ?? configuration.defaultRetryPolicy
-        let authInterceptor = request.enableAuthorization ? configuration.authInterceptor : nil
+        let authInterceptor = (request?.enableAuthorization ?? false) ? configuration.authInterceptor : nil
         var interceptors: [any RequestInterceptor] = []
 
         if let effectiveRetryPolicy {
@@ -289,7 +352,6 @@ public final class NetworkClient: Sendable {
         let validatedRequest = configuration.automaticValidation
             ? dataRequest.validate(statusCode: configuration.acceptableStatusCodes)
             : dataRequest
-
         let serializedRequest = validatedRequest.serializingDecodable(
             Response.self,
             decoder: configuration.decoder
@@ -445,6 +507,18 @@ public final class NetworkClient: Sendable {
                     multipartFormData.append(jsonData, withName: "parameters")
                 }
             }
+        }
+    }
+
+    private func buildDownloadDestination(to destinationFolderURL: URL?, options: DownloadRequest.Options) -> DownloadRequest.Destination? {
+        return { temporaryURL, response in
+            let filename = response.suggestedFilename ?? "file.\(UUID().uuidString)"
+
+            let destinationURL = destinationFolderURL?.appendingPathComponent(filename)
+            let defaultURL = temporaryURL.deletingLastPathComponent().appendingPathComponent(filename)
+            let url = destinationURL ?? defaultURL
+
+            return (url, options)
         }
     }
 

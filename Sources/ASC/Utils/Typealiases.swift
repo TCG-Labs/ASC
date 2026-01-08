@@ -39,8 +39,5 @@ public typealias CachedResponseHandler = Alamofire.CachedResponseHandler
 /// Interceptor combining adapters and retriers.
 public typealias Interceptor = Alamofire.Interceptor
 
-/// Parameter encoder for encoding Encodable parameters.
-public typealias ParameterEncoder = Alamofire.ParameterEncoder
-
 /// Empty type for requests without parameters or empty responses.
 public typealias Empty = Alamofire.Empty

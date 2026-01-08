@@ -23,3 +23,16 @@ extension Data {
         return prettyPrintedString
     }
 }
+
+extension Encodable {
+    func asDictionary(encoder: JSONEncoder) -> [String: Any]? {
+        do {
+            let data = try encoder.encode(self)
+            let dictionary = try JSONSerialization.jsonObject(with: data, options: .allowFragments) as? [String: Any]
+
+            return dictionary
+        } catch let error {
+            return nil
+        }
+    }
+}
