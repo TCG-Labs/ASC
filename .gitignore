@@ -161,3 +161,4 @@ scripts/swiftlint.*
 # ===========================
 # Claude Code files
 .claude/
+tasks/
