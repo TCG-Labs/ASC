@@ -16,7 +16,7 @@ let package = Package(
         ),
     ],
     dependencies: [
-        .package(url: "https://github.com/Alamofire/Alamofire", from: "5.10.2"),
+        .package(url: "https://github.com/Alamofire/Alamofire", .upToNextMinor(from: "5.10.2")),
         .package(url: "https://github.com/auth0/JWTDecode.swift", exact: "3.3.0")
     ],
     targets: [

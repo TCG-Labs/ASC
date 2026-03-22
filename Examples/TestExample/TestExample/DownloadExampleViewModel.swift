@@ -27,8 +27,9 @@
 
 import Foundation
 import SwiftUI
-import ASC
 import Combine
+import Alamofire
+import ASC
 
 // MARK: - Download Method
 
@@ -145,7 +146,9 @@ final class DownloadExampleViewModel: ObservableObject {
 
         do {
             let dimensions = imageSize.dimensions
-            let url = "https://picsum.photos/\(dimensions.width)/\(dimensions.height)"
+            guard let url = URL(string: "https://picsum.photos/\(dimensions.width)/\(dimensions.height)") else {
+                throw ASCError.invalidFormat("Invalid image URL")
+            }
 
             // Create downloads directory
             let documentsPath = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]

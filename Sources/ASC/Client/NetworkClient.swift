@@ -50,7 +50,7 @@ public final class NetworkClient: Sendable {
     private let configuration: NetworkClientConfiguration
 
     /// Alamofire session used for networking.
-    public let session: Session
+    internal let session: Session
 
     /// Request builder for constructing URLRequests.
     private let requestBuilder: RequestBuilder
@@ -142,7 +142,7 @@ public final class NetworkClient: Sendable {
     }
 
     public func download(
-        from url: String,
+        from url: URL,
         to destinationFolderURL: URL?,
         options: DownloadRequest.Options = [.createIntermediateDirectories, .removePreviousFile]
     ) async throws -> URL? {

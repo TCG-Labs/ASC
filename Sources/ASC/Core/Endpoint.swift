@@ -24,6 +24,7 @@
 
 // Core protocol defining network request configuration.
 
+import Alamofire
 import Foundation
 
 /// Protocol defining a network request configuration.

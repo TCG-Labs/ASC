@@ -26,6 +26,7 @@
 //
 
 import Foundation
+import Alamofire
 import ASC
 
 // MARK: - Request Models

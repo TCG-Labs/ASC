@@ -5,7 +5,7 @@
 //  Created by Vyacheslav Razumeenko on 05.01.2026.
 //
 
-@_exported import Alamofire
+import Alamofire
 
 // MARK: - Type Aliases
 

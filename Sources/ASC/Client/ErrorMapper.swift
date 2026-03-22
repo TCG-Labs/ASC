@@ -24,6 +24,7 @@
 
 // Maps Alamofire errors to ASC error types.
 
+import Alamofire
 import Foundation
 
 /// Maps Alamofire errors to ASC-specific error types.

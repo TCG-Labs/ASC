@@ -24,6 +24,7 @@
 
 // Convenient preset retry policies for Alamofire's RetryPolicy.
 
+import Alamofire
 import Foundation
 
 // MARK: - RetryPolicy+Presets

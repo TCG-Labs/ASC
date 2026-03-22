@@ -24,6 +24,7 @@
 
 // Simple request interceptor that adds authentication token to requests.
 
+import Alamofire
 import Foundation
 
 /// Simple request interceptor that adds authentication token to requests.

@@ -22,6 +22,7 @@
 //  SOFTWARE.
 //
 
+import Alamofire
 import Foundation
 import os.log
 import Synchronization
