@@ -51,16 +51,16 @@ NetworkClient
 
 ## Known Decisions
 
-- `NetworkClient.session` is `public let` to allow direct Alamofire access for edge cases not covered by the wrapper.
+- `NetworkClient.session` is `internal let` — downgraded from `public` during refactor; not part of the public API.
 - `executeWithProgress` is commented out, API not finalized.
-- `addParametersToMultipart` attempts to flatten JSON to key-value pairs for multipart; falls back to single `"parameters"` JSON field if structure is not `[String: String]`.
+- `encodeParametersForMultipart` (replaces `addParametersToMultipart`) flattens `Encodable` to `[(String, Data)]`: strings and numbers become UTF-8 values, nested objects/arrays become compact JSON. Throws `.invalidFormat` if the root value is not a JSON object.
 - Configuration presets: `.default` (60s timeout, no retry), `.development` (120s, verbose), `.production` (30s, conservative retry, error logging), `.testing` (10s, no connectivity check, no retry).
 - All three dispatch queues (`rootQueue`, `requestQueue`, `serializationQueue`) have dedicated labels under `com.asc.networkClient.*`.
 
 ## Known Issues / Fragile Areas
 
 - Download methods do not route errors through `ErrorMapper`: raw Alamofire errors may surface to consumers.
-- `addParametersToMultipart` fallback path wraps non-dict JSON as a single `"parameters"` field, may be unexpected for nested Encodable types.
+- `encodeParametersForMultipart` throws `.invalidFormat` for non-object root types (arrays, scalars). This is strict but predictable.
 - `buildDownloadDestination` uses `suggestedFilename` from response, with UUID fallback. If server doesn't send Content-Disposition, filename may be unhelpful.
 - `reachability?.stopMonitoring()` in `deinit` may not fire if `NetworkClient` is retained in a cycle.
 

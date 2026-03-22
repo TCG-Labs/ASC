@@ -19,6 +19,7 @@ Core protocols, types, and request building infrastructure. Defines the `Endpoin
 | `MultipartItem` | `public enum` | `.data(fieldName:data:fileName:mimeType:)`, `.file(fieldName:fileURL:fileName:mimeType:)`, `.parameter(fieldName:value:)`. |
 | `RequestBuilder` | `internal final class` | Constructs `URLRequest` from `Endpoint`. Auto-selects encoder by HTTP method. |
 | `RequestBuildError` | `internal enum` | `.invalidURL`, `.missingBaseURL`. |
+| `JSONMessageExtractor` | `internal enum` | Shared utility for extracting error messages from arbitrary JSON. Used by `ErrorMapper` and `NetworkResponseMonitor`. |
 
 ## Architecture
 
@@ -44,6 +45,7 @@ Core protocols, types, and request building infrastructure. Defines the `Endpoin
 
 - `RequestBuilder.buildURL` does simple string concatenation (`baseURL + path`), no URL component parsing. If baseURL has trailing slash and path has leading slash, double-slash may result.
 - `ASCError` uses `any Error` for associated values (`networkFailure`, `decodingFailed`, `tokenRefreshFailed`), which prevents `Equatable` conformance on the enum.
+- `JSONMessageExtractor.findMessage(in:)` has no recursion depth limit — theoretically slow on deeply nested responses, but no practical issue seen yet.
 
 ## Deviations from Global Rules
 

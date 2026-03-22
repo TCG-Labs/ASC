@@ -40,11 +40,9 @@ Alamofire EventMonitor implementations for logging and response observation.
 - `LoggingMonitor` visibility restricted to internal (`/*public*/`) pending API stabilization.
 - `LoggingMonitor` uses `DateFormatter` (not ISO8601DateFormatter) with `yyyy-MM-dd HH:mm:ss` format for log timestamps.
 - Log format uses box-drawing characters for visual structure.
-- `NetworkResponseMonitor` has duplicated `findMessage(in:)` logic from `ErrorMapper`, no shared extraction.
+- `NetworkResponseMonitor.extractErrorMessage(from:)` delegates to `JSONMessageExtractor` (shared utility in `Core/`), no duplication with `ErrorMapper`.
 
 ## Known Issues / Fragile Areas
-
-- `findMessage(in:)` duplicated in both `ErrorMapper` and `NetworkResponseMonitor` without shared utility. Changes to one should be mirrored.
 - `LoggingMonitor` skips upload requests in `request(_:didResumeTask:)` (returns early for `UploadRequest`), logs them separately via `request(_:didCreateUploadable:)`. If Alamofire changes callback order, upload logs may be lost.
 - `NetworkResponseMonitor` uses `[weak self]` in queue async block but is a `final class`, unnecessary but harmless.
 

@@ -12,7 +12,7 @@ Public surface:
 
 | Type | Role |
 |---|---|
-| `NetworkClient` | Main entry point: `execute(_:)`, `download(from:to:)`, `download(_:to:)` |
+| `NetworkClient` | Main entry point: `execute(_:)`, `download(from:to:)`, `download(_:to:)`. `session` is `internal`. |
 | `Endpoint` | Protocol for defining requests (`path`, `method`, `parameters`, `headers`, `uploadData`, `enableAuthorization`, `validate(response:)`) |
 | `NetworkClientConfiguration` | Configuration with presets (`.default`, `.development`, `.production`, `.testing`) |
 | `ASCError` | Unified error enum (network, response, auth errors) |
@@ -63,16 +63,17 @@ Utils/          — NetworkReachability (internal), Typealiases
 - `RequestBuilder` and `ErrorMapper` are `internal`, not exposed to consumers
 - `LoggingMonitor` access level is intentionally restricted (`/*public*/` comment) pending API stabilization
 - Parameter encoding auto-detected by HTTP method: GET/HEAD/DELETE use URL encoding, POST/PUT/PATCH use JSON encoding. Override via `parameterEncoder` on endpoint.
-- `NetworkClient.session` is `public let` to allow direct Alamofire access for edge cases
+- `NetworkClient.session` is `internal let` (downgraded from `public` during refactor) — direct Alamofire access is no longer part of the public API
 - All Alamofire requests use `withTaskCancellationHandler` for Swift structured concurrency cancellation support
 - `checkConnectivity()` runs before every request when `connectivityCheckEnabled` is true
+- `JSONMessageExtractor` (in `Core/`) is the shared utility for recursive JSON error message extraction; both `ErrorMapper` and `NetworkResponseMonitor` delegate to it (no duplication)
 
 ## Known Issues / Fragile Areas
 
 - `OAuthCredential.requiresRefresh` hardcodes 14-minute refresh window (see comment about 5 min being original intent)
 - `AuthInterceptor.adapt` throws `.invalidToken` when token is nil rather than passing through, this can cause confusing errors if token storage is not properly initialized
-- `ErrorMapper.findMessage(in:)` recursively traverses arbitrary JSON depth, could theoretically be slow on deeply nested responses (no depth limit)
-- `addParametersToMultipart` has a fallback path that wraps non-dict JSON as a single `"parameters"` field, may surprise consumers
+- `JSONMessageExtractor.findMessage(in:)` recursively traverses arbitrary JSON depth, could theoretically be slow on deeply nested responses (no depth limit)
+- `encodeParametersForMultipart` throws `.invalidFormat` if the `Encodable` doesn't serialize to a JSON object (non-dict root types are rejected)
 - Download methods lack error mapping through `ErrorMapper` (raw Alamofire errors may surface)
 
 ## Deviations from Global Rules
