@@ -7,25 +7,24 @@ A modern, type-safe, protocol-oriented networking library built on top of Alamof
 [![SPM](https://img.shields.io/badge/SPM-compatible-brightgreen.svg)](https://swift.org/package-manager)
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
-## ✨ Features
+## Features
 
-- 🎯 **Type-Safe Requests** - Protocol-oriented API with compile-time type checking
-- ⚡️ **Modern Swift** - Full async/await support with Swift 6 Sendable conformance
-- 🔄 **Smart Retry** - Configurable retry policies with exponential backoff
-- 📤 **File Uploads** - Multipart form-data support for file uploads
-- 🔌 **Interceptors** - Request/response interception for auth, logging, and more
-- 📊 **Event Monitoring** - Track request lifecycle for analytics and debugging
-- 🔒 **SSL Pinning** - Certificate pinning support via ServerTrustManager
-- 🎨 **Clean Architecture** - Minimal wrapper, maximum Alamofire compatibility
-- 🧪 **Well Tested** - 131 tests with 100% pass rate and comprehensive coverage
+- **Type-Safe Requests** — Protocol-oriented API with compile-time type checking
+- **Modern Swift** — Full async/await support with Swift 6 Sendable conformance
+- **Smart Retry** — Configurable retry policies with exponential backoff
+- **File Uploads** — Multipart form-data support for file uploads
+- **Interceptors** — Request/response interception for auth, logging, and more
+- **Event Monitoring** — Track request lifecycle for analytics and debugging
+- **SSL Pinning** — Certificate pinning support via `ServerTrustManager`
+- **Well Tested** — 150+ tests covering networking, auth, error handling, and uploads
 
-## 📋 Requirements
+## Requirements
 
 - iOS 18.0+ / macOS 15.0+
 - Swift 6.2+
 - Xcode 16.0+
 
-## 📦 Installation
+## Installation
 
 ### Swift Package Manager
 
@@ -37,12 +36,9 @@ dependencies: [
 ]
 ```
 
-Or add it via Xcode:
-1. File → Add Package Dependencies...
-2. Enter repository URL
-3. Select version and add to target
+Or add it via Xcode: **File → Add Package Dependencies...**
 
-## 🚀 Quick Start
+## Quick Start
 
 ### Basic Usage
 
@@ -54,6 +50,7 @@ let client = NetworkClient(baseURL: "https://api.example.com")
 
 // 2. Define your request
 struct GetUserRequest: Endpoint {
+    typealias Request = Empty
     typealias Response = User
 
     let userId: String
@@ -64,7 +61,6 @@ struct GetUserRequest: Endpoint {
 
 // 3. Execute
 let user = try await client.execute(GetUserRequest(userId: "123"))
-print(user.name)
 ```
 
 ### POST Request with JSON Body
@@ -73,16 +69,19 @@ print(user.name)
 struct CreatePostRequest: Endpoint {
     typealias Response = Post
 
+    struct Body: Encodable, Sendable {
+        let title: String
+        let content: String
+    }
+    typealias Request = Body
+
     let title: String
     let content: String
 
     var path: String { "/posts" }
     var method: HTTPMethod { .post }
-    var parameters: Parameters? {
-        [
-            "title": title,
-            "content": content,
-        ]
+    var parameters: Body? {
+        Body(title: title, content: content)
     }
 }
 
@@ -91,22 +90,25 @@ let post = try await client.execute(
 )
 ```
 
-### URL Encoding (Query Parameters)
+### GET with Query Parameters
 
 ```swift
 struct SearchRequest: Endpoint {
     typealias Response = [SearchResult]
+
+    struct Query: Encodable, Sendable {
+        let q: String
+        let limit: Int
+    }
+    typealias Request = Query
 
     let query: String
     let limit: Int
 
     var path: String { "/search" }
     var method: HTTPMethod { .get }
-    var parameters: Parameters? {
-        ["q": query, "limit": limit]
-    }
-    var parameterEncoding: any ParameterEncoding {
-        URLEncoding.default  // Encodes as query string
+    var parameters: Query? {
+        Query(q: query, limit: limit)
     }
 }
 
@@ -115,161 +117,54 @@ let results = try await client.execute(
 )
 ```
 
-## 🔍 Logging
+GET/HEAD/DELETE parameters are URL-encoded automatically. POST/PUT/PATCH are JSON-encoded in the body.
 
-ASC includes built-in logging using Apple's unified logging system (os.log).
+## Logging
 
-### Log Levels
+ASC includes built-in logging using Apple's unified logging system (`os.log`).
 
-Configure logging when creating a NetworkClient:
+Configure logging when creating a client:
 
 ```swift
 let config = NetworkClientConfiguration(
     baseURL: "https://api.example.com",
-    logLevel: .verbose  // Choose your log level
+    logLevel: .verbose
 )
 let client = NetworkClient(configuration: config)
 ```
 
 **Available levels:**
 
-- `.none` - No logging (default)
-- `.error` - Errors only
-- `.info` - Requests and responses (URLs, status codes, timing)
-- `.debug` - Info + HTTP headers
-- `.verbose` - Debug + request/response bodies (JSON pretty-printed)
-
-### Example Output
-
-With `.verbose` logging enabled, you'll see in Xcode Console:
-
-```
-→ 📤 POST https://api.example.com/v1/auth/login
-  📋 Headers:
-    Content-Type: application/json
-  📦 Body (JSON):
-{
-  "email" : "user@example.com",
-  "password" : "🔒 <redacted>"
-}
-← ✅ 200 https://api.example.com/v1/auth/login ⚡ 0.23s
-  📄 Response (JSON):
-{
-  "accessToken" : "eyJhbG...",
-  "refreshToken" : "eyJhbG..."
-}
-```
+| Level | Output |
+|-------|--------|
+| `.none` | No logging (default) |
+| `.error` | Errors only |
+| `.info` | Request URLs and status codes |
+| `.debug` | Info + HTTP headers |
+| `.verbose` | Debug + request/response bodies (pretty-printed JSON) |
 
 **Features:**
-- 🎨 Emoji indicators for methods, status codes, and timing
-- 🔒 Automatic redaction of sensitive headers (Authorization, API keys, cookies)
-- 📊 Request duration with performance emojis (⚡ fast, 🐢 slow)
-- 🎯 Pretty-printed JSON for easy reading
+- Emoji indicators for methods, status codes, and timing
+- Automatic redaction of sensitive headers (Authorization, API keys, cookies)
+- Request duration with performance emojis
+- Pretty-printed JSON for easy reading
 
-### Viewing Logs in Xcode
+Filter logs in Console.app or Xcode by subsystem: `com.asc.networking`
 
-- Logs appear in real-time with emoji prefixes
-- Filter by subsystem: `com.asc.networking`
-
-## 📚 Examples
-
-All runnable examples are located in the [`Examples/`](ASC/Examples/) directory.
-
-### [QuickStart.swift](ASC/Examples/QuickStart.swift) - 51 lines
-Minimal example to get started in 5 minutes.
-
-**What you'll learn:**
-- Define models and requests
-- Execute GET and POST requests
-- Use Namespace Enum pattern
-
-**Run:**
-```swift
-Task { try await quickStart() }
-```
-
----
-
-### [JSONPlaceholderExample.swift](ASC/Examples/JSONPlaceholderExample.swift) - 121 lines
-Complete CRUD operations with real API (JSONPlaceholder).
-
-**What you'll learn:**
-- GET requests
-- POST with body parameters
-- PUT to update resources
-- DELETE with empty response
-- Nested paths (`/posts/{id}/comments`)
-- Error handling
-
-**Run:**
-```swift
-Task { try await runBasicExamples() }
-```
-
----
-
-### [AdvancedExample.swift](ASC/Examples/AdvancedExample.swift) - 153 lines
-Production-ready patterns for authentication and monitoring.
-
-**What you'll learn:**
-- Custom `RequestInterceptor` for authentication
-- Automatic token refresh on 401
-- Custom `EventMonitor` for performance tracking
-- Advanced configuration with interceptors and monitors
-- Retry policies per request
-- Custom timeouts
-
-**Run:**
-```swift
-Task { try await runAdvancedExamples() }
-```
-
----
-
-### [UploadDataExample.swift](ASC/Examples/UploadDataExample.swift) - 126 lines
-All three methods of uploading files.
-
-**What you'll learn:**
-- Simple uploads with `files`
-- Custom MIME types with `uploadDatas`
-- Memory-efficient uploads with `largeUploadDatas` (for files > 10MB)
-- Upload with metadata
-- Real uploads to httpbin.org
-
-**Run:**
-```swift
-Task { try await runUploadDataExamples() }
-```
-
----
-
-### [EnumRequestExample.swift](ASC/Examples/EnumRequestExample.swift) - 114 lines
-Two ways to organize your API requests.
-
-**What you'll learn:**
-- **Namespace Enum** (recommended) - For different response types
-- **Simple Enum** - For same response type
-- When to use each pattern
-- URL encoding
-
-**Run:**
-```swift
-Task { try await demonstratePatterns() }
-```
-
-## 🎯 Advanced Features
+## Advanced Features
 
 ### File Upload
 
-ASC supports three types of file uploads based on Alamofire's upload API:
+ASC supports three upload modes via the `uploadData` property on `Endpoint`:
 
 #### 1. Upload Data (`.data`)
 
-For small data that can be loaded into memory:
+For small data already in memory:
 
 ```swift
 struct UploadAvatarRequest: Endpoint {
     typealias Response = User
+    typealias Request = Empty
 
     let userId: String
     let imageData: Data
@@ -281,19 +176,19 @@ struct UploadAvatarRequest: Endpoint {
     }
 }
 
-let imageData = UIImage(named: "avatar")?.jpegData(compressionQuality: 0.8)
 let user = try await client.execute(
-    UploadAvatarRequest(userId: "123", imageData: imageData!)
+    UploadAvatarRequest(userId: "123", imageData: imageData)
 )
 ```
 
 #### 2. Upload File (`.file`)
 
-For large files from file system (memory-efficient):
+For large files from the file system (memory-efficient):
 
 ```swift
 struct UploadVideoRequest: Endpoint {
     typealias Response = Video
+    typealias Request = Empty
 
     let videoURL: URL
 
@@ -303,19 +198,16 @@ struct UploadVideoRequest: Endpoint {
         .file(videoURL)
     }
 }
-
-let response = try await client.execute(
-    UploadVideoRequest(videoURL: videoFileURL)
-)
 ```
 
-#### 3. Upload Multipart Form Data (`.multipart`)
+#### 3. Multipart Form Data (`.multipart`)
 
-For multiple files and/or parameters together:
+For multiple files and/or parameters in a single request:
 
 ```swift
 struct UploadDocumentsRequest: Endpoint {
     typealias Response = UploadResponse
+    typealias Request = Empty
 
     let imageData: Data
     let documentURL: URL
@@ -325,282 +217,171 @@ struct UploadDocumentsRequest: Endpoint {
     var method: HTTPMethod { .post }
     var uploadData: UploadData? {
         .multipart([
-            .data("image", data: imageData, fileName: "image.jpg", mimeType: "image/jpeg"),
-            .file("document", fileURL: documentURL, fileName: "doc.pdf", mimeType: "application/pdf"),
-            .parameter("description", value: description)
+            .data(fieldName: "image", data: imageData, fileName: "image.jpg", mimeType: "image/jpeg"),
+            .file(fieldName: "document", fileURL: documentURL, fileName: "doc.pdf", mimeType: "application/pdf"),
+            .parameter("description", value: description),
         ])
     }
 }
-
-let response = try await client.execute(
-    UploadDocumentsRequest(
-        imageData: imageData,
-        documentURL: documentURL,
-        description: "My documents"
-    )
-)
 ```
 
-#### Progress Tracking
+**Choosing the right mode:**
+- `.data` — files < 10MB already loaded into memory
+- `.file` — large files (> 10MB) to avoid memory pressure
+- `.multipart` — multiple files, or files combined with text parameters
 
-Track upload progress using `executeWithProgress()`:
+### Authentication
 
-```swift
-for try await item in client.executeWithProgress(uploadRequest) {
-    switch item {
-    case let .progress(progress):
-        print("Upload progress: \(progress.fractionCompleted * 100)%")
-        print("Uploaded: \(progress.bytesUploaded) / \(progress.totalBytes) bytes")
-    case let .response(response):
-        print("Upload complete: \(response)")
-    }
-}
-```
+ASC provides two authentication mechanisms: simple token injection via `AuthInterceptor`, and automatic pre-emptive token refresh via `OAuthAuthenticator`.
 
-### Request Interceptor (Authentication)
+#### Bearer / Basic / Custom Token
 
-ASC provides built-in authentication support through two key components:
-
-- **`TokenStorage`** - Protocol for storing and managing authentication tokens (bearer, basic, custom)
-- **`AuthInterceptor`** - Request interceptor that automatically adds `Authorization` headers to requests
-
-When a request is marked with `enableAuthorization = true`, the interceptor retrieves the token from storage and adds the appropriate authentication header before sending the request.
-
-**Usage:**
-
-1. Implement the `TokenStorage` protocol to define how tokens are stored
-2. Create an `AuthInterceptor` instance with your token storage
-3. Add the interceptor to `NetworkClientConfiguration`
-4. Mark requests that need authentication with `enableAuthorization = true`
-
-#### Bearer Token Authentication (API Keys, OAuth)
-
-Most common for REST APIs and OAuth 2.0:
+Implement `TokenStorage` to provide tokens, then pass an `AuthInterceptor` via `authInterceptor:`:
 
 ```swift
-import ASC
-
-// 1. Implement TokenStorage protocol
 final class BearerTokenStorage: TokenStorage {
     private var token: String?
-    
+
     var authToken: AuthToken? {
-        guard let token = token else { return nil }
+        guard let token else { return nil }
         return .bearer(token: token)
     }
-    
-    init(token: String) {
-        self.token = token
-    }
-    
+
     func updateToken(_ newToken: String) {
-        self.token = newToken
+        token = newToken
     }
-    
+
     func flush() {
         token = nil
     }
 }
 
-// 2. Configure client with AuthInterceptor
 let storage = BearerTokenStorage(token: "your-api-key")
-let authInterceptor = AuthInterceptor(storage: storage)
 
 let config = NetworkClientConfiguration(
     baseURL: "https://api.example.com",
-    interceptors: [authInterceptor]
+    authInterceptor: AuthInterceptor(storage: storage)
 )
 let client = NetworkClient(configuration: config)
+```
 
-// 3. Mark requests that need authentication
+Mark individual requests that need authentication:
+
+```swift
 struct GetProfileRequest: Endpoint {
     typealias Response = UserProfile
-    
+    typealias Request = Empty
+
     var path: String { "/me" }
     var method: HTTPMethod { .get }
-    var enableAuthorization: Bool { true }  // Adds Authorization header
+    var enableAuthorization: Bool { true }  // injects Authorization header
 }
 
 let profile = try await client.execute(GetProfileRequest())
-// Request includes: Authorization: Bearer your-api-key
+// → Authorization: Bearer your-api-key
 ```
 
-#### OAuth Authentication with Automatic Token Refresh
+`AuthToken` supports three schemes:
+- `.bearer(token:)` — `Authorization: Bearer {token}`
+- `.basic(username:password:)` — `Authorization: Basic {base64}`
+- `.custom(token:)` — `Authorization: {token}`
 
-For OAuth 2.0 with automatic token refresh on 401 errors, use `OAuthAuthenticator`:
+#### OAuth with Pre-emptive Token Refresh
+
+For OAuth 2.0 with automatic token refresh, implement `OAuthTokenStorage` and use `OAuthAuthenticator`:
 
 ```swift
-import ASC
-import Alamofire
-
-// 1. Implement TokenStorage with refresh request
-struct RefreshTokenResponse: Codable {
-    let accessToken: String
-    let refreshToken: String
-    let expiresIn: Int
-}
-
-struct RefreshTokenRequest: Endpoint {
-    typealias Response = RefreshTokenResponse
-    typealias Request = Empty
-
-    let refreshToken: String
-
-    var path: String { "/oauth/refresh" }
-    var method: HTTPMethod { .post }
-    var parameters: [String: String]? {
-        ["refresh_token": refreshToken]
-    }
-}
-
-final class OAuthTokenStorage: TokenStorage {
+final class MyOAuthStorage: OAuthTokenStorage {
     private var accessToken: String?
     private var refreshToken: String?
-    private var expiration: Date?
 
     var authToken: AuthToken? {
         guard let token = accessToken else { return nil }
         return .bearer(token: token)
     }
 
-    var refreshRequest: (any Endpoint)? {
-        guard let refreshToken = refreshToken else { return nil }
-        return RefreshTokenRequest(refreshToken: refreshToken)
+    func update(accessToken: String, refreshToken: String) {
+        self.accessToken = accessToken
+        self.refreshToken = refreshToken
     }
 
-    func executeRefreshToken(with client: NetworkClient) async throws {
-        guard let request = refreshRequest else {
+    func executeRefreshToken() async throws {
+        guard let refresh = refreshToken else {
             throw ASCError.invalidToken
         }
-
-        let response = try await client.execute(request)
-
-        // Update tokens
-        self.accessToken = response.accessToken
-        self.refreshToken = response.refreshToken
-        self.expiration = Date(timeIntervalSinceNow: TimeInterval(response.expiresIn))
+        // Call your refresh endpoint and update tokens
+        let response = try await refreshClient.execute(
+            RefreshTokenRequest(refreshToken: refresh)
+        )
+        update(accessToken: response.accessToken, refreshToken: response.refreshToken)
     }
 
     func flush() {
         accessToken = nil
         refreshToken = nil
-        expiration = nil
     }
 }
+```
 
-// 2. Create OAuth credential
-let credential = OAuthCredential(
-    accessToken: "initial-access-token",
-    refreshToken: "initial-refresh-token",
-    userID: "user123",
-    expiration: Date(timeIntervalSinceNow: 3600)
-)
+Configure the client with `OAuthAuthenticator`:
 
-// 3. Create OAuth authenticator and interceptor
-let storage = OAuthTokenStorage()
+```swift
+let storage = MyOAuthStorage()
+let credential = OAuthCredential(authToken: .bearer(token: initialToken))
 let authenticator = OAuthAuthenticator(storage: storage)
 let interceptor = AuthenticationInterceptor(
     authenticator: authenticator,
     credential: credential
 )
 
-// 4. Configure client with interceptor
 let config = NetworkClientConfiguration(
     baseURL: "https://api.example.com",
     interceptors: [interceptor]
 )
 let client = NetworkClient(configuration: config)
-
-// 5. Use client - tokens will be automatically refreshed on 401
-struct GetProfileRequest: Endpoint {
-    typealias Response = UserProfile
-
-    var path: String { "/me" }
-    var method: HTTPMethod { .get }
-}
-
-let profile = try await client.execute(GetProfileRequest())
-// If token expires, OAuthAuthenticator will automatically refresh it and retry the request
 ```
 
 **How it works:**
-- When a request receives a 401 Unauthorized response, `OAuthAuthenticator.refresh()` is automatically called
-- The refresh method uses `TokenStorage.executeRefreshToken()` to get new tokens
-- After successful refresh, the original request is automatically retried with the new token
-- All token updates are handled by your `TokenStorage` implementation
+- `OAuthCredential.requiresRefresh` returns `true` when the JWT is within 14 minutes of expiry
+- Alamofire calls `OAuthAuthenticator.refresh()` proactively before sending the request
+- `refresh()` delegates to `OAuthTokenStorage.executeRefreshToken()`
+- The original request proceeds with the new token, no retry needed
 
-For advanced scenarios (custom retry logic, manual token refresh), implement Alamofire's `RequestInterceptor` directly:
+### Event Monitoring
 
-```swift
-import Alamofire
-
-final class CustomAuthInterceptor: RequestInterceptor {
-    private var token: String
-    
-    init(token: String) {
-        self.token = token
-    }
-    
-    func adapt(
-        _ urlRequest: URLRequest,
-        for session: Session,
-        completion: @escaping (Result<URLRequest, Error>) -> Void
-    ) {
-        var urlRequest = urlRequest
-        urlRequest.headers.add(.authorization(bearerToken: token))
-        completion(.success(urlRequest))
-    }
-    
-    func retry(
-        _ request: Request,
-        for session: Session,
-        dueTo error: Error,
-        completion: @escaping (RetryResult) -> Void
-    ) {
-        if let response = request.task?.response as? HTTPURLResponse,
-           response.statusCode == 401 {
-            // Refresh token and retry
-            Task {
-                do {
-                    self.token = try await refreshToken()
-                    completion(.retry)
-                } catch {
-                    completion(.doNotRetry)
-                }
-            }
-        } else {
-            completion(.doNotRetry)
-        }
-    }
-    
-    private func refreshToken() async throws -> String {
-        // Implement token refresh logic
-        return "new-token"
-    }
-}
-```
-
-### Event Monitoring (Logging)
+Pass custom `EventMonitor` implementations to track the request lifecycle:
 
 ```swift
-final class Logger: EventMonitor {
+final class AnalyticsMonitor: EventMonitor {
     func requestDidResume(_ request: Request) {
-        print("🚀 Request started: \(request.description)")
+        Analytics.track("network_request_started", path: request.request?.url?.path ?? "")
     }
 
     func request<Value>(
         _ request: DataRequest,
         didParseResponse response: DataResponse<Value, AFError>
     ) {
-        print("✅ Response: \(response.response?.statusCode ?? 0)")
+        Analytics.track("network_request_completed", statusCode: response.response?.statusCode ?? 0)
     }
 }
 
 let config = NetworkClientConfiguration(
     baseURL: "https://api.example.com",
-    eventMonitors: [Logger()]
+    eventMonitors: [AnalyticsMonitor()]
 )
-let client = NetworkClient(configuration: config)
+```
+
+### Configuration Presets
+
+```swift
+// Development — verbose logging, 120s timeout, no retries
+let devConfig = NetworkClientConfiguration.development(baseURL: "https://api.example.com")
+
+// Production — error logging, 30s timeout, conservative retries
+let prodConfig = NetworkClientConfiguration.production(baseURL: "https://api.example.com")
+
+// Testing — no logging, 10s timeout, connectivity check disabled
+let testConfig = NetworkClientConfiguration.testing(baseURL: "https://test.example.com")
 ```
 
 ### Advanced Configuration
@@ -610,51 +391,94 @@ let config = NetworkClientConfiguration(
     baseURL: "https://api.example.com",
 
     // Default headers for all requests
-    defaultHeaders: [
-        "X-App-Version": "1.0.0",
-        "Accept-Language": "en-US",
-    ],
+    defaultHeaders: HTTPHeaders([
+        HTTPHeader(name: "X-App-Version", value: "1.0.0"),
+        HTTPHeader(name: "Accept-Language", value: "en-US"),
+    ]),
 
-    // Request interceptors (auth, signing, etc.)
-    interceptors: [AuthInterceptor()],
+    // Dedicated auth interceptor (applied only to enableAuthorization: true requests)
+    authInterceptor: AuthInterceptor(storage: tokenStorage),
 
-    // Event monitors (logging, analytics)
-    eventMonitors: [Logger(), AnalyticsMonitor()],
+    // Additional interceptors
+    interceptors: [SigningInterceptor()],
+
+    // Event monitors
+    eventMonitors: [AnalyticsMonitor()],
 
     // SSL certificate pinning
     serverTrustManager: ServerTrustManager(
-        evaluators: ["api.example.com": DefaultTrustEvaluator()]
+        evaluators: ["api.example.com": PinnedCertificatesTrustEvaluator()]
     ),
 
-    // Custom timeout
+    // Timeouts and policy
     defaultTimeout: 30.0,
-
-    // Cache policy
     defaultCachePolicy: .reloadIgnoringLocalCacheData,
 
-    // Custom dispatch queues
-    rootQueue: DispatchQueue(label: "com.app.network.root"),
-    requestQueue: DispatchQueue(label: "com.app.network.request"),
-    serializationQueue: DispatchQueue(label: "com.app.network.serialization")
-)
+    // Retry policy for all requests (can be overridden per-request)
+    defaultRetryPolicy: .conservative,
 
+    // Log level
+    logLevel: .error
+)
 let client = NetworkClient(configuration: config)
 ```
 
-### Retry Policy
+### Retry Policies
+
+Use the built-in presets or supply any `Alamofire.RetryPolicy`:
 
 ```swift
-// Use predefined policies
-struct MyRequest: Endpoint {
+struct PaymentRequest: Endpoint {
     // ...
-    var retryPolicy: Alamofire.RetryPolicy? { .aggressive }  // 5 retries with exponential backoff
+    var retryPolicy: Alamofire.RetryPolicy? { .aggressive }   // 5 retries
 }
 
-// Or create custom policy using Alamofire's RetryPolicy
-let customPolicy = Alamofire.RetryPolicy(
-    retryLimit: 3,
-    exponentialBackoffBase: 2,
-    exponentialBackoffScale: 0.5
+struct GetFeedRequest: Endpoint {
+    // ...
+    var retryPolicy: Alamofire.RetryPolicy? { .default }      // 3 retries
+}
+
+struct LogAnalyticsRequest: Endpoint {
+    // ...
+    var retryPolicy: Alamofire.RetryPolicy? { .conservative } // 2 retries
+}
+
+// No retries — omit retryPolicy (default is nil) or return nil explicitly
+struct SearchRequest: Endpoint {
+    // ...
+    // retryPolicy defaults to nil — no retries
+}
+```
+
+Available presets: `.aggressive` (5 retries), `.default` (3 retries), `.conservative` (2 retries).
+
+### Downloads
+
+Download a file from a URL directly:
+
+```swift
+let url = URL(string: "https://example.com/file.pdf")!
+let fileURL = try await client.download(
+    from: url,
+    to: FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0],
+    options: [.createIntermediateDirectories, .removePreviousFile]
+)
+```
+
+Download via an `Endpoint`:
+
+```swift
+struct DownloadReportRequest: Endpoint {
+    typealias Request = Empty
+    typealias Response = Empty
+
+    var path: String { "/reports/latest.pdf" }
+    var method: HTTPMethod { .get }
+}
+
+let fileURL = try await client.download(
+    DownloadReportRequest(),
+    to: destinationFolder
 )
 ```
 
@@ -671,448 +495,214 @@ struct DeleteUserRequest: Endpoint {
     var method: HTTPMethod { .delete }
 }
 
-// Empty response is decoded and returned
-let response: Empty = try await client.execute(DeleteUserRequest(userId: "123"))
+try await client.execute(DeleteUserRequest(userId: "123"))
 ```
 
-## 🔧 Error Handling
+### Custom Response Validation
 
-ASC provides three types of structured errors:
+Add business-logic validation after decoding:
 
-### NetworkError
+```swift
+struct GetUserRequest: Endpoint {
+    typealias Response = UserResponse
+    typealias Request = Empty
 
-Connection and transport-level errors:
+    var path: String { "/me" }
+    var method: HTTPMethod { .get }
+
+    func validate(response: UserResponse) throws {
+        guard response.isActive else {
+            throw ASCError.unauthorized("User account is inactive")
+        }
+    }
+}
+```
+
+## Error Handling
+
+All errors are unified under `ASCError`:
 
 ```swift
 do {
-    let user = try await client.execute(request)
-} catch let error as NetworkError {
+    let user = try await client.execute(GetUserRequest(userId: "123"))
+} catch let error as ASCError {
     switch error {
+    // Network errors
     case .noConnection:
-        print("No internet connection")
-    case .timeout(let duration):
-        print("Request timed out after \(duration)s")
-    case .hostUnreachable(let host):
-        print("Cannot reach \(host)")
-    case .certificateValidationFailed(let reason):
-        print("SSL error: \(reason)")
+        showOfflineBanner()
+    case .timeout:
+        showRetryPrompt()
     case .cancelled:
-        print("Request was cancelled")
-    case .networkFailure(let underlying):
-        print("Network error: \(underlying)")
-    }
-}
-```
+        break
 
-### ResponseError
-
-HTTP response and parsing errors:
-
-```swift
-do {
-    let user = try await client.execute(request)
-} catch let error as ResponseError {
-    switch error {
-    case .invalidStatusCode(let code, let data):
-        print("Invalid status: \(code)")
-    case .decodingFailed(let error, let data):
-        print("Failed to parse: \(error)")
-    case .missingData:
-        print("No response data")
+    // Response errors
     case .serverError(let code, let message):
-        print("Server error \(code): \(message)")
+        log.error("Server \(code): \(message)")
     case .clientError(let code, let message):
-        print("Client error \(code): \(message ?? "")")
-    default:
-        print("Response error: \(error)")
-    }
-}
-```
+        showErrorAlert(message ?? "Request failed (\(code))")
+    case .decodingFailed(let underlying, _):
+        log.error("Decode failed: \(underlying)")
 
-### AuthenticationError
-
-Authentication and authorization errors:
-
-```swift
-do {
-    let user = try await client.execute(request)
-} catch let error as AuthenticationError {
-    switch error {
-    case .notAuthenticated:
-        print("Please log in")
-    case .tokenExpired:
-        print("Session expired, please log in again")
+    // Auth errors
+    case .notAuthenticated, .tokenExpired:
+        navigateToLogin()
     case .unauthorized(let resource):
-        print("No access to \(resource ?? "resource")")
-    case .forbidden(let reason):
-        print("Forbidden: \(reason ?? "")")
+        showPermissionDenied(resource)
+    case .forbidden:
+        showForbiddenAlert()
+
     default:
-        print("Auth error: \(error)")
+        showGenericError(error.localizedDescription)
     }
 }
 ```
 
-## 💡 Best Practices
+**Error categories:**
 
-### Request Organization
+| Category | Cases |
+|----------|-------|
+| Network | `.noConnection`, `.timeout`, `.hostUnreachable`, `.certificateValidationFailed`, `.cancelled`, `.networkFailure` |
+| Response | `.invalidStatusCode`, `.decodingFailed`, `.missingData`, `.invalidFormat`, `.serverError`, `.clientError`, `.validationFailed` |
+| Auth | `.notAuthenticated`, `.tokenExpired`, `.invalidToken`, `.tokenRefreshFailed`, `.unauthorized`, `.forbidden`, `.invalidCredentials` |
 
-Use enums to organize related requests:
+Useful helpers on `ASCError`:
+- `.statusCode: HTTPStatusCode?` — HTTP status from response/server/client errors
+- `.responseData: Data?` — raw response body when available
+- `.underlyingError: Error?` — wrapped original error
+
+## Best Practices
+
+### Organize requests with enums
 
 ```swift
 enum UserAPI {
-    case getUser(id: String)
-    case updateUser(id: String, name: String)
-    case deleteUser(id: String)
-}
+    struct GetUser: Endpoint {
+        typealias Response = User
+        typealias Request = Empty
 
-extension UserAPI: Endpoint {
-    typealias Response = User
-
-    var path: String {
-        switch self {
-        case .getUser(let id):
-            return "/users/\(id)"
-        case .updateUser(let id, _):
-            return "/users/\(id)"
-        case .deleteUser(let id):
-            return "/users/\(id)"
-        }
+        let id: String
+        var path: String { "/users/\(id)" }
+        var method: HTTPMethod { .get }
+        var enableAuthorization: Bool { true }
     }
 
-    var method: HTTPMethod {
-        switch self {
-        case .getUser:
-            return .get
-        case .updateUser:
-            return .put
-        case .deleteUser:
-            return .delete
-        }
-    }
+    struct UpdateUser: Endpoint {
+        typealias Response = User
 
-    var parameters: Parameters? {
-        switch self {
-        case .updateUser(_, let name):
-            return ["name": name]
-        default:
-            return nil
+        struct Body: Encodable, Sendable {
+            let name: String
+            let email: String
         }
+        typealias Request = Body
+
+        let id: String
+        let body: Body
+
+        var path: String { "/users/\(id)" }
+        var method: HTTPMethod { .put }
+        var parameters: Body? { body }
+        var enableAuthorization: Bool { true }
     }
 }
 
-// Usage
-let user = try await client.execute(UserAPI.getUser(id: "123"))
+let user = try await client.execute(UserAPI.GetUser(id: "123"))
 ```
 
-### Client Configuration Management
-
-Create a single configured client for your app:
+### Reuse a single client instance
 
 ```swift
-// NetworkClientFactory.swift
-final class NetworkClientFactory {
-    static let shared = NetworkClientFactory()
+// ✅ Good — single session, shared connection pool
+final class NetworkService {
+    static let shared = NetworkService()
+    private let client = NetworkClient(configuration: .production(baseURL: "https://api.example.com"))
 
-    private(set) lazy var client: NetworkClient = {
-        let config = NetworkClientConfiguration(
-            baseURL: Configuration.apiBaseURL,
-            defaultHeaders: [
-                "X-App-Version": Bundle.main.appVersion,
-                "Accept-Language": Locale.current.languageCode ?? "en"
-            ],
-            interceptors: [AuthInterceptor.shared],
-            eventMonitors: [NetworkLogger.shared],
-            defaultTimeout: 30.0
+    func getUser(id: String) async throws -> User {
+        try await client.execute(UserAPI.GetUser(id: id))
+    }
+}
+
+// ❌ Bad — creates a new Alamofire Session on every call
+func fetchUser() async throws -> User {
+    let client = NetworkClient(baseURL: "https://api.example.com") // don't do this
+    return try await client.execute(UserAPI.GetUser(id: "123"))
+}
+```
+
+### Parallel requests
+
+```swift
+func loadDashboard(userId: String) async throws -> (User, [Post], Stats) {
+    async let user  = client.execute(UserAPI.GetUser(id: userId))
+    async let posts = client.execute(PostAPI.GetPosts(userId: userId))
+    async let stats = client.execute(StatsAPI.GetStats(userId: userId))
+    return try await (user, posts, stats)
+}
+```
+
+### Testing
+
+Mock the network layer using `URLProtocol`:
+
+```swift
+import Testing
+@testable import ASC
+
+@Suite("UserRepository Tests", .serialized)
+struct UserRepositoryTests {
+    @Test("Returns user on success")
+    func testGetUserSuccess() async throws {
+        let mockUser = User(id: "123", name: "John")
+        let response = try JSONEncoder().encode(mockUser)
+
+        MockURLProtocol.setMockResponse(
+            data: response,
+            statusCode: 200,
+            url: URL(string: "https://test.com/users/123")!
         )
-        return NetworkClient(configuration: config)
-    }()
 
-    private init() {}
+        let sessionConfig = URLSessionConfiguration.ephemeral
+        sessionConfig.protocolClasses = [MockURLProtocol.self]
+        let config = NetworkClientConfiguration(
+            baseURL: "https://test.com",
+            sessionType: .custom(sessionConfig),
+            connectivityCheckEnabled: false
+        )
+        let client = NetworkClient(configuration: config)
+        let user = try await client.execute(UserAPI.GetUser(id: "123"))
+
+        #expect(user.id == "123")
+        #expect(user.name == "John")
+    }
 }
-
-// Usage throughout app
-let user = try await NetworkClientFactory.shared.client.execute(request)
 ```
 
-### Error Handling Strategy
+### Error handling in repositories
 
-Handle errors at appropriate levels:
+Transform network errors to domain errors at the repository boundary:
 
 ```swift
-// Repository level - transform to domain errors
-class UserRepository {
+final class UserRepository {
+    private let client: NetworkClient
+
     func getUser(id: String) async throws -> User {
         do {
-            return try await client.execute(UserAPI.getUser(id: id))
-        } catch let error as NetworkError {
-            throw DomainError.connectionFailed(reason: error.localizedDescription)
-        } catch let error as ResponseError {
+            return try await client.execute(UserAPI.GetUser(id: id))
+        } catch let error as ASCError {
             switch error {
-            case .invalidStatusCode(404, _):
+            case .clientError(404, _):
                 throw DomainError.userNotFound(id: id)
-            case .serverError(let code, _):
-                throw DomainError.serverUnavailable(code: code)
+            case .noConnection, .timeout:
+                throw DomainError.networkUnavailable
+            case .notAuthenticated, .tokenExpired:
+                throw DomainError.sessionExpired
             default:
                 throw DomainError.unknown(error)
             }
         }
     }
 }
-
-// ViewModel level - prepare user-facing messages
-class UserViewModel {
-    func loadUser(id: String) async {
-        do {
-            self.user = try await repository.getUser(id: id)
-        } catch let error as DomainError {
-            self.errorMessage = error.userFacingMessage
-        }
-    }
-}
 ```
 
-### File Upload Patterns
+## License
 
-Choose the right upload method based on your needs:
-
-**Use `.data(Data)` for:**
-- Small files (< 10MB) that can be loaded into memory
-- Simple single-file uploads
-- When you already have data in memory
-
-**Use `.file(URL)` for:**
-- Large files (> 10MB) to avoid loading entire file into memory
-- Files from file system
-- Memory-efficient uploads
-
-**Use `.multipart([MultipartItem])` for:**
-- Multiple files in a single request
-- Files combined with text parameters
-- Complex upload scenarios with mixed content types
-
-```swift
-// Small file - use .data
-struct UploadPhotoRequest: Endpoint {
-    typealias Response = Photo
-    let imageData: Data
-
-    var path: String { "/photos" }
-    var method: HTTPMethod { .post }
-    var uploadData: UploadData? {
-        .data(imageData)
-    }
-}
-
-// Large file - use .file (memory-efficient)
-struct UploadVideoRequest: Endpoint {
-    typealias Response = Video
-    let videoURL: URL
-
-    var path: String { "/videos" }
-    var method: HTTPMethod { .post }
-    var uploadData: UploadData? {
-        .file(videoURL)
-    }
-}
-
-// Multiple files with parameters - use .multipart
-struct UploadDocumentsRequest: Endpoint {
-    typealias Response = UploadResult
-    let files: [URL]
-    let category: String
-
-    var path: String { "/documents" }
-    var method: HTTPMethod { .post }
-    var uploadData: UploadData? {
-        .multipart(
-        files.map { url in
-                .file("documents[]", fileURL: url, fileName: url.lastPathComponent, mimeType: "application/octet-stream")
-            } + [.parameter("category", value: category)]
-        )
-    }
-}
-```
-
-**Best Practices:**
-- Use `.data` for files < 10MB
-- Use `.file` for files > 10MB to avoid memory issues
-- Use `.multipart` when you need to upload multiple files or combine files with parameters
-- Always specify correct MIME types for proper server handling
-- Use `executeWithProgress()` for large uploads to show progress to users
-
-### Retry Policy Selection
-
-Choose retry policies based on request importance:
-
-```swift
-// Critical requests - aggressive retry
-struct PaymentRequest: Endpoint {
-    // ...
-    var retryPolicy: Alamofire.RetryPolicy? { .aggressive }  // 5 retries
-}
-
-// Standard requests - default retry
-struct GetFeedRequest: Endpoint {
-    // ...
-    var retryPolicy: Alamofire.RetryPolicy? { .default }  // 3 retries
-}
-
-// Non-critical requests - conservative retry
-struct LogAnalyticsRequest: Endpoint {
-    // ...
-    var retryPolicy: Alamofire.RetryPolicy? { .conservative }  // 2 retries
-}
-
-// Real-time requests - no retry
-struct SearchRequest: Endpoint {
-    // ...
-    var retryPolicy: Alamofire.RetryPolicy? { .none }  // No retries
-}
-```
-
-### Security Considerations
-
-Protect sensitive data in requests:
-
-```swift
-// 1. Don't log sensitive data
-final class SecureLogger: EventMonitor {
-    let sensitiveHeaders = ["Authorization", "X-API-Key", "Cookie"]
-
-    func request<Value>(
-        _ request: DataRequest,
-        didParseResponse response: DataResponse<Value, AFError>
-    ) {
-        var headers = request.request?.allHTTPHeaderFields ?? [:]
-        // Redact sensitive headers
-        for header in sensitiveHeaders {
-            if headers[header] != nil {
-                headers[header] = "[REDACTED]"
-            }
-        }
-        debugPrint("Response:", response.response?.statusCode ?? 0, "Headers:", headers)
-    }
-}
-
-// 2. Use HTTPS only in production
-let config = NetworkClientConfiguration(
-    baseURL: Configuration.isProduction ? "https://api.example.com" : "http://localhost:3000"
-)
-
-// 3. Implement certificate pinning for production
-let trustManager = ServerTrustManager(
-    evaluators: ["api.example.com": PinnedCertificatesTrustEvaluator()]
-)
-```
-
-### Testing Your Network Layer
-
-Mock network calls in tests:
-
-```swift
-import Testing
-@testable import YourApp
-@testable import ASC
-
-@Suite("User Repository Tests")
-struct UserRepositoryTests {
-    @Test("Repository returns user on success")
-    func testGetUserSuccess() async throws {
-        // Setup
-        let mockUser = User(id: "123", name: "John")
-        MockURLProtocol.requestHandler = MockResponseBuilder.success(mockUser).handler()
-
-        let config = URLSessionConfiguration.ephemeral
-        config.protocolClasses = [MockURLProtocol.self]
-        let client = NetworkClient(
-            configuration: NetworkClientConfiguration(
-                baseURL: "https://test.com",
-                session: Session(configuration: config)
-            )
-        )
-
-        let repository = UserRepository(client: client)
-
-        // Execute
-        let user = try await repository.getUser(id: "123")
-
-        // Verify
-        #expect(user.id == "123")
-        #expect(user.name == "John")
-    }
-
-    @Test("Repository throws domain error on 404")
-    func testGetUserNotFound() async throws {
-        // Setup
-        MockURLProtocol.requestHandler = MockResponseBuilder.notFound().handler()
-
-        let config = URLSessionConfiguration.ephemeral
-        config.protocolClasses = [MockURLProtocol.self]
-        let client = NetworkClient(
-            configuration: NetworkClientConfiguration(
-                baseURL: "https://test.com",
-                session: Session(configuration: config)
-            )
-        )
-
-        let repository = UserRepository(client: client)
-
-        // Execute & Verify
-        do {
-            _ = try await repository.getUser(id: "999")
-            Issue.record("Expected error to be thrown")
-        } catch let error as DomainError {
-            #expect(error == .userNotFound(id: "999"))
-        }
-    }
-}
-```
-
-### Performance Optimization
-
-Optimize based on usage patterns:
-
-```swift
-// 1. Reuse client instance (don't create new clients)
-// ✅ Good
-class APIService {
-    private let client = NetworkClientFactory.shared.client
-    func fetchData() async throws { /* ... */ }
-}
-
-// ❌ Bad - creates new session each time
-class APIService {
-    func fetchData() async throws {
-        let client = NetworkClient(baseURL: "...")  // Don't do this
-    }
-}
-
-// 2. Use appropriate cache policy
-struct GetCachedDataRequest: Endpoint {
-    // ...
-    var cachePolicy: URLRequest.CachePolicy? {
-        .returnCacheDataElseLoad  // Use cache when available
-    }
-}
-
-// 3. Batch requests when possible
-func loadUserDashboard(userId: String) async throws {
-    async let user = client.execute(UserAPI.getUser(id: userId))
-    async let posts = client.execute(PostAPI.getUserPosts(userId: userId))
-    async let stats = client.execute(StatsAPI.getUserStats(userId: userId))
-
-    // All requests execute in parallel
-    let (userData, postsData, statsData) = try await (user, posts, stats)
-}
-
-// 4. Use streaming for large responses (if backend supports)
-struct DownloadLargeFileRequest: Endpoint {
-    typealias Response = Data
-    // ...
-    var timeout: TimeInterval? { 300 }  // 5 minutes for large downloads
-}
-```
-
-## 📄 License
-
-ASC is available under the MIT license. See LICENSE file for details.
+ASC is available under the MIT license. See [LICENSE](LICENSE) for details.
