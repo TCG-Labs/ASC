@@ -452,12 +452,20 @@ public final class NetworkClient: Sendable {
                 }
             }
 
+            // Pre-encode parameters before entering the non-throwing multipart closure
+            let encodedParameters: [(String, Data)]
+            if let parameters = endpoint.parameters {
+                encodedParameters = try encodeParametersForMultipart(parameters)
+            } else {
+                encodedParameters = []
+            }
+
             // Upload Multipart Form Data
             return session.upload(
                 multipartFormData: { multipartFormData in
-                    // Add parameters if present
-                    if let parameters = endpoint.parameters {
-                        self.addParametersToMultipart(parameters, to: multipartFormData)
+                    // Add pre-encoded parameters
+                    for (key, data) in encodedParameters {
+                        multipartFormData.append(data, withName: key)
                     }
 
                     // Add multipart items
@@ -486,28 +494,39 @@ public final class NetworkClient: Sendable {
         }
     }
 
-    /// Adds parameters to multipart form data.
-    private func addParametersToMultipart<Params: Encodable & Sendable>(
-        _ parameters: Params,
-        to multipartFormData: MultipartFormData
-    ) {
-        // Try to encode parameters as JSON first
-        if let jsonData = try? JSONEncoder().encode(parameters),
-           let jsonString = String(data: jsonData, encoding: .utf8) {
-            // For simple key-value pairs, try to extract them
-            if let dictionary = try? JSONDecoder().decode([String: String].self, from: jsonData) {
-                for (key, value) in dictionary {
-                    if let valueData = value.data(using: .utf8) {
-                        multipartFormData.append(valueData, withName: key)
-                    }
-                }
+    /// Encodes parameters into an array of (fieldName, data) pairs for multipart upload.
+    ///
+    /// Each top-level key of the `Encodable` becomes a separate multipart field.
+    /// Scalar values are UTF-8 strings; nested objects/arrays become compact JSON.
+    ///
+    /// - Throws: `ASCError.invalidFormat` if the encoded value is not a JSON object.
+    private func encodeParametersForMultipart<Params: Encodable & Sendable>(
+        _ parameters: Params
+    ) throws -> [(String, Data)] {
+        let jsonData = try JSONEncoder().encode(parameters)
+
+        guard let jsonObject = try? JSONSerialization.jsonObject(with: jsonData),
+              let dictionary = jsonObject as? [String: Any] else {
+            throw ASCError.invalidFormat("Multipart parameters must encode to a JSON object")
+        }
+
+        var result: [(String, Data)] = []
+        for (key, value) in dictionary {
+            let fieldData: Data?
+            if let string = value as? String {
+                fieldData = string.data(using: .utf8)
+            } else if let number = value as? NSNumber {
+                fieldData = number.stringValue.data(using: .utf8)
             } else {
-                // Fallback: add as single JSON field
-                if let jsonData = jsonString.data(using: .utf8) {
-                    multipartFormData.append(jsonData, withName: "parameters")
-                }
+                // Nested object or array: serialize as compact JSON
+                fieldData = try? JSONSerialization.data(withJSONObject: value)
+            }
+
+            if let data = fieldData {
+                result.append((key, data))
             }
         }
+        return result
     }
 
     private func buildDownloadDestination(to destinationFolderURL: URL?, options: DownloadRequest.Options) -> DownloadRequest.Destination? {

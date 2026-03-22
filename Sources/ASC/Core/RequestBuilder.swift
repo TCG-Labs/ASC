@@ -112,10 +112,40 @@ internal final class RequestBuilder: Sendable {
             throw RequestBuildError.missingBaseURL
         }
 
-        let fullURL = effectiveBaseURL + request.path
+        guard var components = URLComponents(string: effectiveBaseURL) else {
+            throw RequestBuildError.invalidURL(effectiveBaseURL)
+        }
 
-        guard let url = URL(string: fullURL) else {
-            throw RequestBuildError.invalidURL(fullURL)
+        let fullPath = request.path
+        if !fullPath.isEmpty {
+            // Split path from inline query string if present (e.g. "/search?q=swift")
+            let pathPart: String
+            let queryPart: String?
+            if let queryStart = fullPath.firstIndex(of: "?") {
+                pathPart = String(fullPath[fullPath.startIndex..<queryStart])
+                queryPart = String(fullPath[fullPath.index(after: queryStart)...])
+            } else {
+                pathPart = fullPath
+                queryPart = nil
+            }
+
+            // Ensure exactly one slash between base path and endpoint path
+            let basePath = components.path.hasSuffix("/") ? String(components.path.dropLast()) : components.path
+            let endpointPath = pathPart.hasPrefix("/") ? pathPart : "/\(pathPart)"
+            components.path = basePath + endpointPath
+
+            if let query = queryPart {
+                // Append to existing query if any
+                if let existing = components.query, !existing.isEmpty {
+                    components.query = existing + "&" + query
+                } else {
+                    components.query = query
+                }
+            }
+        }
+
+        guard let url = components.url else {
+            throw RequestBuildError.invalidURL(effectiveBaseURL + fullPath)
         }
 
         return url

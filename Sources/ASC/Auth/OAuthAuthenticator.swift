@@ -71,8 +71,8 @@ public struct OAuthCredential: AuthenticationCredential, Sendable {
         do {
             let jwt = try decode(jwt: token)
             return jwt.expiresAt
-        } catch let error {
-            debugPrint(error.localizedDescription)
+        } catch {
+            log.debug("JWT decode failed: \(error.localizedDescription, privacy: .public)")
             return nil
         }
     }

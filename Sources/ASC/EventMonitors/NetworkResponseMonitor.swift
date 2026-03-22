@@ -189,64 +189,11 @@ public final class NetworkResponseMonitor: EventMonitor, @unchecked Sendable {
 
     /// Extracts error message from response data.
     ///
-    /// Attempts to parse common error response formats:
-    /// - `{"error": "message"}`, `{"message": "message"}`
-    /// - `{"error_description": "message"}`, `{"errorMessage": "message"}`
-    /// - `{"detail": "message"}` (Django REST Framework)
+    /// Delegates to `JSONMessageExtractor` which handles common server error formats.
     ///
     /// - Parameter data: Response data to parse
     /// - Returns: Extracted error message, or nil if parsing fails
     private func extractErrorMessage(from data: Data?) -> String? {
-        guard let data = data,
-              !data.isEmpty,
-              let json = try? JSONSerialization.jsonObject(with: data) else {
-            return nil
-        }
-
-        return findMessage(in: json)
-    }
-
-    /// Recursively finds a message string in any JSON structure.
-    ///
-    /// - Parameter value: JSON value to search
-    /// - Returns: Found message string, or nil if not found
-    private func findMessage(in value: Any) -> String? {
-        // Direct string value
-        if let string = value as? String {
-            return string
-        }
-
-        // Dictionary: check common message keys first, then recurse
-        if let dict = value as? [String: Any] {
-            let messageKeys = [
-                "message",
-                "error",
-                "error_description",
-                "errorMessage",
-                "detail",
-                "error_message",
-            ]
-
-            // Check common message keys first
-            for key in messageKeys {
-                if let message = dict[key] as? String {
-                    return message
-                }
-            }
-
-            // Recursively search nested values
-            for (_, nestedValue) in dict {
-                if let message = findMessage(in: nestedValue) {
-                    return message
-                }
-            }
-        }
-
-        // Array: check first element
-        if let array = value as? [Any], let first = array.first {
-            return findMessage(in: first)
-        }
-
-        return nil
+        JSONMessageExtractor.message(from: data)
     }
 }

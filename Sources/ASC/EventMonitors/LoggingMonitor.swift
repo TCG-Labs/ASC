@@ -122,7 +122,7 @@ public enum ASCLogLevel: Int, Sendable {
 
         lines.append("└─────────────────────────────────────────────────────────────────")
 
-        log.info("\(lines.joined(separator: "\n"))")
+        log.info("\(lines.joined(separator: "\n"), privacy: .private)")
     }
 
     func request(_ request: UploadRequest, didCreateUploadable uploadable: UploadRequest.Uploadable) {
@@ -147,7 +147,7 @@ public enum ASCLogLevel: Int, Sendable {
 
         lines.append("└─────────────────────────────────────────────────────────────────")
 
-        log.debug("\(lines.joined(separator: "\n"))")
+        log.debug("\(lines.joined(separator: "\n"), privacy: .private)")
     }
 
     // MARK: - Response
@@ -186,7 +186,7 @@ public enum ASCLogLevel: Int, Sendable {
 
             lines.append("└─────────────────────────────────────────────────────────────────")
 
-            log.info("\(lines.joined(separator: "\n"))")
+            log.info("\(lines.joined(separator: "\n"), privacy: .private)")
         }
 
         if let error = response.error {
@@ -231,7 +231,7 @@ public enum ASCLogLevel: Int, Sendable {
 
             lines.append("└─────────────────────────────────────────────────────────────────")
 
-            log.info("\(lines.joined(separator: "\n"))")
+            log.info("\(lines.joined(separator: "\n"), privacy: .private)")
         }
 
         if let error = response.error {
@@ -394,7 +394,7 @@ public enum ASCLogLevel: Int, Sendable {
 
         lines.append("└─────────────────────────────────────────────────────────────────")
 
-        log.error("\(lines.joined(separator: "\n"))")
+        log.error("\(lines.joined(separator: "\n"), privacy: .private)")
     }
 
     private func formatBytes(_ bytes: Int?) -> String {
