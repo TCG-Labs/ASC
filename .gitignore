@@ -43,6 +43,7 @@ DerivedData/
 
 # Archives
 *.xcarchive
+/docs/
 
 # CocoaPods (if ever used)
 Pods/
@@ -142,6 +143,8 @@ fastlane/test_output
 fastlane/xcov_output
 fastlane/archive
 fastlane/README.md
+scripts/swiftlint
+scripts/swiftlint.*
 
 # ===========================
 # Backup & Temporary Files
@@ -158,3 +161,4 @@ fastlane/README.md
 # ===========================
 # Claude Code files
 .claude/
+tasks/

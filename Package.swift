@@ -16,17 +16,15 @@ let package = Package(
         ),
     ],
     dependencies: [
-        .package(url: "https://github.com/realm/SwiftLint", from: "0.61.0"),
-        .package(url: "https://github.com/Alamofire/Alamofire", from: "5.10.2"),
+        .package(url: "https://github.com/Alamofire/Alamofire", .upToNextMinor(from: "5.10.2")),
+        .package(url: "https://github.com/auth0/JWTDecode.swift", exact: "3.3.0")
     ],
     targets: [
         .target(
             name: "ASC",
             dependencies: [
                 "Alamofire",
-            ],
-            plugins: [
-                .plugin(name: "SwiftLintBuildToolPlugin", package: "SwiftLint"),
+                .product(name: "JWTDecode", package: "JWTDecode.swift"),
             ]
         ),
         .testTarget(

@@ -1,8 +1,5 @@
-//
-//  TestExampleUITestsLaunchTests.swift
-//  TestExampleUITests
-//
-//  Created by Nikita Omelchenko on 25.10.2025.
+// HTTPURLResponse+Extension.swift
+// ASC - Alamofire Swift Client
 //
 //  Copyright (c) 2025 TCG Labs
 //
@@ -25,29 +22,27 @@
 //  SOFTWARE.
 //
 
-import XCTest
+// Extension for HTTPURLResponse to provide response type categorization.
 
-final class TestExampleUITestsLaunchTests: XCTestCase {
+import Foundation
 
-    override class var runsForEachTargetApplicationUIConfiguration: Bool {
-        true
-    }
+// MARK: - HTTPURLResponse Extension
 
-    override func setUpWithError() throws {
-        continueAfterFailure = false
-    }
-
-    @MainActor
-    func testLaunch() throws {
-        let app = XCUIApplication()
-        app.launch()
-
-        // Insert steps here to perform after app launch but before taking a screenshot,
-        // such as logging into a test account or navigating somewhere in the app
-
-        let attachment = XCTAttachment(screenshot: app.screenshot())
-        attachment.name = "Launch Screen"
-        attachment.lifetime = .keepAlways
-        add(attachment)
+public extension HTTPURLResponse {
+    /// The response type based on the HTTP status code.
+    ///
+    /// Categorizes the response into standard HTTP categories.
+    ///
+    /// Example:
+    /// ```swift
+    /// let response: HTTPURLResponse = ...
+    /// if response.responseType.isSuccess {
+    ///     debugPrint("Request succeeded")
+    /// } else if response.responseType.isError {
+    ///     debugPrint("Request failed")
+    /// }
+    /// ```
+    var responseType: HTTPResponseType {
+        HTTPResponseType(statusCode: statusCode)
     }
 }

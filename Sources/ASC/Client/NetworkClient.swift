@@ -1,8 +1,30 @@
 // NetworkClient.swift
 // ASC - Alamofire Swift Client
+//
+//  Copyright (c) 2025 TCG Labs
+//
+//  Permission is hereby granted, free of charge, to any person obtaining a copy
+//  of this software and associated documentation files (the "Software"), to deal
+//  in the Software without restriction, including without limitation the rights
+//  to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+//  copies of the Software, and to permit persons to whom the Software is
+//  furnished to do so, subject to the following conditions:
+//
+//  The above copyright notice and this permission notice shall be included in all
+//  copies or substantial portions of the Software.
+//
+//  THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+//  IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+//  FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+//  AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+//  LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+//  OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+//  SOFTWARE.
+//
 
 // Main network client for executing requests with advanced Alamofire features.
 
+import Alamofire
 import Foundation
 
 /// Main network client for executing requests.
@@ -28,7 +50,7 @@ public final class NetworkClient: Sendable {
     private let configuration: NetworkClientConfiguration
 
     /// Alamofire session used for networking.
-    private let session: Session
+    internal let session: Session
 
     /// Request builder for constructing URLRequests.
     private let requestBuilder: RequestBuilder
@@ -101,58 +123,209 @@ public final class NetworkClient: Sendable {
 
     /// Executes a network request and returns the decoded response.
     ///
-    /// - Parameter request: The request to execute
-    /// - Returns: Decoded response of type `Request.Response`
+    /// - Parameter endpoint: The endpoint to execute
+    /// - Returns: Decoded response of type `E.Response`
     /// - Throws: `ASCError`
-    public func execute<Request: NetworkRequest>(
-        _ request: Request
-    ) async throws -> Request.Response {
-        guard let response = try await executeRequest(request, responseType: Request.Response.self) else {
-            throw ASCError.missingData
-        }
-        return response
+    public func execute<E: Endpoint>(_ endpoint: E) async throws -> E.Response {
+        try await executeRequest(endpoint, responseType: E.Response.self)
     }
 
-    /// Executes a network request without expecting a response body.
+    /// Executes a network request with Empty response type.
     ///
     /// Useful for requests that return 204 No Content or similar.
     ///
-    /// - Parameter request: The request to execute
+    /// - Parameter endpoint: The endpoint to execute
+    /// - Returns: Decoded `Empty` response
     /// - Throws: `ASCError`
-    public func execute<Request: NetworkRequest>(
-        _ request: Request
-    ) async throws where Request.Response == ASCEmptyResponse {
-        _ = try await executeRequest(request, responseType: nil as ASCEmptyResponse.Type?)
+    public func execute<E: Endpoint>(_ endpoint: E) async throws where E.Response == Empty {
+        _ = try await executeRequest(endpoint, responseType: Empty.self)
     }
 
+    public func download(
+        from url: URL,
+        to destinationFolderURL: URL?,
+        options: DownloadRequest.Options = [.createIntermediateDirectories, .removePreviousFile]
+    ) async throws -> URL? {
+        try Task.checkCancellation()
+        try checkConnectivity()
+
+        let interceptor = buildRequestInterceptor(nil, retryPolicy: nil)
+        let destination = buildDownloadDestination(to: destinationFolderURL, options: options)
+        let downloadRequest = session.download(url, interceptor: interceptor, to: destination)
+
+        // Set request priority
+        downloadRequest.task?.priority = configuration.defaultPriority
+
+        // Apply automatic validation if enabled
+        let validatedRequest = configuration.automaticValidation
+            ? downloadRequest.validate(statusCode: configuration.acceptableStatusCodes)
+            : downloadRequest
+        let serializedRequest = validatedRequest.serializingDownloadedFileURL()
+
+        return try await withTaskCancellationHandler {
+            let fileURL = try await serializedRequest.value
+            return fileURL
+        } onCancel: {
+            downloadRequest.cancel()
+        }
+    }
+
+    public func download<E: Endpoint>(
+        _ endpoint: E,
+        to destinationFolderURL: URL?,
+        options: DownloadRequest.Options = [.createIntermediateDirectories, .removePreviousFile]
+    ) async throws -> URL? {
+        try Task.checkCancellation()
+        try checkConnectivity()
+
+        let interceptor = buildRequestInterceptor(endpoint, retryPolicy: endpoint.retryPolicy)
+        let destination = buildDownloadDestination(to: destinationFolderURL, options: options)
+        let urlRequest = try requestBuilder.buildURLRequest(from: endpoint)
+        let downloadRequest = session.download(
+            urlRequest,
+            interceptor: interceptor,
+            to: destination
+        )
+
+        // Set request priority
+        downloadRequest.task?.priority = configuration.defaultPriority
+
+        // Apply automatic validation if enabled
+        let validatedRequest = configuration.automaticValidation
+            ? downloadRequest.validate(statusCode: configuration.acceptableStatusCodes)
+            : downloadRequest
+        let serializedRequest = validatedRequest.serializingDownloadedFileURL()
+
+        return try await withTaskCancellationHandler {
+            let fileURL = try await serializedRequest.value
+            return fileURL
+        } onCancel: {
+            downloadRequest.cancel()
+        }
+    }
+
+//    /// Executes a network request with file upload and returns progress stream.
+//    ///
+//    /// Use this method when you need to track upload progress for file uploads.
+//    /// Returns an AsyncThrowingStream that yields progress updates as the upload progresses.
+//    ///
+//    /// - Parameter request: The request to execute (must have uploadData property set)
+//    /// - Returns: AsyncThrowingStream with UploadProgress updates, followed by the final response
+//    /// - Throws: `ASCError` if request doesn't have uploadData or if upload fails
+//    public func executeWithProgress<E: Endpoint>(
+//        _ request: E
+//    ) -> AsyncThrowingStream<UploadProgressOrResponse<E.Response>, Error> {
+//        AsyncThrowingStream { continuation in
+//            Task { @Sendable in
+//                do {
+//                    guard let uploadData = request.uploadData else {
+//                        continuation.finish(throwing: ASCError.invalidFormat("Request must have uploadData property set to use executeWithProgress"))
+//                        return
+//                    }
+//
+//                    try Task.checkCancellation()
+//                    try checkConnectivity()
+//
+//                    let url = try requestBuilder.buildURL(from: request)
+//                    let interceptor = buildRequestInterceptor(request, retryPolicy: request.retryPolicy)
+//
+//                    // Create upload request using centralized method
+//                    let uploadRequest = try createUploadRequest(request, uploadData: uploadData, url: url, interceptor: interceptor)
+//
+//                    // Set request priority
+//                    uploadRequest.task?.priority = configuration.defaultPriority
+//
+//                    // Apply automatic validation if enabled
+//                    let validatedRequest = configuration.automaticValidation
+//                        ? uploadRequest.validate(statusCode: configuration.acceptableStatusCodes)
+//                        : uploadRequest
+//
+//                    // Track upload progress before execution
+//                    uploadRequest.uploadProgress { progress in
+//                        let uploadProgress = UploadProgress(
+//                            fractionCompleted: progress.fractionCompleted,
+//                            bytesUploaded: progress.completedUnitCount,
+//                            totalBytes: progress.totalUnitCount
+//                        )
+//                        continuation.yield(.progress(uploadProgress))
+//                    }
+//
+//                    // Execute request using same serialization logic as performUploadRequest
+//                    // Note: We can't use performUploadRequest directly because we need access to UploadRequest
+//                    // for progress tracking before execution
+//                    let serializedRequest = validatedRequest.serializingDecodable(
+//                        Request.Response.self,
+//                        decoder: configuration.decoder
+//                    )
+//
+//                    let response = await serializedRequest.response
+//                    let value = try handleResponse(response)
+//                    try request.validate(response: value)
+//
+//                    continuation.yield(.response(value))
+//                    continuation.finish()
+//                } catch {
+//                    continuation.finish(throwing: error)
+//                }
+//            }
+//        }
+//    }
+
     // MARK: - Private Methods
+    private func buildRequestInterceptor(_ endpoint: (any Endpoint)?, retryPolicy: Alamofire.RetryPolicy?) -> Interceptor {
+        let effectiveRetryPolicy = retryPolicy ?? configuration.defaultRetryPolicy
+        let authInterceptor = (endpoint?.enableAuthorization ?? false) ? configuration.authInterceptor : nil
+        var interceptors: [any RequestInterceptor] = []
+
+        if let effectiveRetryPolicy {
+            interceptors.append(effectiveRetryPolicy)
+        }
+        if let authInterceptor {
+            interceptors.append(authInterceptor)
+        }
+
+        let interceptor: Interceptor = .init(interceptors: interceptors)
+        return interceptor
+    }
 
     /// Executes a network request.
     ///
-    /// Centralized request execution that handles both response types.
+    /// Centralized request execution that always uses decoding.
     /// - Parameters:
-    ///   - request: The network request to execute
-    ///   - responseType: Expected response type, or nil for empty response
-    /// - Returns: Decoded response, or nil for empty response
+    ///   - endpoint: The network endpoint to execute
+    ///   - responseType: Expected response type
+    /// - Returns: Decoded response
     /// - Throws: `ASCError`
-    private func executeRequest<Request: NetworkRequest, Response: Decodable & Sendable>(
-        _ request: Request,
-        responseType: Response.Type?
-    ) async throws -> Response? where Request.Response == Response {
-        let urlRequest = try requestBuilder.buildURLRequest(from: request)
+    private func executeRequest<E: Endpoint, Response: Decodable & Sendable>(
+        _ endpoint: E,
+        responseType: Response.Type
+    ) async throws -> Response where E.Response == Response {
+        // Check if this is an upload request
+        if let uploadData = endpoint.uploadData {
+            let url = try requestBuilder.buildURL(from: endpoint)
+            let interceptor = buildRequestInterceptor(endpoint, retryPolicy: endpoint.retryPolicy)
 
-        if let responseType = responseType {
-            return try await performRequest(
-                request,
-                urlRequest: urlRequest,
-                responseType: responseType,
-                retryPolicy: request.retryPolicy
+            return try await performUploadRequest(
+                endpoint,
+                uploadData: uploadData,
+                url: url,
+                interceptor: interceptor,
+                responseType: responseType
             )
-        } else {
-            try await performEmptyRequest(urlRequest, retryPolicy: request.retryPolicy)
-            return nil
         }
+
+        // Regular request (non-upload)
+        let urlRequest = try requestBuilder.buildURLRequest(from: endpoint)
+
+        return try await performRequest(
+            endpoint,
+            urlRequest: urlRequest,
+            responseType: responseType,
+            retryPolicy: endpoint.retryPolicy
+        )
     }
+
+    // MARK: - Data Request Handling
 
     /// Performs the actual network request using Alamofire.
     ///
@@ -160,19 +333,17 @@ public final class NetworkClient: Sendable {
     /// the underlying Alamofire request is automatically cancelled.
     ///
     /// Calls request.validate() on successful response.
-    private func performRequest<Request: NetworkRequest, Response: Decodable & Sendable>(
-        _ request: Request,
+    private func performRequest<E: Endpoint, Response: Decodable & Sendable>(
+        _ endpoint: E,
         urlRequest: URLRequest,
         responseType: Response.Type,
         retryPolicy: Alamofire.RetryPolicy?
-    ) async throws -> Response where Request.Response == Response {
+    ) async throws -> Response where E.Response == Response {
         try Task.checkCancellation()
         try checkConnectivity()
 
-        // Use request's retry policy, fallback to configuration default
-        let effectiveRetryPolicy = retryPolicy ?? configuration.defaultRetryPolicy
-
-        let dataRequest = session.request(urlRequest, interceptor: effectiveRetryPolicy)
+        let interceptor = buildRequestInterceptor(endpoint, retryPolicy: retryPolicy)
+        let dataRequest = session.request(urlRequest, interceptor: interceptor)
 
         // Set request priority
         dataRequest.task?.priority = configuration.defaultPriority
@@ -181,6 +352,48 @@ public final class NetworkClient: Sendable {
         let validatedRequest = configuration.automaticValidation
             ? dataRequest.validate(statusCode: configuration.acceptableStatusCodes)
             : dataRequest
+        let serializedRequest = validatedRequest.serializingDecodable(
+            Response.self,
+            decoder: configuration.decoder
+        )
+
+        return try await withTaskCancellationHandler {
+            let response = await serializedRequest.response
+            let value = try handleResponse(response)
+
+            try endpoint.validate(response: value)
+
+            return value
+        } onCancel: {
+            dataRequest.cancel()
+        }
+    }
+
+    // MARK: - Upload Request Handling
+
+    /// Performs an upload request with file upload.
+    ///
+    /// Handles all three types of uploads: .data, .file, and .multipart
+    private func performUploadRequest<E: Endpoint, Response: Decodable & Sendable>(
+        _ endpoint: E,
+        uploadData: UploadData,
+        url: URL,
+        interceptor: Interceptor,
+        responseType: Response.Type
+    ) async throws -> Response where E.Response == Response {
+        try Task.checkCancellation()
+        try checkConnectivity()
+
+        // Create upload request using centralized method
+        let uploadRequest = try createUploadRequest(endpoint, uploadData: uploadData, url: url, interceptor: interceptor)
+
+        // Set request priority
+        uploadRequest.task?.priority = configuration.defaultPriority
+
+        // Apply automatic validation if enabled
+        let validatedRequest = configuration.automaticValidation
+            ? uploadRequest.validate(statusCode: configuration.acceptableStatusCodes)
+            : uploadRequest
 
         let serializedRequest = validatedRequest.serializingDecodable(
             Response.self,
@@ -191,45 +404,140 @@ public final class NetworkClient: Sendable {
             let response = await serializedRequest.response
             let value = try handleResponse(response)
 
-            try request.validate(response: value)
+            try endpoint.validate(response: value)
 
             return value
         } onCancel: {
-            dataRequest.cancel()
+            uploadRequest.cancel()
         }
     }
 
-    /// Performs a request without expecting a response body.
+    /// Creates an UploadRequest from UploadData configuration.
     ///
-    /// Supports Task cancellation - when the Swift Task is cancelled,
-    /// the underlying Alamofire request is automatically cancelled.
-    private func performEmptyRequest(
-        _ urlRequest: URLRequest,
-        retryPolicy: Alamofire.RetryPolicy?
-    ) async throws {
-        try Task.checkCancellation()
-        try checkConnectivity()
+    /// Centralized method for creating upload requests to avoid code duplication.
+    /// Handles all three types of uploads: .data, .file, and .multipart
+    ///
+    /// - Parameters:
+    ///   - endpoint: The network endpoint
+    ///   - uploadData: Upload data configuration
+    ///   - url: Target URL for upload
+    ///   - interceptor: Request interceptor
+    /// - Returns: Configured UploadRequest
+    /// - Throws: ASCError if file validation fails
+    private func createUploadRequest<E: Endpoint>(
+        _ endpoint: E,
+        uploadData: UploadData,
+        url: URL,
+        interceptor: Interceptor
+    ) throws -> UploadRequest {
+        switch uploadData {
+        case let .data(data):
+            // Upload Data directly from memory
+            return session.upload(data, to: url, interceptor: interceptor)
 
-        // Use request's retry policy, fallback to configuration default
-        let effectiveRetryPolicy = retryPolicy ?? configuration.defaultRetryPolicy
+        case let .file(fileURL):
+            // Upload File from file system (memory-efficient)
+            guard FileManager.default.fileExists(atPath: fileURL.path) else {
+                throw ASCError.invalidFormat("File does not exist at path: \(fileURL.path)")
+            }
+            return session.upload(fileURL, to: url, interceptor: interceptor)
 
-        let dataRequest = session.request(urlRequest, interceptor: effectiveRetryPolicy)
+        case let .multipart(items):
+            // Validate files exist before creating multipart
+            for item in items {
+                if case let .file(_, fileURL, _, _) = item {
+                    guard FileManager.default.fileExists(atPath: fileURL.path) else {
+                        throw ASCError.invalidFormat("File does not exist at path: \(fileURL.path)")
+                    }
+                }
+            }
 
-        // Set request priority
-        dataRequest.task?.priority = configuration.defaultPriority
+            // Pre-encode parameters before entering the non-throwing multipart closure
+            let encodedParameters: [(String, Data)]
+            if let parameters = endpoint.parameters {
+                encodedParameters = try encodeParametersForMultipart(parameters)
+            } else {
+                encodedParameters = []
+            }
 
-        // Apply automatic validation if enabled
-        let validatedRequest = configuration.automaticValidation
-            ? dataRequest.validate(statusCode: configuration.acceptableStatusCodes)
-            : dataRequest
+            // Upload Multipart Form Data
+            return session.upload(
+                multipartFormData: { multipartFormData in
+                    // Add pre-encoded parameters
+                    for (key, data) in encodedParameters {
+                        multipartFormData.append(data, withName: key)
+                    }
 
-        let serializedRequest = validatedRequest.serializingData()
+                    // Add multipart items
+                    for item in items {
+                        switch item {
+                        case let .data(fieldName, data, fileName, mimeType):
+                            multipartFormData.append(data, withName: fieldName, fileName: fileName, mimeType: mimeType)
 
-        try await withTaskCancellationHandler {
-            let response = await serializedRequest.response
-            try validateResponse(response)
-        } onCancel: {
-            dataRequest.cancel()
+                        case let .file(fieldName, fileURL, fileName, mimeType):
+                            if let fileName, let mimeType {
+                                multipartFormData.append(fileURL, withName: fieldName, fileName: fileName, mimeType: mimeType)
+                            } else {
+                                multipartFormData.append(fileURL, withName: fieldName)
+                            }
+
+                        case let .parameter(fieldName, value):
+                            if let valueData = value.data(using: .utf8) {
+                                multipartFormData.append(valueData, withName: fieldName)
+                            }
+                        }
+                    }
+                },
+                to: url,
+                interceptor: interceptor
+            )
+        }
+    }
+
+    /// Encodes parameters into an array of (fieldName, data) pairs for multipart upload.
+    ///
+    /// Each top-level key of the `Encodable` becomes a separate multipart field.
+    /// Scalar values are UTF-8 strings; nested objects/arrays become compact JSON.
+    ///
+    /// - Throws: `ASCError.invalidFormat` if the encoded value is not a JSON object.
+    private func encodeParametersForMultipart<Params: Encodable & Sendable>(
+        _ parameters: Params
+    ) throws -> [(String, Data)] {
+        let jsonData = try JSONEncoder().encode(parameters)
+
+        guard let jsonObject = try? JSONSerialization.jsonObject(with: jsonData),
+              let dictionary = jsonObject as? [String: Any] else {
+            throw ASCError.invalidFormat("Multipart parameters must encode to a JSON object")
+        }
+
+        var result: [(String, Data)] = []
+        for (key, value) in dictionary {
+            let fieldData: Data?
+            if let string = value as? String {
+                fieldData = string.data(using: .utf8)
+            } else if let number = value as? NSNumber {
+                fieldData = number.stringValue.data(using: .utf8)
+            } else {
+                // Nested object or array: serialize as compact JSON
+                fieldData = try? JSONSerialization.data(withJSONObject: value)
+            }
+
+            if let data = fieldData {
+                result.append((key, data))
+            }
+        }
+        return result
+    }
+
+    private func buildDownloadDestination(to destinationFolderURL: URL?, options: DownloadRequest.Options) -> DownloadRequest.Destination? {
+        return { temporaryURL, response in
+            let filename = response.suggestedFilename ?? "file.\(UUID().uuidString)"
+
+            let destinationURL = destinationFolderURL?.appendingPathComponent(filename)
+            let defaultURL = temporaryURL.deletingLastPathComponent().appendingPathComponent(filename)
+            let url = destinationURL ?? defaultURL
+
+            return (url, options)
         }
     }
 
@@ -254,18 +562,6 @@ public final class NetworkClient: Sendable {
         return value
     }
 
-    /// Validates response for empty responses.
-    ///
-    /// Checks for errors in responses without expected body.
-    ///
-    /// - Parameter response: Data response from Alamofire
-    /// - Throws: Mapped error if present
-    private func validateResponse(_ response: DataResponse<Data, AFError>) throws {
-        if let error = response.error {
-            throw errorMapper.mapError(error, data: response.data)
-        }
-    }
-
     // MARK: - Connectivity Check
 
     /// Checks network connectivity before making a request.
@@ -279,15 +575,31 @@ public final class NetworkClient: Sendable {
     }
 }
 
-// MARK: - EmptyResponse
+// MARK: - Upload Progress
 
-/// A response type for requests that don't return a body.
-///
-/// Use this for requests that return 204 No Content or when you
-/// don't need to parse the response.
-public struct ASCEmptyResponse: Codable, Sendable {
-    public init() {}
+/// Progress information for file uploads.
+public struct UploadProgress: Sendable {
+    /// Fraction of upload completed (0.0 to 1.0).
+    public let fractionCompleted: Double
+
+    /// Number of bytes uploaded so far.
+    public let bytesUploaded: Int64
+
+    /// Total number of bytes to upload.
+    public let totalBytes: Int64
+
+    public init(fractionCompleted: Double, bytesUploaded: Int64, totalBytes: Int64) {
+        self.fractionCompleted = fractionCompleted
+        self.bytesUploaded = bytesUploaded
+        self.totalBytes = totalBytes
+    }
 }
 
-/// Type alias for backward compatibility.
-public typealias EmptyResponse = ASCEmptyResponse
+/// Represents either upload progress or final response.
+public enum UploadProgressOrResponse<Response: Sendable>: Sendable {
+    /// Upload progress update.
+    case progress(UploadProgress)
+
+    /// Final response after upload completes.
+    case response(Response)
+}

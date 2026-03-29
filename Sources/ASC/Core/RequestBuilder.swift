@@ -1,12 +1,33 @@
 // RequestBuilder.swift
 // ASC - Alamofire Swift Client
+//
+//  Copyright (c) 2025 TCG Labs
+//
+//  Permission is hereby granted, free of charge, to any person obtaining a copy
+//  of this software and associated documentation files (the "Software"), to deal
+//  in the Software without restriction, including without limitation the rights
+//  to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+//  copies of the Software, and to permit persons to whom the Software is
+//  furnished to do so, subject to the following conditions:
+//
+//  The above copyright notice and this permission notice shall be included in all
+//  copies or substantial portions of the Software.
+//
+//  THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+//  IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+//  FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+//  AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+//  LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+//  OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+//  SOFTWARE.
+//
 
 // Request building utilities for network requests.
 
 import Alamofire
 import Foundation
 
-/// Builds URLRequests from NetworkRequest configurations.
+/// Builds URLRequests from Endpoint configurations.
 ///
 /// Encapsulates all logic for constructing URLRequests including:
 /// - URL construction
@@ -49,14 +70,12 @@ internal final class RequestBuilder: Sendable {
 
     // MARK: - Public Methods
 
-    /// Builds a complete URLRequest from a NetworkRequest.
+    /// Builds a complete URLRequest from an Endpoint.
     ///
-    /// - Parameter request: The network request to build from
+    /// - Parameter request: The endpoint to build from
     /// - Returns: Fully configured URLRequest
     /// - Throws: RequestBuildError if URL construction fails
-    internal func buildURLRequest<Request: NetworkRequest>(
-        from request: Request
-    ) throws -> URLRequest {
+    internal func buildURLRequest<E: Endpoint>(from request: E) throws -> URLRequest {
         // Step 1: Build the URL
         let url = try buildURL(from: request)
 
@@ -88,31 +107,55 @@ internal final class RequestBuilder: Sendable {
     // MARK: - Private Methods
 
     /// Builds the URL for a request.
-    private func buildURL<Request: NetworkRequest>(
-        from request: Request
-    ) throws -> URL {
+    internal func buildURL<E: Endpoint>(from request: E) throws -> URL {
         guard let effectiveBaseURL = request.baseURL ?? baseURL else {
             throw RequestBuildError.missingBaseURL
         }
 
-        let fullURL = effectiveBaseURL + request.path
+        guard var components = URLComponents(string: effectiveBaseURL) else {
+            throw RequestBuildError.invalidURL(effectiveBaseURL)
+        }
 
-        guard let url = URL(string: fullURL) else {
-            throw RequestBuildError.invalidURL(fullURL)
+        let fullPath = request.path
+        if !fullPath.isEmpty {
+            // Split path from inline query string if present (e.g. "/search?q=swift")
+            let pathPart: String
+            let queryPart: String?
+            if let queryStart = fullPath.firstIndex(of: "?") {
+                pathPart = String(fullPath[fullPath.startIndex..<queryStart])
+                queryPart = String(fullPath[fullPath.index(after: queryStart)...])
+            } else {
+                pathPart = fullPath
+                queryPart = nil
+            }
+
+            // Ensure exactly one slash between base path and endpoint path
+            let basePath = components.path.hasSuffix("/") ? String(components.path.dropLast()) : components.path
+            let endpointPath = pathPart.hasPrefix("/") ? pathPart : "/\(pathPart)"
+            components.path = basePath + endpointPath
+
+            if let query = queryPart {
+                // Append to existing query if any
+                if let existing = components.query, !existing.isEmpty {
+                    components.query = existing + "&" + query
+                } else {
+                    components.query = query
+                }
+            }
+        }
+
+        guard let url = components.url else {
+            throw RequestBuildError.invalidURL(effectiveBaseURL + fullPath)
         }
 
         return url
     }
 
     /// Builds HTTP headers for a request.
-    private func buildHeaders<Request: NetworkRequest>(
-        for request: Request
+    private func buildHeaders<E: Endpoint>(
+        for request: E
     ) -> HTTPHeaders {
         var headers = defaultHeaders.copy()
-
-        if request.enableAuthorization {
-            headers.add(.authenticationRequired)
-        }
 
         if let requestHeaders = request.headers {
             for header in requestHeaders {
@@ -182,7 +225,7 @@ internal enum RequestBuildError: Error, LocalizedError {
             return "Check the base URL and path configuration"
 
         case .missingBaseURL:
-            return "Provide baseURL either in NetworkClient configuration or in the request"
+            return "Provide baseURL either in NetworkClient configuration or in the endpoint"
         }
     }
 }

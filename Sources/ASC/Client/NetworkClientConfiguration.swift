@@ -1,12 +1,35 @@
 // NetworkClientConfiguration.swift
 // ASC - Alamofire Swift Client
+//
+//  Copyright (c) 2025 TCG Labs
+//
+//  Permission is hereby granted, free of charge, to any person obtaining a copy
+//  of this software and associated documentation files (the "Software"), to deal
+//  in the Software without restriction, including without limitation the rights
+//  to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+//  copies of the Software, and to permit persons to whom the Software is
+//  furnished to do so, subject to the following conditions:
+//
+//  The above copyright notice and this permission notice shall be included in all
+//  copies or substantial portions of the Software.
+//
+//  THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+//  IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+//  FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+//  AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+//  LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+//  OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+//  SOFTWARE.
+//
 
 // Configuration for NetworkClient.
 
+import Alamofire
 import Foundation
 
 // MARK: - Supporting Types
 
+// MARK: - NetworkConstraints
 /// Network constraints configuration.
 ///
 /// Controls network access policies for URLSession.
@@ -57,6 +80,7 @@ public struct NetworkConstraints: Sendable {
     }
 }
 
+// MARK: - ValidationOptions
 /// HTTP response validation options.
 ///
 /// Controls automatic validation of HTTP status codes.
@@ -86,6 +110,7 @@ public struct ValidationOptions: Sendable {
     }
 }
 
+// MARK: - NetworkClientConfigurationDefaults
 /// Default values for NetworkClientConfiguration.
 public enum NetworkClientConfigurationDefaults {
     /// Default JSON decoder with ISO8601 dates and snake_case keys.
@@ -120,6 +145,7 @@ public enum NetworkClientConfigurationDefaults {
     )
 }
 
+// MARK: - SessionType
 /// Type of URLSession to use.
 public enum SessionType: Sendable {
     /// Default URLSession with disk-persisted cache
@@ -149,6 +175,7 @@ public enum SessionType: Sendable {
     }
 }
 
+// MARK: - NetworkClientConfiguration
 /// Configuration for NetworkClient.
 ///
 /// Provides fine-grained control over networking behavior using Alamofire's
@@ -170,6 +197,8 @@ public struct NetworkClientConfiguration: Sendable {
 
     /// Default headers added to all requests.
     public var defaultHeaders: HTTPHeaders
+
+    public var authInterceptor: (any RequestInterceptor)?
 
     /// Request interceptors for adapting and retrying requests.
     public var interceptors: [any RequestInterceptor]
@@ -197,7 +226,7 @@ public struct NetworkClientConfiguration: Sendable {
 
     /// Log level for built-in logger.
     ///
-    /// When set to anything other than .none, an ASCLogger is automatically added to eventMonitors.
+    /// When set to anything other than .none, an LoggingMonitor is automatically added to eventMonitors.
     /// Default is .none (no logging).
     public let logLevel: ASCLogLevel
 
@@ -365,6 +394,7 @@ public struct NetworkClientConfiguration: Sendable {
         defaultTimeout: TimeInterval = 60,
         defaultCachePolicy: URLRequest.CachePolicy = .useProtocolCachePolicy,
         defaultHeaders: HTTPHeaders = .default,
+        authInterceptor: (any RequestInterceptor)? = nil,
         interceptors: [any RequestInterceptor] = [],
         eventMonitors: [any EventMonitor] = [],
         serverTrustManager: ServerTrustManager? = nil,
@@ -397,6 +427,7 @@ public struct NetworkClientConfiguration: Sendable {
         self.defaultTimeout = defaultTimeout
         self.defaultCachePolicy = defaultCachePolicy
         self.defaultHeaders = defaultHeaders
+        self.authInterceptor = authInterceptor
         self.interceptors = interceptors
         self.logLevel = logLevel
         self.decoder = decoder
@@ -406,15 +437,13 @@ public struct NetworkClientConfiguration: Sendable {
         self.validation = validation
         self.defaultPriority = defaultPriority
 
-        // Automatically add ASCLogger if logging is enabled
+        // Automatically add LoggingMonitor if logging is enabled
+        var monitors = eventMonitors
         if logLevel != .none {
-            var monitors = eventMonitors
-            monitors.append(ASCLogger(logLevel: logLevel))
-            self.eventMonitors = monitors
-        } else {
-            self.eventMonitors = eventMonitors
+            monitors.append(LoggingMonitor(logLevel: logLevel))
         }
 
+        self.eventMonitors = monitors
         self.serverTrustManager = serverTrustManager
         self.redirectHandler = redirectHandler
         self.cachedResponseHandler = cachedResponseHandler
